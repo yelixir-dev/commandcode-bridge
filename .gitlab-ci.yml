@@ -1,0 +1,15 @@
+image: node:24
+
+stages:
+  - verify
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .npm/
+
+verify:
+  stage: verify
+  script:
+    - npm ci --include=dev --cache .npm --prefer-offline
+    - npm run verify

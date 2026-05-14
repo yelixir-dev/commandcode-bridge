@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.vitest-tmp/
+.env
+.env.*
+!.env.example
+env.production
+release/env.production
+*.log
+*.tgz
+.DS_Store
+npm-debug.log*

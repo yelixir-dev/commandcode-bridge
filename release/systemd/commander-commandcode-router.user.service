@@ -1,0 +1,22 @@
+[Unit]
+Description=Commander CommandCode Router - OpenAI-compatible backend router for CommandCode bridges
+After=default.target commander-commandcode-bridge.service
+Wants=commander-commandcode-bridge.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+EnvironmentFile=%h/.config/commander-commandcode-bridge/env
+EnvironmentFile=%h/.config/commander-commandcode-bridge/router.env
+ExecStart=%h/.local/bin/commandcode-router
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=default.target

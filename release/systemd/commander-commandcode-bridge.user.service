@@ -1,0 +1,20 @@
+[Unit]
+Description=Commander CommandCode Bridge - OpenAI-compatible API for CommandCode DeepSeek
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+EnvironmentFile=%h/.config/commander-commandcode-bridge/env
+ExecStart=%h/.local/bin/commandcode-bridge
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=default.target

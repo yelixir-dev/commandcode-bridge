@@ -1,0 +1,57 @@
+{
+  "name": "commander-commandcode-bridge",
+  "version": "0.1.0",
+  "description": "OpenAI-compatible HTTP bridge for CommandCode's DeepSeek V4 Pro API path.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Commander Workspace",
+  "bin": {
+    "commandcode-bridge": "dist/index.js",
+    "commandcode-router": "dist/router-index.js"
+  },
+  "files": [
+    "dist/",
+    "docs/",
+    "release/",
+    "README.md",
+    "README.ko.md",
+    "LICENSE",
+    ".env.example"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "npm run clean && tsc -p tsconfig.build.json && node -e \"import('node:fs').then(fs=>{fs.chmodSync('dist/index.js',0o755);fs.chmodSync('dist/router-index.js',0o755)})\"",
+    "clean": "node -e \"import('node:fs').then(fs=>{fs.rmSync('dist',{recursive:true,force:true});fs.rmSync('.vitest-tmp',{recursive:true,force:true});})\"",
+    "start": "node dist/index.js",
+    "test": "mkdir -p .vitest-tmp && TMPDIR=$PWD/.vitest-tmp vitest run --pool=threads --maxWorkers=1",
+    "test:watch": "mkdir -p .vitest-tmp && TMPDIR=$PWD/.vitest-tmp vitest --pool=threads --maxWorkers=1",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build",
+    "prepack": "npm run build",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.6.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^4.0.8"
+  }
+}

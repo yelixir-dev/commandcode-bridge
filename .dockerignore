@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+.vitest-tmp
+.git
+.github
+.gitlab-ci.yml
+.env
+.env.*
+!.env.example
+env.production
+release/env.production
+*.log
+npm-debug.log*
+.DS_Store
+.hermes

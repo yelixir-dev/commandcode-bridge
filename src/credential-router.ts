@@ -1,0 +1,468 @@
+import type {
+  CommandCodeBillingSnapshot,
+  CommandCodeCredential,
+  CommandCodeRoutingPolicy,
+} from "./types.js";
+
+const DAY_MS = 86_400_000;
+const MIN_DAYS_LEFT = 0.25;
+const DEFAULT_BILLING_TIMEOUT_MS = 10_000;
+
+export interface CommandCodeCredentialState {
+  credential: CommandCodeCredential;
+  billing?: CommandCodeBillingSnapshot;
+  billingError: string | undefined;
+  disabledUntil: number;
+  inFlight: number;
+  lastSelectedAt: number;
+  currentWeight: number;
+  billingRefreshPromise?: Promise<void> | undefined;
+}
+
+export interface CommandCodeCreditMetrics {
+  monthlyBalance: number;
+  freeBalance: number;
+  purchasedBalance: number;
+  expiringBalance: number;
+  currentBalance: number;
+  daysRemaining: number | null;
+  scoringDaysRemaining: number | null;
+  requiredDailyBurn: number;
+  reserveDailyWeight: number;
+}
+
+export interface CommandCodeCredentialDiagnostic {
+  id: string;
+  weight: number;
+  allowedModels: string[] | undefined;
+  disabledUntil: number | null;
+  disabledUntilIso: string | null;
+  disabledForMs: number;
+  inFlight: number;
+  lastSelectedAt: number | null;
+  lastSelectedAtIso: string | null;
+  currentWeight: number;
+  routingScore: number;
+  billingError: string | undefined;
+  billing:
+    | {
+        fetchedAt: number;
+        fetchedAtIso: string;
+        ageMs: number;
+        stale: boolean;
+        monthlyCredits: number;
+        freeCredits: number;
+        purchasedCredits: number;
+        currentPeriodEnd: string | null | undefined;
+        planId: string | null | undefined;
+        totalCost: number | undefined;
+        totalCount: number | undefined;
+        metrics: CommandCodeCreditMetrics;
+      }
+    | undefined;
+}
+
+export interface CommandCodeCredentialRouterOptions {
+  credentials: CommandCodeCredential[];
+  policy: CommandCodeRoutingPolicy;
+  billingRefreshMs: number;
+  billingTimeoutMs?: number;
+  cooldownMs: number;
+  now?: () => number;
+  billingProvider?: (
+    credential: CommandCodeCredential,
+    signal: AbortSignal,
+  ) => Promise<CommandCodeBillingSnapshot>;
+}
+
+export interface SelectCredentialOptions {
+  model: string;
+  excludeIds?: Iterable<string>;
+}
+
+export interface RecordFailureOptions {
+  statusCode?: number;
+}
+
+export class NoAvailableCommandCodeCredentialError extends Error {
+  public constructor(message = "No available CommandCode credentials") {
+    super(message);
+    this.name = "NoAvailableCommandCodeCredentialError";
+  }
+}
+
+function positive(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) && value !== undefined && value > 0 ? value : fallback;
+}
+
+function isModelAllowed(credential: CommandCodeCredential, model: string): boolean {
+  return !credential.allowedModels || credential.allowedModels.length === 0
+    ? true
+    : credential.allowedModels.includes(model);
+}
+
+function daysUntil(value: string | null | undefined, now: number): number | undefined {
+  if (!value) return undefined;
+  const end = Date.parse(value);
+  if (!Number.isFinite(end)) return undefined;
+  return Math.max((end - now) / DAY_MS, 0);
+}
+
+function scoringDaysUntil(value: string | null | undefined, now: number): number | undefined {
+  const remaining = daysUntil(value, now);
+  return remaining === undefined ? undefined : Math.max(remaining, MIN_DAYS_LEFT);
+}
+
+function createTimeoutSignal(timeoutMs: number): AbortSignal {
+  const timeoutFactory = (
+    AbortSignal as typeof AbortSignal & { timeout?: (milliseconds: number) => AbortSignal }
+  ).timeout;
+  if (typeof timeoutFactory === "function") return timeoutFactory(timeoutMs);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(new Error(`Timed out after ${timeoutMs}ms`)),
+    timeoutMs,
+  );
+  timeout.unref?.();
+  return controller.signal;
+}
+
+function remainingCredits(state: CommandCodeCredentialState, now: number): number | undefined {
+  if (!state.billing) return undefined;
+  return calculateCreditMetrics(state.billing, now).currentBalance;
+}
+
+function hasKnownCreditCapacity(state: CommandCodeCredentialState, now: number): boolean {
+  const remaining = remainingCredits(state, now);
+  return remaining === undefined || remaining > 0;
+}
+
+export function calculateCreditMetrics(
+  billing: CommandCodeBillingSnapshot,
+  now: number,
+): CommandCodeCreditMetrics {
+  const monthlyBalance = Math.max(0, billing.monthlyCredits);
+  const freeBalance = Math.max(0, billing.freeCredits);
+  const purchasedBalance = Math.max(0, billing.purchasedCredits);
+  const expiringBalance = monthlyBalance + freeBalance;
+  const currentBalance = expiringBalance + purchasedBalance;
+  const daysRemaining = daysUntil(billing.currentPeriodEnd, now) ?? null;
+  const scoringDaysRemaining = scoringDaysUntil(billing.currentPeriodEnd, now) ?? null;
+  const requiredDailyBurn =
+    scoringDaysRemaining === null ? expiringBalance : expiringBalance / scoringDaysRemaining;
+
+  return {
+    monthlyBalance,
+    freeBalance,
+    purchasedBalance,
+    expiringBalance,
+    currentBalance,
+    daysRemaining,
+    scoringDaysRemaining,
+    requiredDailyBurn,
+    reserveDailyWeight: purchasedBalance / 365,
+  };
+}
+
+export function calculateDepletionScore(state: CommandCodeCredentialState, now: number): number {
+  const configuredWeight = positive(state.credential.weight, 1);
+  if (!state.billing) return configuredWeight;
+
+  const metrics = calculateCreditMetrics(state.billing, now);
+
+  if (metrics.requiredDailyBurn > 0) {
+    return Math.max(metrics.requiredDailyBurn, 0.0001) * configuredWeight;
+  }
+
+  // Purchased credits are treated as reserve capacity when monthly/free credits are unavailable.
+  if (metrics.reserveDailyWeight > 0)
+    return Math.max(0.01, metrics.reserveDailyWeight) * configuredWeight;
+
+  return 0;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export class CommandCodeCredentialRouter {
+  private readonly states: CommandCodeCredentialState[];
+  private readonly policy: CommandCodeRoutingPolicy;
+  private readonly billingRefreshMs: number;
+  private readonly billingTimeoutMs: number;
+  private readonly cooldownMs: number;
+  private readonly now: () => number;
+  private readonly billingProvider:
+    | ((
+        credential: CommandCodeCredential,
+        signal: AbortSignal,
+      ) => Promise<CommandCodeBillingSnapshot>)
+    | undefined;
+
+  public constructor(options: CommandCodeCredentialRouterOptions) {
+    this.policy = options.policy;
+    this.billingRefreshMs = options.billingRefreshMs;
+    this.billingTimeoutMs = positive(options.billingTimeoutMs, DEFAULT_BILLING_TIMEOUT_MS);
+    this.cooldownMs = options.cooldownMs;
+    this.now = options.now ?? Date.now;
+    this.billingProvider = options.billingProvider;
+
+    const ids = new Set<string>();
+    this.states = options.credentials.map((credential) => {
+      if (ids.has(credential.id)) {
+        throw new Error(`Duplicate CommandCode credential id: ${credential.id}`);
+      }
+      ids.add(credential.id);
+
+      const normalizedCredential: CommandCodeCredential = {
+        id: credential.id,
+        apiKey: credential.apiKey,
+        weight: positive(credential.weight, 1),
+      };
+      if (credential.allowedModels)
+        normalizedCredential.allowedModels = [...credential.allowedModels];
+      return {
+        credential: normalizedCredential,
+        billingError: undefined,
+        disabledUntil: 0,
+        inFlight: 0,
+        lastSelectedAt: 0,
+        currentWeight: 0,
+      };
+    });
+  }
+
+  public get credentialCount(): number {
+    return this.states.length;
+  }
+
+  public snapshot(): CommandCodeCredentialState[] {
+    return this.states.map((state) => {
+      const redactedCredential: CommandCodeCredential = {
+        id: state.credential.id,
+        apiKey: "[REDACTED]",
+        weight: state.credential.weight,
+      };
+      if (state.credential.allowedModels) {
+        redactedCredential.allowedModels = [...state.credential.allowedModels];
+      }
+      const snapshot: CommandCodeCredentialState = {
+        credential: redactedCredential,
+        billingError: state.billingError,
+        disabledUntil: state.disabledUntil,
+        inFlight: state.inFlight,
+        lastSelectedAt: state.lastSelectedAt,
+        currentWeight: state.currentWeight,
+      };
+      if (state.billing) snapshot.billing = { ...state.billing };
+      return snapshot;
+    });
+  }
+
+  public async refreshAllBilling(options: { force?: boolean } = {}): Promise<void> {
+    if (!this.billingProvider) return;
+    const now = this.now();
+    await Promise.all(
+      this.states.map((state) =>
+        options.force ? this.loadBilling(state) : this.refreshBillingIfStale(state, now),
+      ),
+    );
+  }
+
+  public diagnostics(now = this.now()): CommandCodeCredentialDiagnostic[] {
+    return this.states.map((state) => {
+      const disabledUntil = state.disabledUntil > now ? state.disabledUntil : null;
+      const billing = state.billing;
+      const metrics = billing ? calculateCreditMetrics(billing, now) : undefined;
+      return {
+        id: state.credential.id,
+        weight: state.credential.weight,
+        allowedModels: state.credential.allowedModels
+          ? [...state.credential.allowedModels]
+          : undefined,
+        disabledUntil,
+        disabledUntilIso:
+          disabledUntil === null || disabledUntil === Number.MAX_SAFE_INTEGER
+            ? null
+            : new Date(disabledUntil).toISOString(),
+        disabledForMs:
+          disabledUntil === null
+            ? 0
+            : disabledUntil === Number.MAX_SAFE_INTEGER
+              ? Number.MAX_SAFE_INTEGER
+              : Math.max(0, disabledUntil - now),
+        inFlight: state.inFlight,
+        lastSelectedAt: state.lastSelectedAt > 0 ? state.lastSelectedAt : null,
+        lastSelectedAtIso:
+          state.lastSelectedAt > 0 ? new Date(state.lastSelectedAt).toISOString() : null,
+        currentWeight: state.currentWeight,
+        routingScore: calculateDepletionScore(state, now),
+        billingError: state.billingError,
+        billing:
+          billing && metrics
+            ? {
+                fetchedAt: billing.fetchedAt,
+                fetchedAtIso: new Date(billing.fetchedAt).toISOString(),
+                ageMs: Math.max(0, now - billing.fetchedAt),
+                stale: now - billing.fetchedAt >= this.billingRefreshMs,
+                monthlyCredits: billing.monthlyCredits,
+                freeCredits: billing.freeCredits,
+                purchasedCredits: billing.purchasedCredits,
+                currentPeriodEnd: billing.currentPeriodEnd,
+                planId: billing.planId,
+                totalCost: billing.totalCost,
+                totalCount: billing.totalCount,
+                metrics,
+              }
+            : undefined,
+      };
+    });
+  }
+
+  public async select(options: SelectCredentialOptions): Promise<CommandCodeCredential> {
+    if (this.states.length === 0) {
+      throw new NoAvailableCommandCodeCredentialError("No CommandCode credentials are configured");
+    }
+
+    const now = this.now();
+    const excludedIds = new Set(options.excludeIds ?? []);
+    let candidates = this.basicCandidates(options.model, now, excludedIds);
+    if (candidates.length === 0) {
+      throw new NoAvailableCommandCodeCredentialError(
+        `No available CommandCode credentials for model ${options.model}`,
+      );
+    }
+
+    if (this.policy === "depletion_aware") {
+      await Promise.all(candidates.map((state) => this.refreshBillingIfStale(state, now)));
+      candidates = this.activeCandidates(options.model, now, excludedIds);
+    } else {
+      candidates = this.activeCandidates(options.model, now, excludedIds);
+    }
+
+    if (candidates.length === 0) {
+      throw new NoAvailableCommandCodeCredentialError(
+        `No available CommandCode credentials for model ${options.model}`,
+      );
+    }
+
+    const selected = this.selectSmoothWeighted(candidates, now);
+    selected.inFlight += 1;
+    selected.lastSelectedAt = now;
+    return selected.credential;
+  }
+
+  public recordSuccess(id: string): void {
+    this.release(id);
+  }
+
+  public recordFailure(id: string, options: RecordFailureOptions = {}): void {
+    const state = this.stateById(id);
+    if (!state) return;
+
+    const statusCode = options.statusCode;
+    if (statusCode === 401) {
+      state.disabledUntil = Number.MAX_SAFE_INTEGER;
+    } else if (statusCode === 402) {
+      state.disabledUntil = this.now() + Math.max(this.cooldownMs, this.billingRefreshMs);
+    } else if (
+      statusCode === undefined ||
+      statusCode === 429 ||
+      (statusCode !== undefined && statusCode >= 500)
+    ) {
+      state.disabledUntil = this.now() + this.cooldownMs;
+    }
+
+    this.release(id);
+  }
+
+  public release(id: string): void {
+    const state = this.stateById(id);
+    if (!state) return;
+    state.inFlight = Math.max(0, state.inFlight - 1);
+  }
+
+  private async refreshBillingIfStale(
+    state: CommandCodeCredentialState,
+    now: number,
+  ): Promise<void> {
+    if (!this.billingProvider) return;
+    if (state.billing && now - state.billing.fetchedAt < this.billingRefreshMs) return;
+    if (state.billingRefreshPromise) return state.billingRefreshPromise;
+
+    state.billingRefreshPromise = this.loadBilling(state).finally(() => {
+      state.billingRefreshPromise = undefined;
+    });
+    return state.billingRefreshPromise;
+  }
+
+  private async loadBilling(state: CommandCodeCredentialState): Promise<void> {
+    if (!this.billingProvider) return;
+    try {
+      state.billing = await this.billingProvider(
+        state.credential,
+        createTimeoutSignal(this.billingTimeoutMs),
+      );
+      state.billingError = undefined;
+      const remaining = remainingCredits(state, this.now()) ?? 0;
+      if (remaining > 0 && state.disabledUntil !== Number.MAX_SAFE_INTEGER) {
+        state.disabledUntil = 0;
+      } else if (state.disabledUntil !== Number.MAX_SAFE_INTEGER) {
+        state.disabledUntil = this.now() + this.billingRefreshMs;
+      }
+    } catch (error) {
+      state.billingError = errorMessage(error);
+    }
+  }
+
+  private basicCandidates(
+    model: string,
+    now: number,
+    excludedIds: Set<string>,
+  ): CommandCodeCredentialState[] {
+    return this.states.filter(
+      (state) =>
+        !excludedIds.has(state.credential.id) &&
+        state.disabledUntil <= now &&
+        isModelAllowed(state.credential, model),
+    );
+  }
+
+  private activeCandidates(
+    model: string,
+    now: number,
+    excludedIds: Set<string>,
+  ): CommandCodeCredentialState[] {
+    return this.basicCandidates(model, now, excludedIds).filter((state) =>
+      hasKnownCreditCapacity(state, now),
+    );
+  }
+
+  private selectSmoothWeighted(
+    candidates: CommandCodeCredentialState[],
+    now: number,
+  ): CommandCodeCredentialState {
+    let best: CommandCodeCredentialState | undefined;
+    let totalWeight = 0;
+
+    for (const state of candidates) {
+      const weight =
+        this.policy === "depletion_aware"
+          ? calculateDepletionScore(state, now)
+          : positive(state.credential.weight, 1);
+      const adjustedWeight = Math.max(0.0001, weight);
+      state.currentWeight += adjustedWeight;
+      totalWeight += adjustedWeight;
+      if (!best || state.currentWeight > best.currentWeight) best = state;
+    }
+
+    if (!best) throw new NoAvailableCommandCodeCredentialError();
+    best.currentWeight -= totalWeight;
+    return best;
+  }
+
+  private stateById(id: string): CommandCodeCredentialState | undefined {
+    return this.states.find((state) => state.credential.id === id);
+  }
+}
