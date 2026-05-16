@@ -11,11 +11,26 @@ describe("dashboard UI", () => {
       models: [],
     });
 
-    expect(html).toContain("키당 동시 병렬 요청 회수");
+    expect(html).toContain("키당 동시 요청");
     expect(html).toContain('id="maxPer"');
+    expect(html).toContain("운영 기본값은 키당 4회입니다.");
+    expect(html).toContain("concurrencyInfo");
     expect(html).not.toContain('id="maxMult"');
     expect(html).not.toContain('id="maxTotal"');
     expect(html).not.toContain("총 동시요청");
+  });
+
+  it("lays out bind host and port on one compact row with an admin key field", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+    });
+
+    expect(html).toContain("bind-grid");
+    expect(html).toContain("0.0.0.0은 Tailscale/LAN에서 접근 가능합니다.<br />");
+    expect(html).toContain('id="bridgeApiKey"');
   });
 
   it("renders a per-credential enable toggle before the delete button", () => {
