@@ -37,6 +37,7 @@ export interface DashboardConfigView {
   configFilePath: string | undefined;
   dirty: boolean;
   restart_required: boolean;
+  bridgeApiKey?: string | undefined;
   server: DashboardServerConfig;
   routing: CommandCodeRoutingConfig;
   models: CommandCodeModelConfig[];

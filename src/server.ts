@@ -207,6 +207,7 @@ function dashboardConfigResponse(
     configFilePath: config.configFilePath,
     dirty,
     restart_required: dirty,
+    bridgeApiKey: config.bridgeApiKey,
     server: {
       host: config.host,
       port: config.port,

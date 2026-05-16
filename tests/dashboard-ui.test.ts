@@ -28,6 +28,7 @@ describe("dashboard UI", () => {
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
       credentials: [],
       models: [],
+      bridgeApiKey: "sk-cmdbridge-a1b2c3",
     });
 
     expect(html).toContain("bind-grid");
@@ -44,6 +45,8 @@ describe("dashboard UI", () => {
     expect(html).toContain('id="saveBridgeKey"');
     expect(html).not.toContain('id="bridgeKeyInfo"');
     expect(html).toContain("0.0.0.0/LAN 공개 시 필요");
+    expect(html).toContain("sk-cmdbridge-a1b2c3");
+    expect(html).toContain("cfg?.bridgeApiKey");
   });
 
   it("renders a per-credential enable toggle before the delete button", () => {
