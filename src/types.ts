@@ -1,4 +1,4 @@
-export type OpenAIRole = "system" | "user" | "assistant" | "tool";
+export type OpenAIRole = "developer" | "system" | "user" | "assistant" | "tool";
 
 export interface OpenAITextContentPart {
   type: "text";

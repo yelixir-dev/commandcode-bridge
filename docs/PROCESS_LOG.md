@@ -3,7 +3,7 @@
 ## 2026-05-11
 
 - Selected the direct CommandCode `/alpha/generate` bridge design instead of per-request `cmd -p` subprocess wrapping.
-- Created isolated workspace: `~/workspace/commander-commandcode-bridge`.
+- Created isolated workspace: `~/workspace/commandcode-bridge`.
 - Recorded PRD and implementation plan before production implementation.
 - TDD policy: tests are written before source implementation.
 
@@ -26,3 +26,11 @@
 - Added `round_robin` and `depletion_aware` routing. Depletion-aware routing caches `/alpha/billing/credits`, `/alpha/billing/subscriptions`, and `/alpha/usage/summary` snapshots per credential and routes expiring credits first.
 - Added credential health rules and failover: 401 disables, 402 drains/cools down, 429/5xx/timeouts cooldown, and pre-visible-output stream errors can retry on another credential.
 - `/health` now reports credential count and routing policy without exposing raw upstream keys.
+
+## 2026-05-16
+
+- Renamed the workspace/package from `commander-commandcode-bridge` to `commandcode-bridge`; removed the old internal remote pending future GitHub publication.
+- Added Hermes/OpenAI `developer` role compatibility by folding developer messages into the upstream system prompt.
+- Fixed two tool-call reliability blockers found during strict review: malformed `tool_calls` now fail OpenAI-style validation, and normal Fastify request close no longer aborts upstream generation.
+- Hardened follow-up tool history conversion: assistant `tool_calls` are no longer flattened into visible prose such as `Assistant requested tool calls`, tool results no longer expose OpenAI call IDs, and a system guard marks prior function context as internal bridge context.
+- Verification: `npm run typecheck`, all 72 Vitest tests, `npm run build`, LaunchAgent restart, `/health`, and Hermes provider tool-loop smoke all passed.

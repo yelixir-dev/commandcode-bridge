@@ -1,6 +1,6 @@
-# Commander CommandCode Bridge Deployment Guide
+# CommandCode Bridge Deployment Guide
 
-This guide explains how to deploy Commander CommandCode Bridge as a durable OpenAI-compatible API service for CommandCode-backed DeepSeek models in a CommandCode CLI environment.
+This guide explains how to deploy CommandCode Bridge as a durable OpenAI-compatible API service for CommandCode-backed DeepSeek models in a CommandCode CLI environment.
 
 > **CommandCode CLI environment required:** download/install the official CLI from [commandcode.ai/install](https://commandcode.ai/install) (official site: [commandcode.ai](https://commandcode.ai/)), then authenticate the CLI or provide equivalent `COMMANDCODE_*` credentials. This bridge uses the same CommandCode account/upstream API and is not a public standalone DeepSeek proxy.
 
@@ -13,7 +13,7 @@ For a personal workstation, homelab, or tailnet host, the recommended shape is:
 ```text
 OpenAI-compatible client
   -> http://127.0.0.1:9992 or http://<tailscale-ip>:9992
-  -> commander-commandcode-bridge systemd service
+  -> commandcode-bridge systemd service
   -> CommandCode /alpha/generate upstream
 ```
 
@@ -31,10 +31,10 @@ On this workstation, the public/tailnet endpoint is now fronted by a **user-syst
 
 Paths:
 
-- Bridge user unit: `~/.config/systemd/user/commander-commandcode-bridge.service`
-- Router user unit: `~/.config/systemd/user/commander-commandcode-router.service`
-- Bridge runtime env file: `~/.config/commander-commandcode-bridge/env`
-- Router runtime env file: `~/.config/commander-commandcode-bridge/router.env`
+- Bridge user unit: `~/.config/systemd/user/commandcode-bridge.service`
+- Router user unit: `~/.config/systemd/user/commandcode-router.service`
+- Bridge runtime env file: `~/.config/commandcode-bridge/env`
+- Router runtime env file: `~/.config/commandcode-bridge/router.env`
 - Bridge executable: `~/.local/bin/commandcode-bridge`
 - Router executable: `~/.local/bin/commandcode-router`
 - External/Tailscale endpoint: router on `0.0.0.0:9992`
@@ -44,10 +44,10 @@ Paths:
 Check status:
 
 ```bash
-systemctl --user status commander-commandcode-bridge --no-pager
-systemctl --user status commander-commandcode-router --no-pager
-systemctl --user is-enabled commander-commandcode-bridge
-systemctl --user is-enabled commander-commandcode-router
+systemctl --user status commandcode-bridge --no-pager
+systemctl --user status commandcode-router --no-pager
+systemctl --user is-enabled commandcode-bridge
+systemctl --user is-enabled commandcode-router
 loginctl show-user "$USER" -p Linger
 ```
 
@@ -60,10 +60,10 @@ Expected:
 Operate:
 
 ```bash
-systemctl --user restart commander-commandcode-bridge
-systemctl --user restart commander-commandcode-router
-journalctl --user -u commander-commandcode-bridge -f
-journalctl --user -u commander-commandcode-router -f
+systemctl --user restart commandcode-bridge
+systemctl --user restart commandcode-router
+journalctl --user -u commandcode-bridge -f
+journalctl --user -u commandcode-router -f
 ```
 
 Router health:
@@ -82,25 +82,27 @@ Authenticated models check through the router:
 
 ```bash
 set -a
-. "$HOME/.config/commander-commandcode-bridge/env"
+. "$HOME/.config/commandcode-bridge/env"
 set +a
-curl -sS http://127.0.0.1:9992/v1/models   -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
+curl -sS http://127.0.0.1:9992/v1/models \
+  -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
 ```
 
 Router backend status:
 
 ```bash
 set -a
-. "$HOME/.config/commander-commandcode-bridge/env"
+. "$HOME/.config/commandcode-bridge/env"
 set +a
-curl -sS http://127.0.0.1:9992/admin/router/backends   -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
+curl -sS http://127.0.0.1:9992/admin/router/backends \
+  -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
 ```
 
 Smoke test through the externally preserved endpoint:
 
 ```bash
 set -a
-. "$HOME/.config/commander-commandcode-bridge/env"
+. "$HOME/.config/commandcode-bridge/env"
 set +a
 BRIDGE_BASE_URL=http://127.0.0.1:9992 npm run smoke
 ```
@@ -109,7 +111,7 @@ If the upstream account is reachable but blocked by balance/credits, use routing
 
 ```bash
 set -a
-. "$HOME/.config/commander-commandcode-bridge/env"
+. "$HOME/.config/commandcode-bridge/env"
 set +a
 BRIDGE_BASE_URL=http://127.0.0.1:9992 SMOKE_ACCEPT_UPSTREAM_ERRORS=1 npm run smoke
 ```
@@ -120,7 +122,7 @@ Admin credential metrics through the router:
 
 ```bash
 set -a
-. "$HOME/.config/commander-commandcode-bridge/env"
+. "$HOME/.config/commandcode-bridge/env"
 set +a
 curl -sS 'http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true'   -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
 ```
@@ -129,7 +131,7 @@ The admin endpoint returns credential IDs, routing state, billing-derived metric
 
 ## Router mode for multiple bridge hosts
 
-Run one `commander-commandcode-bridge` per machine, then put one `commandcode-router` in front of them. The router preserves a single OpenAI-compatible endpoint for agents and chooses an eligible backend by least in-flight request count.
+Run one `commandcode-bridge` per machine, then put one `commandcode-router` in front of them. The router preserves a single OpenAI-compatible endpoint for agents and chooses an eligible backend by least in-flight request count.
 
 Minimal router env:
 
@@ -170,10 +172,10 @@ loginctl show-user "$USER" -p Linger
 Create the env directory and file:
 
 ```bash
-mkdir -p ~/.config/commander-commandcode-bridge
-chmod 700 ~/.config/commander-commandcode-bridge
-nano ~/.config/commander-commandcode-bridge/env
-chmod 600 ~/.config/commander-commandcode-bridge/env
+mkdir -p ~/.config/commandcode-bridge
+chmod 700 ~/.config/commandcode-bridge
+nano ~/.config/commandcode-bridge/env
+chmod 600 ~/.config/commandcode-bridge/env
 ```
 
 Minimal env file:
@@ -204,21 +206,21 @@ COMMANDCODE_API_KEY=cmd_key_here
 COMMANDCODE_API_KEYS=primary=cmd_key_one,secondary=cmd_key_two
 ```
 
-Create the user unit manually, or copy the release template from `release/systemd/commander-commandcode-bridge.user.service`.
+Create the user unit manually, or copy the release template from `release/systemd/commandcode-bridge.user.service`.
 
 Manual unit creation:
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cat > ~/.config/systemd/user/commander-commandcode-bridge.service <<'EOF'
+cat > ~/.config/systemd/user/commandcode-bridge.service <<'EOF'
 [Unit]
-Description=Commander CommandCode Bridge - OpenAI-compatible API for CommandCode DeepSeek
+Description=CommandCode Bridge - OpenAI-compatible API for CommandCode DeepSeek
 After=default.target
 
 [Service]
 Type=simple
 WorkingDirectory=%h
-EnvironmentFile=%h/.config/commander-commandcode-bridge/env
+EnvironmentFile=%h/.config/commandcode-bridge/env
 ExecStart=%h/.local/bin/commandcode-bridge
 Restart=always
 RestartSec=5
@@ -238,27 +240,27 @@ Enable and start:
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now commander-commandcode-bridge
-systemctl --user status commander-commandcode-bridge --no-pager
+systemctl --user enable --now commandcode-bridge
+systemctl --user status commandcode-bridge --no-pager
 ```
 
 ## System-level systemd deployment
 
-Use this for server-style installs where a dedicated service user owns `/opt/commander-commandcode-bridge`.
+Use this for server-style installs where a dedicated service user owns `/opt/commandcode-bridge`.
 
 The repository includes a system unit at:
 
 ```text
-release/systemd/commander-commandcode-bridge.service
+release/systemd/commandcode-bridge.service
 ```
 
 Install from a source checkout:
 
 ```bash
-sudo useradd --system --home /opt/commander-commandcode-bridge --shell /usr/sbin/nologin commandcode-bridge || true
-sudo mkdir -p /opt/commander-commandcode-bridge
-sudo rsync -a --delete ./ /opt/commander-commandcode-bridge/
-cd /opt/commander-commandcode-bridge
+sudo useradd --system --home /opt/commandcode-bridge --shell /usr/sbin/nologin commandcode-bridge || true
+sudo mkdir -p /opt/commandcode-bridge
+sudo rsync -a --delete ./ /opt/commandcode-bridge/
+cd /opt/commandcode-bridge
 sudo npm ci
 sudo npm run verify
 sudo npm run build
@@ -268,26 +270,26 @@ sudo npm prune --omit=dev
 Create the environment file:
 
 ```bash
-sudo cp release/env.production.example /etc/commander-commandcode-bridge.env
-sudo chmod 600 /etc/commander-commandcode-bridge.env
-sudoedit /etc/commander-commandcode-bridge.env
+sudo cp release/env.production.example /etc/commandcode-bridge.env
+sudo chmod 600 /etc/commandcode-bridge.env
+sudoedit /etc/commandcode-bridge.env
 ```
 
 Start the unit:
 
 ```bash
-sudo cp release/systemd/commander-commandcode-bridge.service /etc/systemd/system/
+sudo cp release/systemd/commandcode-bridge.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now commander-commandcode-bridge
-sudo systemctl status commander-commandcode-bridge --no-pager
+sudo systemctl enable --now commandcode-bridge
+sudo systemctl status commandcode-bridge --no-pager
 ```
 
 Operate:
 
 ```bash
-sudo journalctl -u commander-commandcode-bridge -f
-sudo systemctl restart commander-commandcode-bridge
-sudo systemctl stop commander-commandcode-bridge
+sudo journalctl -u commandcode-bridge -f
+sudo systemctl restart commandcode-bridge
+sudo systemctl stop commandcode-bridge
 ```
 
 ## Docker Compose deployment
@@ -295,7 +297,7 @@ sudo systemctl stop commander-commandcode-bridge
 Use Docker Compose when you want a container boundary and have the full source checkout available.
 
 ```bash
-cd /opt/commander-commandcode-bridge
+cd /opt/commandcode-bridge
 cp release/env.production.example release/env.production
 chmod 600 release/env.production
 nano release/env.production
@@ -321,20 +323,20 @@ Notes:
 If the live service uses the globally installed package, building the source checkout is not enough. Repack and reinstall the package globally, then restart the service.
 
 ```bash
-cd /home/yelixir/workspace/commander-commandcode-bridge
+cd /home/yelixir/workspace/commandcode-bridge
 npm run verify
 TGZ=$(npm pack --silent | tail -n1)
 npm install -g "./$TGZ"
 rm -f "$TGZ"
-systemctl --user restart commander-commandcode-bridge
-systemctl --user status commander-commandcode-bridge --no-pager
+systemctl --user restart commandcode-bridge
+systemctl --user status commandcode-bridge --no-pager
 ```
 
 Then run smoke:
 
 ```bash
 set -a
-. "$HOME/.config/commander-commandcode-bridge/env"
+. "$HOME/.config/commandcode-bridge/env"
 set +a
 npm run smoke
 ```
@@ -435,7 +437,7 @@ Run this only after adding enough balance/top-up for real content generation.
 
    ```bash
    set -a
-   . "$HOME/.config/commander-commandcode-bridge/env"
+   . "$HOME/.config/commandcode-bridge/env"
    set +a
    curl -sS 'http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true' \
      -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
@@ -457,7 +459,7 @@ Fix:
 
 ```bash
 set -a
-. "$HOME/.config/commander-commandcode-bridge/env"
+. "$HOME/.config/commandcode-bridge/env"
 set +a
 npm run smoke
 ```
@@ -470,7 +472,7 @@ The live service probably uses a global npm install. Run `npm pack`, `npm instal
 
 ```bash
 ss -ltnp '( sport = :9992 )'
-systemctl --user status commander-commandcode-bridge --no-pager
+systemctl --user status commandcode-bridge --no-pager
 ```
 
 Stop the manual process or change `PORT` in the env file.
@@ -481,7 +483,7 @@ Check linger and enablement:
 
 ```bash
 loginctl show-user "$USER" -p Linger
-systemctl --user is-enabled commander-commandcode-bridge
+systemctl --user is-enabled commandcode-bridge
 ```
 
 If linger is disabled:

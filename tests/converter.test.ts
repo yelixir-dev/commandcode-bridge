@@ -78,7 +78,31 @@ describe("OpenAI to CommandCode conversion", () => {
     expect(body.config.workingDir).toBe("/tmp/project");
   });
 
-  it("normalizes OpenAI tool-call history into CommandCode user/assistant text messages", () => {
+  it("treats OpenAI developer messages as system instructions for Hermes compatibility", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4-pro",
+        messages: [
+          { role: "developer", content: "Follow bridge policy." },
+          { role: "system", content: "You are terse." },
+          { role: "user", content: "Say hi" },
+        ],
+      },
+      upstreamModel: "deepseek/deepseek-v4-pro",
+      now: () => new Date("2026-05-11T00:00:00Z"),
+      cwd: () => "/tmp/project",
+      environment: "linux-x64, Node.js test",
+      threadId: "00000000-0000-4000-8000-000000000000",
+    });
+
+    expect(body.params.system).toContain("Follow bridge policy.");
+    expect(body.params.system).toContain("You are terse.");
+    expect(body.params.messages).toEqual([
+      { role: "user", content: [{ type: "text", text: "Say hi" }] },
+    ]);
+  });
+
+  it("preserves prior tool-result context without leaking OpenAI tool transcript markers", () => {
     const body = buildCommandCodeGenerateBody({
       request: {
         model: "deepseek/deepseek-v4-pro",
@@ -117,37 +141,21 @@ describe("OpenAI to CommandCode conversion", () => {
     });
 
     expect(body.params.tools).toHaveLength(1);
-    expect(body.params.messages.map((message) => message.role)).toEqual([
-      "user",
-      "assistant",
-      "user",
-      "user",
-    ]);
-    expect(body.params.messages).toEqual([
-      { role: "user", content: [{ type: "text", text: "What is the weather in Seoul?" }] },
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "text",
-            text: expect.stringContaining("Assistant requested tool calls"),
-          },
-        ],
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: expect.stringContaining("Tool result for call_weather"),
-          },
-        ],
-      },
-      { role: "user", content: [{ type: "text", text: "Summarize the result." }] },
-    ]);
-    expect(JSON.stringify(body.params.messages)).not.toContain('"role":"tool"');
-    expect(JSON.stringify(body.params.messages)).not.toContain("tool_calls");
-    expect(JSON.stringify(body.params.messages)).not.toContain("tool_call_id");
+    expect(body.params.messages.map((message) => message.role)).toEqual(["user", "user", "user"]);
+
+    const serializedMessages = JSON.stringify(body.params.messages);
+    expect(serializedMessages).not.toContain("Assistant requested tool calls");
+    expect(serializedMessages).not.toContain("Tool result for");
+    expect(serializedMessages).not.toContain('"role":"tool"');
+    expect(serializedMessages).not.toContain("tool_calls");
+    expect(serializedMessages).not.toContain("tool_call_id");
+    expect(serializedMessages).not.toContain("call_weather");
+
+    expect(serializedMessages).toContain("get_weather");
+    expect(serializedMessages).toContain("Seoul");
+    expect(serializedMessages).toContain("12C");
+    expect(body.params.system).toMatch(/internal bridge context/i);
+    expect(body.params.system).toMatch(/do not quote|do not expose|do not mention/i);
   });
 
   it("injects JSON-only guidance for OpenAI response_format", () => {

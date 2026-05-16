@@ -14,9 +14,9 @@ try {
       port: config.port,
       backends: config.backends.map((backend) => ({ id: backend.id, baseUrl: backend.baseUrl })),
     },
-    "Commander CommandCode Router listening",
+    "CommandCode Router listening",
   );
 } catch (error) {
-  app.log.error(error, "Failed to start Commander CommandCode Router");
+  app.log.error(error, "Failed to start CommandCode Router");
   process.exit(1);
 }

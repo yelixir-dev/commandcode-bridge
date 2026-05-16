@@ -95,6 +95,21 @@ class ThrowingStreamCommandCodeClient implements CommandCodeUpstream {
   }
 }
 
+class AbortAwareCommandCodeClient implements CommandCodeUpstream {
+  public signalStates: boolean[] = [];
+
+  async *generate(
+    _body: CommandCodeGenerateBody,
+    signal?: AbortSignal,
+  ): AsyncIterable<CommandCodeEvent> {
+    this.signalStates.push(signal?.aborted ?? false);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    this.signalStates.push(signal?.aborted ?? false);
+    yield { type: "text-delta", text: "NOT_ABORTED" };
+    yield { type: "finish", finishReason: "stop" };
+  }
+}
+
 function createTestApp(options: Parameters<typeof createApp>[0] = {}) {
   return createApp({
     ...options,
@@ -214,6 +229,26 @@ describe("Fastify OpenAI-compatible server", () => {
     await app.close();
   });
 
+  it("accepts developer role messages from OpenAI-compatible clients", async () => {
+    const fake = new FakeCommandCodeClient();
+    const app = await createTestApp({ upstream: fake });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: {
+        model: "default",
+        messages: [
+          { role: "developer", content: "Follow bridge policy." },
+          { role: "user", content: "hi" },
+        ],
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(fake.seenBodies[0]?.params.system).toContain("Follow bridge policy.");
+    expect(fake.seenBodies[0]?.params.messages.map((message) => message.role)).toEqual(["user"]);
+    await app.close();
+  });
+
   it("normalizes follow-up OpenAI tool history before forwarding upstream", async () => {
     const fake = new FakeCommandCodeClient();
     const app = await createTestApp({ upstream: fake });
@@ -251,18 +286,42 @@ describe("Fastify OpenAI-compatible server", () => {
     expect(fake.seenBodies[0]?.params.tools).toHaveLength(1);
     expect(fake.seenBodies[0]?.params.messages.map((message) => message.role)).toEqual([
       "user",
-      "assistant",
       "user",
       "user",
     ]);
-    expect(JSON.stringify(fake.seenBodies[0]?.params.messages)).not.toContain('"role":"tool"');
-    expect(JSON.stringify(fake.seenBodies[0]?.params.messages)).not.toContain("tool_calls");
-    expect(fake.seenBodies[0]?.params.messages[1]?.content[0]?.text).toContain(
-      "Assistant requested tool calls",
-    );
-    expect(fake.seenBodies[0]?.params.messages[2]?.content[0]?.text).toContain(
-      "Tool result for call_weather",
-    );
+    const serializedMessages = JSON.stringify(fake.seenBodies[0]?.params.messages);
+    expect(serializedMessages).not.toContain("Assistant requested tool calls");
+    expect(serializedMessages).not.toContain("Tool result for");
+    expect(serializedMessages).not.toContain('"role":"tool"');
+    expect(serializedMessages).not.toContain("tool_calls");
+    expect(serializedMessages).not.toContain("tool_call_id");
+    expect(serializedMessages).not.toContain("call_weather");
+    expect(serializedMessages).toContain("get_weather");
+    expect(serializedMessages).toContain("Seoul");
+    expect(serializedMessages).toContain("12C");
+    expect(fake.seenBodies[0]?.params.system).toMatch(/internal bridge context/i);
+    await app.close();
+  });
+
+  it("rejects malformed assistant tool_calls with an OpenAI-style validation error", async () => {
+    const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: {
+        model: "default",
+        messages: [
+          { role: "user", content: "weather?" },
+          {
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: "call_weather", type: "function" }],
+          },
+        ],
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("invalid_request");
     await app.close();
   });
 
@@ -321,6 +380,20 @@ describe("Fastify OpenAI-compatible server", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toContain("text/event-stream");
     expect(response.body).toContain("data: [DONE]");
+    await app.close();
+  });
+
+  it("does not abort upstream generation when a normal request body closes", async () => {
+    const fake = new AbortAwareCommandCodeClient();
+    const app = await createTestApp({ upstream: fake });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: { model: "default", messages: [{ role: "user", content: "hi" }] },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().choices[0].message.content).toBe("NOT_ABORTED");
+    expect(fake.signalStates).toEqual([false, false]);
     await app.close();
   });
 

@@ -10,7 +10,7 @@ Client
   └─ local/tailnet agents
         │
         ▼
-Commander CommandCode Bridge
+CommandCode Bridge
   ├─ Fastify server
   ├─ authentication guard
   ├─ request validation (Zod)

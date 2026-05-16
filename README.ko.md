@@ -1,4 +1,4 @@
-# Commander CommandCode Bridge
+# CommandCode Bridge
 
 > **CommandCode CLI 환경 전제:** 이 브리지는 공식 CommandCode CLI(`cmd`, npm package `command-code`)를 사용할 수 있도록 준비된 머신/계정에서 쓰는 내부용 브리지입니다. CLI 다운로드/설치는 [commandcode.ai/install](https://commandcode.ai/install) (공식 사이트: [commandcode.ai](https://commandcode.ai/))에서 진행한 뒤, CLI 인증을 완료하거나 동등한 `COMMANDCODE_*` credential을 제공하십시오. 즉, 공개 독립형 DeepSeek 프록시가 아니라 CommandCode 계정/upstream API를 이용하는 브리지입니다.
 
@@ -37,7 +37,7 @@ CommandCode의 DeepSeek V4 Pro 백엔드를 OpenAI-compatible HTTP API로 노출
 ```text
 Single-host mode:
 OpenAI-compatible client
-  → Commander CommandCode Bridge :9992
+  → CommandCode Bridge :9992
   → POST https://api.commandcode.ai/alpha/generate
   → CommandCode stream events
   → OpenAI chat.completion 또는 chat.completion.chunk
@@ -46,7 +46,7 @@ OpenAI-compatible client
 OpenAI-compatible client
   → commandcode-router :9992
   → healthy backend 중 least-inflight 선택
-  → PC별 Commander CommandCode Bridge, 예: local :19992 + remote Tailscale :9992
+  → PC별 CommandCode Bridge, 예: local :19992 + remote Tailscale :9992
   → CommandCode upstream
 ```
 
@@ -65,8 +65,8 @@ OpenAI-compatible client
 ## 빠른 시작
 
 ```bash
-git clone http://100.113.251.30:8929/root/commander-commandcode-bridge.git commander-commandcode-bridge
-cd commander-commandcode-bridge
+git clone http://100.113.251.30:8929/root/commandcode-bridge.git commandcode-bridge
+cd commandcode-bridge
 npm install --include=dev
 cp .env.example .env
 ```
@@ -312,12 +312,12 @@ SMOKE_ACCEPT_UPSTREAM_ERRORS=1 npm run smoke
 Docker 빌드는 전체 source checkout을 기준으로 합니다. Dockerfile이 runtime image 생성 전에 검증/빌드 파이프라인을 실행하므로 `src/`, `tests/`, lockfile, config 파일이 모두 필요합니다. npm package는 runtime 중심이며 전체 Docker build context를 포함하지 않습니다.
 
 ```bash
-docker build -t commander-commandcode-bridge .
+docker build -t commandcode-bridge .
 docker run --rm -p 127.0.0.1:9992:9992 \
   -e HOST=0.0.0.0 \
   -e COMMANDCODE_API_KEY="$COMMANDCODE_API_KEY" \
   -e BRIDGE_API_KEY="$BRIDGE_API_KEY" \
-  commander-commandcode-bridge
+  commandcode-bridge
 ```
 
 컨테이너 내부에서는 `0.0.0.0`으로 listen하지만, 위 예시는 localhost에만 publish합니다. Tailnet 또는 외부 interface에 bind할 경우 `BRIDGE_API_KEY`를 설정하십시오.
@@ -332,12 +332,12 @@ docker compose up -d --build
 
 ## systemd
 
-권장 user-systemd 배포는 `docs/DEPLOYMENT.ko.md`를 참고하십시오. system-level host unit 예시는 `release/systemd/commander-commandcode-bridge.service`에 있습니다.
+권장 user-systemd 배포는 `docs/DEPLOYMENT.ko.md`를 참고하십시오. system-level host unit 예시는 `release/systemd/commandcode-bridge.service`에 있습니다.
 
 권장 설치 경로:
 
 ```text
-/opt/commander-commandcode-bridge
+/opt/commandcode-bridge
 ```
 
 ## 보안

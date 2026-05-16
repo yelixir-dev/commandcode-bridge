@@ -1,4 +1,4 @@
-# Commander CommandCode Bridge
+# CommandCode Bridge
 
 > **CommandCode CLI environment required:** this bridge is for machines/accounts already set up to use the official CommandCode CLI (`cmd`, npm package `command-code`). Download/install it from [commandcode.ai/install](https://commandcode.ai/install) (official site: [commandcode.ai](https://commandcode.ai/)), then authenticate the CLI or provide equivalent `COMMANDCODE_*` credentials. The bridge uses the same CommandCode account/upstream API; it is not a public standalone DeepSeek proxy.
 
@@ -37,7 +37,7 @@ This project exposes a minimal OpenAI Chat Completions API over CommandCode's up
 ```text
 Single-host mode:
 OpenAI-compatible client
-  → Commander CommandCode Bridge :9992
+  → CommandCode Bridge :9992
   → POST https://api.commandcode.ai/alpha/generate
   → CommandCode stream events
   → OpenAI chat.completion or chat.completion.chunk
@@ -46,7 +46,7 @@ Router mode for multiple PCs:
 OpenAI-compatible client
   → commandcode-router :9992
   → least-inflight healthy backend selection
-  → one Commander CommandCode Bridge per PC, e.g. local :19992 + remote Tailscale :9992
+  → one CommandCode Bridge per PC, e.g. local :19992 + remote Tailscale :9992
   → CommandCode upstream
 ```
 
@@ -65,8 +65,8 @@ The bridge does **not** spawn `cmd` per request. It calls the same upstream API 
 ## Quick Start
 
 ```bash
-git clone http://100.113.251.30:8929/root/commander-commandcode-bridge.git commander-commandcode-bridge
-cd commander-commandcode-bridge
+git clone http://100.113.251.30:8929/root/commandcode-bridge.git commandcode-bridge
+cd commandcode-bridge
 npm install --include=dev
 cp .env.example .env
 ```
@@ -312,12 +312,12 @@ For production deployment and operations, start with:
 Docker builds require a full source checkout because the Dockerfile runs the verification/build pipeline before producing the runtime image. The npm package is runtime-oriented and intentionally does not contain the full Docker build context.
 
 ```bash
-docker build -t commander-commandcode-bridge .
+docker build -t commandcode-bridge .
 docker run --rm -p 127.0.0.1:9992:9992 \
   -e HOST=0.0.0.0 \
   -e COMMANDCODE_API_KEY="$COMMANDCODE_API_KEY" \
   -e BRIDGE_API_KEY="$BRIDGE_API_KEY" \
-  commander-commandcode-bridge
+  commandcode-bridge
 ```
 
 The container listens on `0.0.0.0` internally, but the example publishes only to localhost. If you bind to a tailnet or external interface, set `BRIDGE_API_KEY`.
@@ -332,12 +332,12 @@ See `release/docker-compose.yml`.
 
 ## systemd
 
-See `docs/DEPLOYMENT.md` for the recommended user-systemd deployment and `release/systemd/commander-commandcode-bridge.service` for a system-level host unit.
+See `docs/DEPLOYMENT.md` for the recommended user-systemd deployment and `release/systemd/commandcode-bridge.service` for a system-level host unit.
 
 Recommended installation path:
 
 ```text
-/opt/commander-commandcode-bridge
+/opt/commandcode-bridge
 ```
 
 ## Security

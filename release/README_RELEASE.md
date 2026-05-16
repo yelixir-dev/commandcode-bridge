@@ -1,6 +1,6 @@
 # Release Deployment Assets
 
-This directory contains copy-ready deployment assets for operating Commander CommandCode Bridge from a **source checkout** in a CommandCode CLI/account environment. The npm package is runtime-oriented and does not contain the full Docker build context.
+This directory contains copy-ready deployment assets for operating CommandCode Bridge from a **source checkout** in a CommandCode CLI/account environment. The npm package is runtime-oriented and does not contain the full Docker build context.
 
 > **CommandCode CLI environment required:** download/install the official CLI from [commandcode.ai/install](https://commandcode.ai/install) (official site: [commandcode.ai](https://commandcode.ai/)), then authenticate the CLI or provide equivalent `COMMANDCODE_*` credentials.
 
@@ -13,10 +13,10 @@ For the full deployment and option reference, see:
 
 - `docker-compose.yml` — production-oriented Compose service. It publishes `127.0.0.1:9992` on the host and overrides the container process to `HOST=0.0.0.0` so Docker port publishing works.
 - `env.production.example` — production environment template. Track this file only; never commit `env.production`.
-- `systemd/commander-commandcode-bridge.service` — system-level systemd unit for a direct host install.
-- `systemd/commander-commandcode-bridge.user.service` — user-systemd unit for rootless installs with linger.
-- `systemd/commander-commandcode-router.user.service` — optional user-systemd router in front of one or more bridge backends.
-- `nginx/commander-commandcode-bridge.conf` — optional authenticated/TLS reverse proxy example.
+- `systemd/commandcode-bridge.service` — system-level systemd unit for a direct host install.
+- `systemd/commandcode-bridge.user.service` — user-systemd unit for rootless installs with linger.
+- `systemd/commandcode-router.user.service` — optional user-systemd router in front of one or more bridge backends.
+- `nginx/commandcode-bridge.conf` — optional authenticated/TLS reverse proxy example.
 - `smoke-curl.sh` — health and chat-completion smoke test.
 
 ## Security Baseline
@@ -31,7 +31,7 @@ For the full deployment and option reference, see:
 Start from the repository root. The Dockerfile intentionally runs the full verification pipeline, so it requires the full source checkout (`src/`, `tests/`, `tsconfig*.json`, lockfile, and config files), not the npm runtime package.
 
 ```bash
-cd /opt/commander-commandcode-bridge
+cd /opt/commandcode-bridge
 cp release/env.production.example release/env.production
 chmod 600 release/env.production
 ```
@@ -75,7 +75,7 @@ SMOKE_ACCEPT_UPSTREAM_ERRORS=1 ./smoke-curl.sh http://127.0.0.1:9992
 Operate:
 
 ```bash
-cd /opt/commander-commandcode-bridge/release
+cd /opt/commandcode-bridge/release
 docker compose ps
 docker compose logs -f --tail=200
 docker compose restart
@@ -96,15 +96,15 @@ docker compose down
 Create a service user if desired:
 
 ```bash
-sudo useradd --system --home /opt/commander-commandcode-bridge --shell /usr/sbin/nologin commandcode-bridge || true
+sudo useradd --system --home /opt/commandcode-bridge --shell /usr/sbin/nologin commandcode-bridge || true
 ```
 
 Install the app from a source checkout:
 
 ```bash
-sudo mkdir -p /opt/commander-commandcode-bridge
-sudo rsync -a --delete ./ /opt/commander-commandcode-bridge/
-cd /opt/commander-commandcode-bridge
+sudo mkdir -p /opt/commandcode-bridge
+sudo rsync -a --delete ./ /opt/commandcode-bridge/
+cd /opt/commandcode-bridge
 sudo npm ci
 sudo npm run build
 sudo npm prune --omit=dev
@@ -113,9 +113,9 @@ sudo npm prune --omit=dev
 Create the environment file:
 
 ```bash
-sudo cp release/env.production.example /etc/commander-commandcode-bridge.env
-sudo chmod 600 /etc/commander-commandcode-bridge.env
-sudoedit /etc/commander-commandcode-bridge.env
+sudo cp release/env.production.example /etc/commandcode-bridge.env
+sudo chmod 600 /etc/commandcode-bridge.env
+sudoedit /etc/commandcode-bridge.env
 ```
 
 For direct host/systemd installs, `HOST=127.0.0.1` is the safe default. Use a private interface only when an authenticated reverse proxy or VPN controls access.
@@ -123,16 +123,16 @@ For direct host/systemd installs, `HOST=127.0.0.1` is the safe default. Use a pr
 Install and start the unit:
 
 ```bash
-sudo cp release/systemd/commander-commandcode-bridge.service /etc/systemd/system/
+sudo cp release/systemd/commandcode-bridge.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now commander-commandcode-bridge
-sudo systemctl status commander-commandcode-bridge --no-pager
+sudo systemctl enable --now commandcode-bridge
+sudo systemctl status commandcode-bridge --no-pager
 ```
 
 Verify:
 
 ```bash
-export BRIDGE_API_KEY='<same value as /etc/commander-commandcode-bridge.env>'
+export BRIDGE_API_KEY='<same value as /etc/commandcode-bridge.env>'
 release/smoke-curl.sh http://127.0.0.1:9992
 ```
 
@@ -146,14 +146,14 @@ curl -sS 'http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true' \
 Operate:
 
 ```bash
-sudo journalctl -u commander-commandcode-bridge -f
-sudo systemctl restart commander-commandcode-bridge
-sudo systemctl stop commander-commandcode-bridge
+sudo journalctl -u commandcode-bridge -f
+sudo systemctl restart commandcode-bridge
+sudo systemctl stop commandcode-bridge
 ```
 
 ## Nginx Reverse Proxy
 
-Use `nginx/commander-commandcode-bridge.conf` only after setting TLS and client auth policy appropriate for the environment. The bridge should still require `BRIDGE_API_KEY` for non-localhost clients.
+Use `nginx/commandcode-bridge.conf` only after setting TLS and client auth policy appropriate for the environment. The bridge should still require `BRIDGE_API_KEY` for non-localhost clients.
 
 ## Balance Alerts
 

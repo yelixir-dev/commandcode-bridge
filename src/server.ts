@@ -24,12 +24,21 @@ import {
 } from "./openai.js";
 import type { BridgeConfig, CommandCodeUpstream, OpenAIChatCompletionRequest } from "./types.js";
 
+const toolCallSchema = z.object({
+  id: z.string().optional(),
+  type: z.literal("function"),
+  function: z.object({
+    name: z.string().min(1),
+    arguments: z.string(),
+  }),
+});
+
 const messageSchema = z.object({
-  role: z.enum(["system", "user", "assistant", "tool"]),
+  role: z.enum(["developer", "system", "user", "assistant", "tool"]),
   content: z.union([z.string(), z.array(z.record(z.string(), z.unknown())), z.null()]).optional(),
   name: z.string().optional(),
   tool_call_id: z.string().optional(),
-  tool_calls: z.array(z.record(z.string(), z.unknown())).optional(),
+  tool_calls: z.array(toolCallSchema).optional(),
 });
 
 const chatCompletionRequestSchema = z.object({
@@ -225,7 +234,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
 
   app.get("/health", async () => ({
     status: "ok",
-    service: "commander-commandcode-bridge",
+    service: "commandcode-bridge",
     version: "0.1.0",
     upstream: "commandcode-alpha-generate",
     default_model: config.defaultModel,
@@ -302,7 +311,10 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       const id = `chatcmpl_${randomUUID().replace(/-/g, "")}`;
       const created = Math.floor(Date.now() / 1000);
       const abortController = new AbortController();
-      request.raw.on("close", () => abortController.abort());
+      request.raw.on("aborted", () => abortController.abort());
+      reply.raw.on("close", () => {
+        if (!reply.raw.writableEnded) abortController.abort();
+      });
       const commandCodeBody = buildCommandCodeGenerateBody({
         request: openAIRequest,
         upstreamModel: resolvedModel.upstreamModel,

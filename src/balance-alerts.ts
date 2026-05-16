@@ -145,7 +145,7 @@ export class CommandCodeBalanceAlertManager {
     if (dueAlerts.length === 0) return alerts;
 
     const payload = {
-      service: "commander-commandcode-bridge",
+      service: "commandcode-bridge",
       kind: "commandcode_balance_alert",
       generatedAt: new Date(now).toISOString(),
       reason: context.reason ?? "periodic",

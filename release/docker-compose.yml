@@ -1,6 +1,6 @@
 services:
-  commander-commandcode-bridge:
-    image: commander-commandcode-bridge:latest
+  commandcode-bridge:
+    image: commandcode-bridge:latest
     build:
       context: ..
       dockerfile: Dockerfile

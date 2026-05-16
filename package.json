@@ -1,10 +1,10 @@
 {
-  "name": "commander-commandcode-bridge",
+  "name": "commandcode-bridge",
   "version": "0.1.0",
   "description": "OpenAI-compatible HTTP bridge for CommandCode's DeepSeek V4 Pro API path.",
   "type": "module",
   "license": "MIT",
-  "author": "Commander Workspace",
+  "author": "Yorha Workspace",
   "bin": {
     "commandcode-bridge": "dist/index.js",
     "commandcode-router": "dist/router-index.js"

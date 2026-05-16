@@ -1,7 +1,7 @@
 services:
-  commander-commandcode-bridge:
+  commandcode-bridge:
     build: .
-    image: commander-commandcode-bridge:latest
+    image: commandcode-bridge:latest
     restart: unless-stopped
     env_file:
       - .env

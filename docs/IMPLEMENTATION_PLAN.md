@@ -1,4 +1,4 @@
-# Commander CommandCode Bridge Implementation Plan
+# CommandCode Bridge Implementation Plan
 
 > **For Hermes:** Use TDD, then perform three independent code reviews before declaring release readiness.
 

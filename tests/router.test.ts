@@ -84,7 +84,7 @@ describe("CommandCode router", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       status: "ok",
-      service: "commander-commandcode-router",
+      service: "commandcode-router",
       backend_count: 1,
       healthy_backend_count: 1,
     });

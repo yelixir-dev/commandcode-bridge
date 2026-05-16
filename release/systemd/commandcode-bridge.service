@@ -1,5 +1,5 @@
 [Unit]
-Description=Commander CommandCode Bridge - OpenAI-compatible API for CommandCode DeepSeek
+Description=CommandCode Bridge - OpenAI-compatible API for CommandCode DeepSeek
 After=network-online.target
 Wants=network-online.target
 
@@ -7,9 +7,9 @@ Wants=network-online.target
 Type=simple
 User=commandcode-bridge
 Group=commandcode-bridge
-WorkingDirectory=/opt/commander-commandcode-bridge
-EnvironmentFile=/etc/commander-commandcode-bridge.env
-ExecStart=/usr/bin/node /opt/commander-commandcode-bridge/dist/index.js
+WorkingDirectory=/opt/commandcode-bridge
+EnvironmentFile=/etc/commandcode-bridge.env
+ExecStart=/usr/bin/node /opt/commandcode-bridge/dist/index.js
 Restart=always
 RestartSec=5
 NoNewPrivileges=true

@@ -1,4 +1,4 @@
-# Commander CommandCode Bridge PRD
+# CommandCode Bridge PRD
 
 > Product Requirement Document for an OpenAI-compatible HTTP proxy over CommandCode's `/alpha/generate` endpoint.
 
@@ -28,7 +28,7 @@ Expose the local CommandCode account's DeepSeek V4 Pro route as a clean, OpenAI-
 
 ## Users
 
-- Primary: Commander workstation owner using trusted local agents.
+- Primary: CommandCode Bridge workstation owner using trusted local agents.
 - Secondary: Tailnet clients that need an OpenAI-compatible endpoint.
 
 ## Acceptance Criteria

@@ -453,7 +453,7 @@ export async function createRouterApp(
     const healthyCount = probes.filter((backend) => backend.health.ok).length;
     return {
       status: healthyCount > 0 ? "ok" : "degraded",
-      service: "commander-commandcode-router",
+      service: "commandcode-router",
       version: "0.1.0",
       external_port: config.port,
       backend_count: backends.length,
