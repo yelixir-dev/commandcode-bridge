@@ -106,4 +106,17 @@ describe("dashboard UI", () => {
     expect(html).toContain("이미 등록된 키입니다");
     expect(html).toContain("Duplicate CommandCode API key");
   });
+
+  it("uses the loaded admin API key for writes when browser storage is empty or stale", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+      bridgeApiKey: "test-admin-token",
+    });
+
+    expect(html).toContain("cfg?.bridgeApiKey||localStorage.getItem('bridgeApiKey')");
+    expect(html).toContain("'authorization':'Bearer '+key");
+  });
 });
