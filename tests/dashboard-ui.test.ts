@@ -52,7 +52,10 @@ describe("dashboard UI", () => {
     expect(html).toContain("bridge-key-row");
     expect(html).toContain("bridge-key-help-row");
     expect(html).toContain("bridge-key-prefix");
+    expect(html).toContain('id="generateBridgeKey"');
+    expect(html.indexOf('id="generateBridgeKey"')).toBeLessThan(html.indexOf('id="copyBridgeKey"'));
     expect(html).toContain('id="copyBridgeKey"');
+    expect(html).toContain("🎲");
     expect(html).toContain("💾");
     expect(html).toContain("📋");
     expect(html).toContain("sk-");
@@ -133,5 +136,20 @@ describe("dashboard UI", () => {
     expect(html).toContain("authKey(cfg?.bridgeApiKey)");
     expect(html).toContain("const configured=authKey(cfg?.bridgeApiKey)");
     expect(html).toContain("return isRedactedSecret(key)?''");
+  });
+
+  it("can generate and persist a random admin API key from the dashboard", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+      bridgeApiKey: "[REDACTED]",
+    });
+
+    expect(html).toContain("function randomBridgeKey");
+    expect(html).toContain("cmdbridge-");
+    expect(html).toContain("generateBridgeKey");
+    expect(html).toContain("saveBridgeKey(key)");
   });
 });
