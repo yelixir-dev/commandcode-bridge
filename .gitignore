@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 .vitest-tmp/
+.internal/
 .env
 .env.*
 !.env.example

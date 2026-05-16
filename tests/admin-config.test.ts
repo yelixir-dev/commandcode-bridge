@@ -283,7 +283,6 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
-
   it("saves dashboard JSON without requiring the bridge client API key", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",

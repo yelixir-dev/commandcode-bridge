@@ -120,7 +120,9 @@ describe("dashboard UI", () => {
       bridgeApiKey: "test-admin-token",
     });
 
-    expect(html).toContain("authKey(cfg?.bridgeApiKey)||authKey(localStorage.getItem('bridgeApiKey'))");
+    expect(html).toContain(
+      "authKey(cfg?.bridgeApiKey)||authKey(localStorage.getItem('bridgeApiKey'))",
+    );
     expect(html).toContain("'authorization':'Bearer '+key");
   });
 
@@ -199,12 +201,16 @@ describe("dashboard UI", () => {
     });
 
     expect(html).toContain("async function load(){");
-    expect(html).toContain("return {ok:true,dirty:!!cfg.dirty,restartRequired:!!cfg.restart_required}");
+    expect(html).toContain(
+      "return {ok:true,dirty:!!cfg.dirty,restartRequired:!!cfg.restart_required}",
+    );
     expect(html).toContain("async function waitForRestart()");
     expect(html).toContain("elapsed=5;elapsed<=30;elapsed+=5");
     expect(html).toContain("setTimeout(r,5000)");
     expect(html).toContain("showPopup('Restart requested. Checking bridge state in '");
-    expect(html).toContain("if(state?.ok&&!state.dirty&&!state.restartRequired){hidePopup(); return true;}");
+    expect(html).toContain(
+      "if(state?.ok&&!state.dirty&&!state.restartRequired){hidePopup(); return true;}",
+    );
     expect(html).toContain("Restart did not finish cleanly within 30s");
     expect(html).not.toContain("if($('online').textContent==='online')return");
   });

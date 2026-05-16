@@ -196,7 +196,9 @@ function hasSameHostnameReferer(request: FastifyRequest): boolean {
 function isDashboardWriteSourceAllowed(request: FastifyRequest): boolean {
   if (sameHostnameOrigin(request)) return true;
   if (hasSameHostnameReferer(request)) return true;
-  return !request.headers.origin && !request.headers.referer && isLoopbackHost(request.headers.host);
+  return (
+    !request.headers.origin && !request.headers.referer && isLoopbackHost(request.headers.host)
+  );
 }
 
 function asOpenAIRequest(
@@ -240,7 +242,8 @@ function duplicateCommandCodeApiKeyIds(update: DashboardConfigUpdate): string[] 
   for (const credential of update.credentials ?? []) {
     const apiKey = typeof credential.apiKey === "string" ? credential.apiKey.trim() : "";
     if (!apiKey) continue;
-    const id = typeof credential.id === "string" && credential.id.trim() ? credential.id.trim() : "unknown";
+    const id =
+      typeof credential.id === "string" && credential.id.trim() ? credential.id.trim() : "unknown";
     const existingId = seen.get(apiKey);
     if (existingId) {
       duplicateIds.add(existingId);

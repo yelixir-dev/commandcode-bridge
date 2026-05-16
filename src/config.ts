@@ -178,7 +178,8 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     defaultModel,
     allowedModels,
     allowUnknownModels: parseBoolean(env.COMMANDCODE_ALLOW_UNKNOWN_MODELS, false),
-    bridgeApiKey: stringValue(dashboardConfig.bridgeApiKey) || env.BRIDGE_API_KEY?.trim() || undefined,
+    bridgeApiKey:
+      stringValue(dashboardConfig.bridgeApiKey) || env.BRIDGE_API_KEY?.trim() || undefined,
     commandCodeApiKey: commandCodeCredentials[0]?.apiKey,
     commandCodeCredentials,
     commandCodeRoutingPolicy: routingPolicy,
