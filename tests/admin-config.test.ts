@@ -179,6 +179,41 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
+  it("rejects dashboard saves that would duplicate an existing API key", async () => {
+    const file = tempConfigFile({
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: { authorization: "Bearer bridge-secret" },
+      payload: {
+        routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+        credentials: [
+          { id: "alpha", originalId: "alpha", weight: 1 },
+          { id: "beta", apiKey: "alpha-secret", weight: 1 },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.body).toContain("duplicate_commandcode_api_key");
+    expect(response.body).not.toContain("alpha-secret");
+    expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
+      credentials: [{ id: "alpha", apiKey: "alpha-secret" }],
+    });
+
+    await app.close();
+  });
+
   it("serves the mobile dashboard shell without admin authorization", async () => {
     const app = await createApp({
       upstream: new FakeCommandCodeClient(),

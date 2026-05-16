@@ -93,4 +93,17 @@ describe("dashboard UI", () => {
     expect(html).toContain(".footerbar .token{grid-column:1/-1");
     expect(html).toContain(".footerbar button{width:100%;min-width:0}");
   });
+
+  it("includes duplicate API key validation in the dashboard save flow", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [{ id: "alpha", apiKeyConfigured: true, apiKeyPreview: "alph…cret" }],
+      models: [],
+    });
+
+    expect(html).toContain("duplicateCredentialMessage");
+    expect(html).toContain("이미 등록된 키입니다");
+    expect(html).toContain("Duplicate CommandCode API key");
+  });
 });

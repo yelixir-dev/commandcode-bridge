@@ -183,6 +183,24 @@ function withExistingCredentialSecrets(
   return merged;
 }
 
+function duplicateCommandCodeApiKeyIds(update: DashboardConfigUpdate): string[] {
+  const seen = new Map<string, string>();
+  const duplicateIds = new Set<string>();
+  for (const credential of update.credentials ?? []) {
+    const apiKey = typeof credential.apiKey === "string" ? credential.apiKey.trim() : "";
+    if (!apiKey) continue;
+    const id = typeof credential.id === "string" && credential.id.trim() ? credential.id.trim() : "unknown";
+    const existingId = seen.get(apiKey);
+    if (existingId) {
+      duplicateIds.add(existingId);
+      duplicateIds.add(id);
+      continue;
+    }
+    seen.set(apiKey, id);
+  }
+  return Array.from(duplicateIds);
+}
+
 function dashboardConfigResponse(
   config: BridgeConfig,
   dirty: boolean,
@@ -408,6 +426,17 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       request.body as DashboardConfigUpdate,
       secretSourceConfig,
     );
+    const duplicateIds = duplicateCommandCodeApiKeyIds(update);
+    if (duplicateIds.length > 0) {
+      return reply.code(409).send({
+        ...openAIError(
+          `Duplicate CommandCode API key for credential ids: ${duplicateIds.join(", ")}`,
+          "invalid_request_error",
+          "duplicate_commandcode_api_key",
+        ),
+        duplicateCredentialIds: duplicateIds,
+      });
+    }
     writeDashboardConfigFile(config.configFilePath, update);
     configDirty = true;
     const savedConfig = loadBridgeConfig({
