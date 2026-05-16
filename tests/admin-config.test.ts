@@ -199,7 +199,7 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
-  it("preserves an existing credential secret by position when a browser rename payload loses originalId", async () => {
+  it("preserves an existing credential secret by originalId when a browser rename payload omits apiKey", async () => {
     const file = tempConfigFile({
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
       credentials: [
@@ -222,7 +222,7 @@ describe("JSON dashboard configuration", () => {
         routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
         credentials: [
           { id: "ktk.archive", originalId: "ktk.archive", weight: 1, enabled: true },
-          { id: "teykim.renamed", weight: 1, enabled: true },
+          { id: "teykim.renamed", originalId: "teykim.001", weight: 1, enabled: true },
         ],
       },
     });
@@ -239,6 +239,46 @@ describe("JSON dashboard configuration", () => {
       { id: "ktk.archive", apiKey: "ktk-secret" },
       { id: "teykim.renamed", apiKey: "teykim-secret" },
     ]);
+
+    await app.close();
+  });
+
+  it("does not preserve credential secrets by position for ambiguous replacement payloads", async () => {
+    const file = tempConfigFile({
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [
+        { id: "alpha", apiKey: "alpha-secret", weight: 1 },
+        { id: "beta", apiKey: "beta-secret", weight: 1 },
+      ],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: { authorization: "Bearer bridge-secret" },
+      payload: {
+        routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+        credentials: [
+          { id: "new-alpha", weight: 1, enabled: true },
+          { id: "beta", weight: 1, enabled: true },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const persisted = JSON.parse(readFileSync(file, "utf8")) as {
+      credentials: Array<{ id: string; apiKey?: string }>;
+    };
+    expect(persisted.credentials).toMatchObject([{ id: "beta", apiKey: "beta-secret" }]);
+    expect(persisted.credentials).not.toContainEqual(
+      expect.objectContaining({ id: "new-alpha", apiKey: "alpha-secret" }),
+    );
 
     await app.close();
   });

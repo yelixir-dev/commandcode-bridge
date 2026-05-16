@@ -214,17 +214,16 @@ function withExistingCredentialSecrets(
   );
   const merged: DashboardConfigUpdate = { ...update };
   if (update.credentials) {
-    merged.credentials = update.credentials.map((credential, index) => {
+    merged.credentials = update.credentials.map((credential) => {
       const originalId = (credential as { originalId?: string }).originalId;
-      const existingAtIndex = config.commandCodeCredentials[index]?.apiKey;
       const apiKey =
         typeof credential.apiKey === "string" && credential.apiKey.trim().length > 0
           ? credential.apiKey
-          : typeof credential.id === "string"
-            ? (existingById.get(credential.id) ??
-              existingById.get(originalId ?? "") ??
-              existingAtIndex)
-            : (originalId ? existingById.get(originalId) : undefined) ?? existingAtIndex;
+          : typeof originalId === "string" && originalId.length > 0
+            ? existingById.get(originalId)
+            : typeof credential.id === "string"
+              ? existingById.get(credential.id)
+              : undefined;
       const mergedCredential: Partial<(typeof config.commandCodeCredentials)[number]> = {
         ...credential,
       };
@@ -300,9 +299,12 @@ function dashboardConfigResponse(
 
 function restartBridge(): void {
   if (process.platform === "linux") {
-    setTimeout(() => {
-      process.exit(0);
-    }, 100).unref?.();
+    const supervisedBySystemd = Boolean(process.env.INVOCATION_ID || process.env.SYSTEMD_EXEC_PID);
+    if (supervisedBySystemd || process.env.COMMANDCODE_BRIDGE_RESTART_MODE === "exit") {
+      setTimeout(() => {
+        process.exit(0);
+      }, 100).unref?.();
+    }
     return;
   }
   const label = process.env.COMMANDCODE_BRIDGE_LAUNCHD_LABEL ?? "com.yorha.commandcode-bridge";
