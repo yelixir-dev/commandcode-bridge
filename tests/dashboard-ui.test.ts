@@ -74,4 +74,19 @@ describe("dashboard UI", () => {
     expect(html).toContain("data-cenabled");
     expect(html.indexOf("data-cenabled")).toBeLessThan(html.indexOf("data-del"));
   });
+
+  it("keeps toast notifications from blocking the floating save/restart bar", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+    });
+
+    expect(html).toContain(".footerbar{position:fixed");
+    expect(html).toContain("z-index:30");
+    expect(html).toContain(".toast{position:fixed");
+    expect(html).toContain("z-index:20;pointer-events:none");
+    expect(html).toContain("env(safe-area-inset-bottom)");
+  });
 });
