@@ -68,6 +68,7 @@ describe("JSON dashboard configuration", () => {
 
   it("loads routing defaults and enabled model toggles from credentials JSON", () => {
     const file = tempConfigFile({
+      server: { host: "0.0.0.0", port: 9992 },
       routing: {
         policy: "daily_burn_priority",
         maxInFlightPerCredential: 4,
@@ -88,6 +89,8 @@ describe("JSON dashboard configuration", () => {
       authPaths: [],
     });
 
+    expect(config.host).toBe("0.0.0.0");
+    expect(config.port).toBe(9992);
     expect(config.commandCodeRoutingPolicy).toBe("daily_burn_priority");
     expect(config.commandCodeMaxInFlightPerCredential).toBe(4);
     expect(config.commandCodeMaxTotalInFlight).toBe(6);
@@ -119,6 +122,7 @@ describe("JSON dashboard configuration", () => {
     expect(getResponse.body).not.toContain("alpha-secret");
     expect(getResponse.json()).toMatchObject({
       dirty: false,
+      server: { host: "127.0.0.1", port: 9992 },
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
       credentials: [{ id: "alpha", apiKeyConfigured: true }],
     });
@@ -128,6 +132,7 @@ describe("JSON dashboard configuration", () => {
       url: "/admin/config",
       headers,
       payload: {
+        server: { host: "0.0.0.0", port: 9992 },
         routing: {
           policy: "round_robin",
           maxInFlightPerCredential: 4,

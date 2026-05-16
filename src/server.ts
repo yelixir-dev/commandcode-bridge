@@ -190,6 +190,10 @@ function dashboardConfigResponse(config: BridgeConfig, dirty: boolean) {
     configFilePath: config.configFilePath,
     dirty,
     restart_required: dirty,
+    server: {
+      host: config.host,
+      port: config.port,
+    },
     routing,
     models: config.modelCatalog ?? [],
     credentials: redactedCredentials(config.commandCodeCredentials),

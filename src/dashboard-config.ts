@@ -10,7 +10,13 @@ import type {
   CommandCodeRoutingPolicy,
 } from "./types.js";
 
+export interface DashboardServerConfig {
+  host: string;
+  port: number;
+}
+
 export interface CommandCodeDashboardConfigFile {
+  server?: Partial<DashboardServerConfig>;
   routing?: Partial<CommandCodeRoutingConfig>;
   models?: Array<Partial<CommandCodeModelConfig>>;
   credentials?: Array<Partial<CommandCodeCredential>>;
@@ -30,12 +36,14 @@ export interface DashboardConfigView {
   configFilePath: string | undefined;
   dirty: boolean;
   restart_required: boolean;
+  server: DashboardServerConfig;
   routing: CommandCodeRoutingConfig;
   models: CommandCodeModelConfig[];
   credentials: RedactedCommandCodeCredential[];
 }
 
 export interface DashboardConfigUpdate {
+  server?: Partial<DashboardServerConfig>;
   routing?: Partial<CommandCodeRoutingConfig>;
   models?: Array<Partial<CommandCodeModelConfig>>;
   credentials?: Array<Partial<CommandCodeCredential>>;
@@ -57,6 +65,11 @@ export const DEFAULT_ROUTING_CONFIG: CommandCodeRoutingConfig = {
   maxTotalInFlightMultiplier: 3,
   billingRefreshMs: 300_000,
   credentialCooldownMs: 60_000,
+};
+
+export const DEFAULT_SERVER_CONFIG: DashboardServerConfig = {
+  host: "127.0.0.1",
+  port: 9992,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -97,6 +110,13 @@ function policyValue(value: unknown, fallback: CommandCodeRoutingPolicy): Comman
   const policy = stringValue(value) as CommandCodeRoutingPolicy | undefined;
   if (!policy || !VALID_POLICIES.has(policy)) return fallback;
   return policy;
+}
+
+function hostValue(value: unknown, fallback: string): string {
+  const host = stringValue(value);
+  if (!host) return fallback;
+  if (host === "127.0.0.1" || host === "0.0.0.0" || host === "localhost") return host;
+  return fallback;
 }
 
 function expandPath(path: string): string {
@@ -146,6 +166,17 @@ export function normalizeRoutingConfig(
     ),
     billingRefreshMs: numberValue(record.billingRefreshMs, defaults.billingRefreshMs),
     credentialCooldownMs: numberValue(record.credentialCooldownMs, defaults.credentialCooldownMs),
+  };
+}
+
+export function normalizeServerConfig(
+  value: unknown,
+  defaults: DashboardServerConfig = DEFAULT_SERVER_CONFIG,
+): DashboardServerConfig {
+  const record = isRecord(value) ? value : {};
+  return {
+    host: hostValue(record.host, defaults.host),
+    port: numberValue(record.port, defaults.port),
   };
 }
 
@@ -227,6 +258,7 @@ export function buildWritableDashboardConfig(
   update: DashboardConfigUpdate,
 ): CommandCodeDashboardConfigFile {
   return {
+    server: normalizeServerConfig(update.server),
     routing: normalizeRoutingConfig(update.routing),
     models: normalizeModelUpdate(update.models ?? []),
     credentials: normalizeCredentialUpdate(update.credentials ?? []),

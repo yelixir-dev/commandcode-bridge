@@ -1,6 +1,7 @@
 import { loadCommandCodeCredentialsFromEnvOrFile } from "./auth.js";
 import {
   normalizeRoutingConfig,
+  normalizeServerConfig,
   readDashboardConfigFile,
   resolveConfigFilePath,
 } from "./dashboard-config.js";
@@ -105,6 +106,10 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
   const env = options.env ?? process.env;
   const configFilePath = resolveConfigFilePath(env);
   const dashboardConfig = readDashboardConfigFile(configFilePath);
+  const serverFromFile = normalizeServerConfig(dashboardConfig.server, {
+    host: env.HOST?.trim() || "127.0.0.1",
+    port: parseNumber(env.PORT, 9992),
+  });
   const defaultModel = normalizeModelName(env.COMMANDCODE_DEFAULT_MODEL?.trim() || DEFAULT_MODEL);
   const allowedFromEnv = parseCsv(env.COMMANDCODE_ALLOWED_MODELS).map(normalizeModelName);
   const configuredModelCatalog = dashboardConfig.models
@@ -166,8 +171,8 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
   );
 
   return {
-    host: env.HOST?.trim() || "127.0.0.1",
-    port: parseNumber(env.PORT, 9992),
+    host: serverFromFile.host,
+    port: serverFromFile.port,
     apiBase: (env.COMMANDCODE_API_BASE?.trim() || "https://api.commandcode.ai").replace(/\/+$/, ""),
     cliVersion: env.COMMANDCODE_CLI_VERSION?.trim() || "0.25.12",
     defaultModel,
