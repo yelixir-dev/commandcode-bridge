@@ -3,6 +3,20 @@ import { describe, expect, it } from "vitest";
 import { dashboardHtml } from "../src/dashboard.js";
 
 describe("dashboard UI", () => {
+  it("shows the bridge version in the header instead of the endpoint", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+      bridge: { online: true, endpoint: "0.0.0.0:9992", version: "0.1.0" },
+    });
+
+    expect(html).toContain('id="bridgeVersion"');
+    expect(html).toContain("v0.1.0");
+    expect(html).not.toContain('id="endpoint"');
+  });
+
   it("shows only the key-level concurrency field, not total concurrency controls", () => {
     const html = dashboardHtml({
       server: { host: "127.0.0.1", port: 9992 },

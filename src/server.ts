@@ -23,6 +23,7 @@ import {
 } from "./credential-router.js";
 import { CommandCodeBalanceAlertManager } from "./balance-alerts.js";
 import { buildCommandCodeGenerateBody, isSupportedToolChoice } from "./converter.js";
+import { BRIDGE_VERSION } from "./version.js";
 import {
   collectOpenAICompletion,
   CommandCodeEmptyResponseError,
@@ -220,6 +221,7 @@ function dashboardConfigResponse(
     })),
     bridge: {
       online: true,
+      version: BRIDGE_VERSION,
       endpoint: `${config.host}:${config.port}`,
       port: config.port,
       models: publicModelList(config),
@@ -343,7 +345,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   app.get("/health", async () => ({
     status: "ok",
     service: "commandcode-bridge",
-    version: "0.1.0",
+    version: BRIDGE_VERSION,
     upstream: "commandcode-alpha-generate",
     endpoint: `${config.host}:${config.port}`,
     port: config.port,

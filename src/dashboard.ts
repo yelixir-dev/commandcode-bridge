@@ -1,3 +1,5 @@
+import { BRIDGE_VERSION } from "./version.js";
+
 function scriptJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
@@ -29,7 +31,7 @@ export function dashboardHtml(initialConfig: unknown = null): string {
   <main class="wrap">
     <section class="top">
       <div class="brand"><a class="eyebrow" href="https://github.com/yelixir-dev" target="_blank" rel="noopener noreferrer">github.com/yelixir-dev</a><h1>CommandCode Bridge Console</h1></div>
-      <div class="status"><span class="pill"><i id="dot" class="dot"></i><span id="online">checking</span></span><div id="endpoint" class="small"></div></div>
+      <div class="status"><span class="pill"><i id="dot" class="dot"></i><span id="online">checking</span></span><div id="bridgeVersion" class="small">v${BRIDGE_VERSION}</div></div>
     </section>
     <section class="grid">
       <div class="card wide"><h2>Server Bind <span class="sub">after restart</span></h2><div class="bind-grid"><div class="field"><label>Bind host</label><select id="bindHost"><option value="127.0.0.1">127.0.0.1 · local only</option><option value="0.0.0.0">0.0.0.0 · LAN/Tailscale</option></select></div><div class="field"><label>Port</label><input id="bindPort" type="number" min="1" max="65535" /></div></div><div id="bridgeKeyWrap" class="field bridge-key"><label>Admin API Key</label><div class="bridge-key-row"><span class="bridge-key-prefix">sk-</span><input id="bridgeApiKey" type="text" autocomplete="off" spellcheck="false" placeholder="cmdbridge-랜덤6 · 복사/수정 가능" /></div><div class="bridge-key-help-row"><span class="bridge-key-help">0.0.0.0/LAN 공개 시 필요</span><button id="copyBridgeKey" class="secondary" type="button" aria-label="Copy Admin API Key">📋</button><button id="saveBridgeKey" class="secondary" type="button" aria-label="Save Admin API Key">💾</button></div></div></div>
@@ -55,7 +57,7 @@ function updateRestart(){const online=$('online').textContent==='online'; $('res
 async function fetchJson(path,opt={}){const init={...opt,cache:'no-store',headers:{...auth(),...(opt.headers||{})}}; try{const r=await fetch(path,init); if(!r.ok) throw new Error(await r.text()); return r.json();}catch(e){if(location.hostname&&!location.port){const r=await fetch('http://'+location.hostname+':9992'+path,init); if(!r.ok) throw new Error(await r.text()); return r.json();}throw e;}}
 async function api(path,opt={}){return fetchJson(path,opt)}
 async function health(){return fetchJson('/health')}
-function setOnline(h){$('dot').className='dot on'; $('online').textContent='online'; $('endpoint').textContent=(h.endpoint||((location.hostname||'127.0.0.1')+':'+(location.port||'9992')))}
+function setOnline(h){$('dot').className='dot on'; $('online').textContent='online'; $('bridgeVersion').textContent='v'+(h.version||'${BRIDGE_VERSION}')}
 async function load(){if(cfg){if(cfg.bridge) setOnline(cfg.bridge); render(); setDirty(cfg.dirty||false);} try{const h=await health(); setOnline(h);}catch{ if(!cfg){$('dot').className='dot off'; $('online').textContent='offline';} } updateRestart(); try{cfg=await api('/admin/config'); if(cfg.bridge) setOnline(cfg.bridge); try{const m=await api('/admin/commandcode/credentials?refresh=true'); const byId=new Map((m.credentials||[]).map(x=>[x.id,x])); cfg.credentials.forEach(c=>c.metrics=byId.get(c.id));}catch{} render(); setDirty(cfg.dirty||false);}catch(e){if(!cfg) toast('설정 로드 실패: 포트 9992 주소로 다시 열어주세요.');}}
 function render(){if(!cfg)return; $('bindHost').value=cfg.server.host; $('bindPort').value=cfg.server.port; $('maxPer').value=cfg.routing.maxInFlightPerCredential||4; syncBridgeKey();
 $('policies').innerHTML=policies.map(p=>'<label class="policy"><input type="radio" name="policy" value="'+esc(p[0])+'" '+(cfg.routing.policy===p[0]?'checked':'')+'><b>'+esc(p[1])+'</b><span class="info" tabindex="0" aria-label="'+esc(p[1])+' 설명">ℹ️<span class="tip">'+esc(p[2])+'<br><span class="token">'+esc(p[0])+'</span></span></span></label>').join(''); document.querySelectorAll('input[name=policy]').forEach(el=>el.onchange=()=>{cfg.routing.policy=el.value;setDirty();});
