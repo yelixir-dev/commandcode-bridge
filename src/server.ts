@@ -135,11 +135,18 @@ function isAdminRequest(request: FastifyRequest): boolean {
 
 function shouldRequireAuth(request: FastifyRequest): boolean {
   if (request.method === "GET" && request.url.startsWith("/admin/config")) return false;
+  if (request.method === "GET" && request.url.startsWith("/admin/commandcode/credentials")) {
+    return false;
+  }
   return request.url.startsWith("/v1/") || isAdminRequest(request);
 }
 
 function isPublicAdminRequest(request: FastifyRequest): boolean {
-  return request.method === "GET" && request.url.startsWith("/admin/config");
+  return (
+    request.method === "GET" &&
+    (request.url.startsWith("/admin/config") ||
+      request.url.startsWith("/admin/commandcode/credentials"))
+  );
 }
 
 function asOpenAIRequest(
@@ -175,7 +182,12 @@ function withExistingCredentialSecrets(
   return merged;
 }
 
-function dashboardConfigResponse(config: BridgeConfig, dirty: boolean) {
+function dashboardConfigResponse(
+  config: BridgeConfig,
+  dirty: boolean,
+  diagnostics: CommandCodeCredentialDiagnostic[] = [],
+) {
+  const diagnosticsById = new Map(diagnostics.map((diagnostic) => [diagnostic.id, diagnostic]));
   const routing = {
     ...DEFAULT_ROUTING_CONFIG,
     policy: config.commandCodeRoutingPolicy,
@@ -201,7 +213,10 @@ function dashboardConfigResponse(config: BridgeConfig, dirty: boolean) {
     },
     routing,
     models: config.modelCatalog ?? [],
-    credentials: redactedCredentials(config.commandCodeCredentials),
+    credentials: redactedCredentials(config.commandCodeCredentials).map((credential) => ({
+      ...credential,
+      metrics: diagnosticsById.get(credential.id),
+    })),
     bridge: {
       online: true,
       endpoint: `${config.host}:${config.port}`,
@@ -345,18 +360,29 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
 
   app.get("/", async (_request, reply) => reply.redirect("/dashboard"));
 
-  app.get("/dashboard", async (_request, reply) =>
-    reply
+  async function readCredentialDiagnostics(
+    refresh: boolean,
+  ): Promise<CommandCodeCredentialDiagnostic[]> {
+    if (!diagnosticsProvider) return [];
+    return diagnosticsProvider.getCredentialDiagnostics({ refresh });
+  }
+
+  app.get("/dashboard", async (_request, reply) => {
+    const diagnostics = await readCredentialDiagnostics(false).catch(() => []);
+    return reply
       .type("text/html; charset=utf-8")
       .header("cache-control", "no-store")
-      .send(dashboardHtml(dashboardConfigResponse(config, configDirty))),
-  );
+      .send(dashboardHtml(dashboardConfigResponse(config, configDirty, diagnostics)));
+  });
 
   let configDirty = false;
 
-  app.get("/admin/config", async (_request, reply) =>
-    reply.header("cache-control", "no-store").send(dashboardConfigResponse(config, configDirty)),
-  );
+  app.get("/admin/config", async (_request, reply) => {
+    const diagnostics = await readCredentialDiagnostics(false).catch(() => []);
+    return reply
+      .header("cache-control", "no-store")
+      .send(dashboardConfigResponse(config, configDirty, diagnostics));
+  });
 
   app.put("/admin/config", async (request, reply) => {
     if (!config.configFilePath) {

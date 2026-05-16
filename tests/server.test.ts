@@ -146,21 +146,23 @@ describe("Fastify OpenAI-compatible server", () => {
     await app.close();
   });
 
-  it("keeps admin credential metrics closed unless BRIDGE_API_KEY is configured", async () => {
+  it("serves redacted credential metrics without requiring BRIDGE_API_KEY", async () => {
     const app = await createTestApp({ upstream: new FakeDiagnosticsCommandCodeClient() });
     const response = await app.inject({ method: "GET", url: "/admin/commandcode/credentials" });
-    expect(response.statusCode).toBe(403);
-    expect(response.json().error.code).toBe("admin_auth_not_configured");
+    expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain("commandcode-secret");
+    expect(response.json()).toMatchObject({ object: "commandcode.credential_metrics" });
     await app.close();
   });
 
-  it("requires authentication for admin credential metrics when BRIDGE_API_KEY is configured", async () => {
+  it("keeps credential metrics public and redacted when BRIDGE_API_KEY is configured", async () => {
     const app = await createTestApp({
       upstream: new FakeDiagnosticsCommandCodeClient(),
       configOverrides: { bridgeApiKey: "bridge-secret" },
     });
     const response = await app.inject({ method: "GET", url: "/admin/commandcode/credentials" });
-    expect(response.statusCode).toBe(401);
+    expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain("bridge-secret");
     await app.close();
   });
 
