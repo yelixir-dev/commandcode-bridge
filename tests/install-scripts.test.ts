@@ -36,6 +36,8 @@ describe("installer scripts", () => {
     expect(script).toContain("EnvironmentFile=%h/.config/commandcode-bridge/env");
     expect(script).toContain("write_env_line BRIDGE_API_KEY");
     expect(script).toContain("write_env_line COMMANDCODE_ALLOWED_MODELS");
+    expect(script).toContain("sk-cmdbridge-");
+    expect(script).toContain("randomBytes(3)");
     expect(script).toContain("read -rs key_input");
     expect(script).toContain("refusing unexpected INSTALL_DIR");
   });

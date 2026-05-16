@@ -36,6 +36,11 @@ describe("dashboard UI", () => {
     expect(html).toContain('type="text"');
     expect(html).toContain("bridge-key-row");
     expect(html).toContain("bridge-key-spacer");
+    expect(html).toContain("bridge-key-prefix");
+    expect(html).toContain('id="copyBridgeKey"');
+    expect(html).toContain("💾");
+    expect(html).toContain("📋");
+    expect(html).toContain("sk-");
     expect(html).toContain('id="saveBridgeKey"');
     expect(html).toContain('id="bridgeKeyInfo"');
     expect(html).toContain(
