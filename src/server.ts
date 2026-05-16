@@ -134,7 +134,12 @@ function isAdminRequest(request: FastifyRequest): boolean {
 }
 
 function shouldRequireAuth(request: FastifyRequest): boolean {
+  if (request.method === "GET" && request.url.startsWith("/admin/config")) return false;
   return request.url.startsWith("/v1/") || isAdminRequest(request);
+}
+
+function isPublicAdminRequest(request: FastifyRequest): boolean {
+  return request.method === "GET" && request.url.startsWith("/admin/config");
 }
 
 function asOpenAIRequest(
@@ -299,7 +304,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   }
 
   app.addHook("preHandler", async (request, reply) => {
-    if (isAdminRequest(request) && !config.bridgeApiKey) {
+    if (isAdminRequest(request) && !isPublicAdminRequest(request) && !config.bridgeApiKey) {
       return reply
         .code(403)
         .send(
@@ -341,12 +346,17 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   app.get("/", async (_request, reply) => reply.redirect("/dashboard"));
 
   app.get("/dashboard", async (_request, reply) =>
-    reply.type("text/html; charset=utf-8").send(dashboardHtml()),
+    reply
+      .type("text/html; charset=utf-8")
+      .header("cache-control", "no-store")
+      .send(dashboardHtml()),
   );
 
   let configDirty = false;
 
-  app.get("/admin/config", async () => dashboardConfigResponse(config, configDirty));
+  app.get("/admin/config", async (_request, reply) =>
+    reply.header("cache-control", "no-store").send(dashboardConfigResponse(config, configDirty)),
+  );
 
   app.put("/admin/config", async (request, reply) => {
     if (!config.configFilePath) {

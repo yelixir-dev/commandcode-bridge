@@ -117,7 +117,7 @@ describe("JSON dashboard configuration", () => {
     });
 
     const headers = { authorization: "Bearer bridge-secret" };
-    const getResponse = await app.inject({ method: "GET", url: "/admin/config", headers });
+    const getResponse = await app.inject({ method: "GET", url: "/admin/config" });
     expect(getResponse.statusCode).toBe(200);
     expect(getResponse.body).not.toContain("alpha-secret");
     expect(getResponse.json()).toMatchObject({
