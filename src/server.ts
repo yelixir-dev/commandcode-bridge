@@ -349,7 +349,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     reply
       .type("text/html; charset=utf-8")
       .header("cache-control", "no-store")
-      .send(dashboardHtml()),
+      .send(dashboardHtml(dashboardConfigResponse(config, configDirty))),
   );
 
   let configDirty = false;
