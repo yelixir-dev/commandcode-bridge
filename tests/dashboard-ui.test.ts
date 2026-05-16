@@ -167,6 +167,8 @@ describe("dashboard UI", () => {
 
     expect(html).toContain("function credentialPayloads");
     expect(html).toContain("document.querySelectorAll('[data-cid]')");
+    expect(html).toContain("data-original-id");
+    expect(html).toContain("originalIds.set(i,e.dataset.originalId");
     expect(html).toContain("document.querySelector('[data-ckey=\"'+i+'\"]')");
     expect(html).toContain("api('/admin/config'");
     expect(html).toContain("api('/admin/restart'");
@@ -183,11 +185,12 @@ describe("dashboard UI", () => {
 
     expect(html).toContain('id="modal"');
     expect(html).toContain(".modal{position:fixed");
+    expect(html).toContain("function showPopup(t,ms=0)");
     expect(html).toContain("function popup(t,ms=3000)");
     expect(html).toContain("popup('JSON saved. Restart required.',3000)");
   });
 
-  it("waits for a fresh clean admin config after restart instead of returning on health-only races", () => {
+  it("keeps the restart popup open in five-second health/config polling windows", () => {
     const html = dashboardHtml({
       server: { host: "0.0.0.0", port: 9992 },
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -198,8 +201,11 @@ describe("dashboard UI", () => {
     expect(html).toContain("async function load(){");
     expect(html).toContain("return {ok:true,dirty:!!cfg.dirty,restartRequired:!!cfg.restart_required}");
     expect(html).toContain("async function waitForRestart()");
-    expect(html).toContain("if(state?.ok&&!state.dirty&&!state.restartRequired)");
-    expect(html).toContain("restart still pending");
+    expect(html).toContain("elapsed=5;elapsed<=30;elapsed+=5");
+    expect(html).toContain("setTimeout(r,5000)");
+    expect(html).toContain("showPopup('Restart requested. Checking bridge state in '");
+    expect(html).toContain("if(state?.ok&&!state.dirty&&!state.restartRequired){hidePopup(); return true;}");
+    expect(html).toContain("Restart did not finish cleanly within 30s");
     expect(html).not.toContain("if($('online').textContent==='online')return");
   });
 });

@@ -138,6 +138,7 @@ describe("JSON dashboard configuration", () => {
     const getResponse = await app.inject({ method: "GET", url: "/admin/config" });
     expect(getResponse.statusCode).toBe(200);
     expect(getResponse.body).not.toContain("alpha-secret");
+    expect(getResponse.body).not.toContain("bridge-secret");
     expect(getResponse.json()).toMatchObject({
       dirty: false,
       server: { host: "127.0.0.1", port: 9992 },
@@ -170,6 +171,7 @@ describe("JSON dashboard configuration", () => {
     expect(putResponse.json()).toMatchObject({ dirty: true, restart_required: true });
     expect(putResponse.body).not.toContain("alpha-secret");
     expect(putResponse.body).not.toContain("beta-secret");
+    expect(putResponse.body).not.toContain("bridge-secret");
 
     const secondPutResponse = await app.inject({
       method: "PUT",
@@ -196,6 +198,51 @@ describe("JSON dashboard configuration", () => {
 
     await app.close();
   });
+
+  it("preserves an existing credential secret by position when a browser rename payload loses originalId", async () => {
+    const file = tempConfigFile({
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [
+        { id: "ktk.archive", apiKey: "ktk-secret", weight: 1 },
+        { id: "teykim.001", apiKey: "teykim-secret", weight: 1 },
+      ],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: { authorization: "Bearer bridge-secret" },
+      payload: {
+        routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+        credentials: [
+          { id: "ktk.archive", originalId: "ktk.archive", weight: 1, enabled: true },
+          { id: "teykim.renamed", weight: 1, enabled: true },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().credentials.map((credential: { id: string }) => credential.id)).toEqual([
+      "ktk.archive",
+      "teykim.renamed",
+    ]);
+    const persisted = JSON.parse(readFileSync(file, "utf8")) as {
+      credentials: Array<{ id: string; apiKey?: string }>;
+    };
+    expect(persisted.credentials).toMatchObject([
+      { id: "ktk.archive", apiKey: "ktk-secret" },
+      { id: "teykim.renamed", apiKey: "teykim-secret" },
+    ]);
+
+    await app.close();
+  });
+
 
   it("saves dashboard JSON without requiring the bridge client API key", async () => {
     const file = tempConfigFile({

@@ -1,5 +1,5 @@
-import { randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Readable } from "node:stream";
 
 import cors from "@fastify/cors";
@@ -214,14 +214,17 @@ function withExistingCredentialSecrets(
   );
   const merged: DashboardConfigUpdate = { ...update };
   if (update.credentials) {
-    merged.credentials = update.credentials.map((credential) => {
+    merged.credentials = update.credentials.map((credential, index) => {
+      const originalId = (credential as { originalId?: string }).originalId;
+      const existingAtIndex = config.commandCodeCredentials[index]?.apiKey;
       const apiKey =
         typeof credential.apiKey === "string" && credential.apiKey.trim().length > 0
           ? credential.apiKey
           : typeof credential.id === "string"
             ? (existingById.get(credential.id) ??
-              existingById.get((credential as { originalId?: string }).originalId ?? ""))
-            : undefined;
+              existingById.get(originalId ?? "") ??
+              existingAtIndex)
+            : (originalId ? existingById.get(originalId) : undefined) ?? existingAtIndex;
       const mergedCredential: Partial<(typeof config.commandCodeCredentials)[number]> = {
         ...credential,
       };
@@ -274,7 +277,7 @@ function dashboardConfigResponse(
     object: "commandcode.dashboard_config",
     dirty,
     restart_required: dirty,
-    bridgeApiKey: config.bridgeApiKey,
+    bridgeApiKey: config.bridgeApiKey ? "[REDACTED]" : undefined,
     server: {
       host: config.host,
       port: config.port,
@@ -296,6 +299,12 @@ function dashboardConfigResponse(
 }
 
 function restartBridge(): void {
+  if (process.platform === "linux") {
+    setTimeout(() => {
+      process.exit(0);
+    }, 100).unref?.();
+    return;
+  }
   const label = process.env.COMMANDCODE_BRIDGE_LAUNCHD_LABEL ?? "com.yorha.commandcode-bridge";
   const target = `gui/${process.getuid?.() ?? 501}/${label}`;
   const child = spawn("launchctl", ["kickstart", "-k", target], {
