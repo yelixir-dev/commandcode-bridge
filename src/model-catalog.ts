@@ -18,7 +18,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "deepseek",
     aliases: ["deepseek-v4-pro", "commandcode/deepseek-v4-pro"],
     enabledByDefault: true,
-    notes: "CommandCode: $0.435/M in · $0.87/M out · cache hit $0.003625/M",
+    notes: "$0.435/M in · $0.87/M out · cache hit $0.003625/M",
   },
   {
     id: "deepseek/deepseek-v4-flash",
@@ -27,7 +27,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "deepseek",
     aliases: ["deepseek-v4-flash", "commandcode/deepseek-v4-flash"],
     enabledByDefault: true,
-    notes: "CommandCode: $0.14/M in · $0.28/M out · cache hit $0.01/M",
+    notes: "$0.14/M in · $0.28/M out · cache hit $0.01/M",
   },
   {
     id: "MiniMaxAI/MiniMax-M2.7",
@@ -36,7 +36,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "minimax",
     aliases: ["minimax-m2.7", "MiniMax-M2.7"],
     enabledByDefault: true,
-    notes: "CommandCode: $0.30/M in · $1.20/M out · cache hit $0.06/M",
+    notes: "$0.30/M in · $1.20/M out · cache hit $0.06/M",
   },
   {
     id: "Qwen/Qwen3.6-Plus",
@@ -45,7 +45,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "qwen",
     aliases: ["qwen3.6-plus", "Qwen3.6-Plus"],
     enabledByDefault: true,
-    notes: "CommandCode: $0.50/M in · $3/M out · cache hit $0.10/M",
+    notes: "$0.50/M in · $3/M out · cache hit $0.10/M",
   },
   {
     id: "zai-org/GLM-5.1",
@@ -54,7 +54,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "glm",
     aliases: ["glm-5.1", "GLM-5.1"],
     enabledByDefault: true,
-    notes: "CommandCode: $1.40/M in · $4.40/M out · cache hit $0.26/M",
+    notes: "$1.40/M in · $4.40/M out · cache hit $0.26/M",
   },
   {
     id: "moonshotai/Kimi-K2.6",
@@ -63,7 +63,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "kimi",
     aliases: ["kimi-k2.6", "Kimi-K2.6"],
     enabledByDefault: true,
-    notes: "CommandCode: $0.95/M in · $4/M out · cache hit $0.16/M",
+    notes: "$0.95/M in · $4/M out · cache hit $0.16/M",
   },
   {
     id: "openai/gpt-5.5",
@@ -72,7 +72,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "gpt",
     aliases: ["gpt-5.5", "GPT-5.5"],
     enabledByDefault: false,
-    notes: "CommandCode: $5/M in · $30/M out",
+    notes: "$5/M in · $30/M out",
   },
   {
     id: "anthropic/claude-opus-4.7",
@@ -81,7 +81,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "claude",
     aliases: ["claude-opus-4.7", "opus-4.7"],
     enabledByDefault: false,
-    notes: "CommandCode: $5/M in · $25/M out · cache hit $0.5/M",
+    notes: "$5/M in · $25/M out · cache hit $0.5/M",
   },
   {
     id: "anthropic/claude-sonnet-4.6",
@@ -90,7 +90,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "claude",
     aliases: ["claude-sonnet-4.6", "sonnet-4.6"],
     enabledByDefault: false,
-    notes: "CommandCode: $3/M in · $15/M out · cache hit $0.3/M",
+    notes: "$3/M in · $15/M out · cache hit $0.3/M",
   },
 ];
 
