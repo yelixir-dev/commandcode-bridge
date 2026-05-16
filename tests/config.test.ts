@@ -15,7 +15,7 @@ describe("configuration and model aliases", () => {
     );
     expect(
       config.modelCatalog?.find((model) => model.id === "deepseek/deepseek-v4-pro")?.notes,
-    ).toContain("CommandCode OSS credits");
+    ).toBe("CommandCode: $0.435/M in · $0.87/M out · cache hit $0.003625/M");
   });
 
   it("keeps balance alerts off by default while failing closed on empty length responses", () => {
