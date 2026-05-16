@@ -172,4 +172,34 @@ describe("dashboard UI", () => {
     expect(html).toContain("api('/admin/restart'");
     expect(html).not.toContain("/Users/yorha");
   });
+
+  it("uses a three-second modal popup for explicit save feedback", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [{ id: "default", apiKeyConfigured: true }],
+      models: [],
+    });
+
+    expect(html).toContain('id="modal"');
+    expect(html).toContain(".modal{position:fixed");
+    expect(html).toContain("function popup(t,ms=3000)");
+    expect(html).toContain("popup('JSON saved. Restart required.',3000)");
+  });
+
+  it("waits for a fresh clean admin config after restart instead of returning on health-only races", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [{ id: "default", apiKeyConfigured: true }],
+      models: [],
+    });
+
+    expect(html).toContain("async function load(){");
+    expect(html).toContain("return {ok:true,dirty:!!cfg.dirty,restartRequired:!!cfg.restart_required}");
+    expect(html).toContain("async function waitForRestart()");
+    expect(html).toContain("if(state?.ok&&!state.dirty&&!state.restartRequired)");
+    expect(html).toContain("restart still pending");
+    expect(html).not.toContain("if($('online').textContent==='online')return");
+  });
 });
