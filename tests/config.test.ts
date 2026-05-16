@@ -97,7 +97,7 @@ describe("configuration and model aliases", () => {
       "alpha-secret",
       "beta-secret",
     ]);
-    expect(config.commandCodeRoutingPolicy).toBe("depletion_aware");
+    expect(config.commandCodeRoutingPolicy).toBe("daily_burn_priority");
     expect(config.commandCodeApiKey).toBe("alpha-secret");
   });
 

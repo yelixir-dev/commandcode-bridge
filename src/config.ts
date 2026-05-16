@@ -1,4 +1,10 @@
 import { loadCommandCodeCredentialsFromEnvOrFile } from "./auth.js";
+import {
+  normalizeRoutingConfig,
+  readDashboardConfigFile,
+  resolveConfigFilePath,
+} from "./dashboard-config.js";
+import { defaultModelCatalog, mergeModelCatalog, modelAliasMap } from "./model-catalog.js";
 import type {
   BridgeConfig,
   CommandCodeEmptyVisibleResponsePolicy,
@@ -11,12 +17,7 @@ export const FLASH_MODEL = "deepseek/deepseek-v4-flash";
 export const MODEL_ALIASES: Record<string, string> = {
   default: DEFAULT_MODEL,
   "commandcode/default": DEFAULT_MODEL,
-  "deepseek-v4-pro": DEFAULT_MODEL,
-  "deepseek/deepseek-v4-pro": DEFAULT_MODEL,
-  "commandcode/deepseek-v4-pro": DEFAULT_MODEL,
-  "deepseek-v4-flash": FLASH_MODEL,
-  "deepseek/deepseek-v4-flash": FLASH_MODEL,
-  "commandcode/deepseek-v4-flash": FLASH_MODEL,
+  ...modelAliasMap(),
 };
 
 export interface LoadBridgeConfigOptions {
@@ -57,7 +58,12 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 }
 
 function parseRoutingPolicy(value: string | undefined): CommandCodeRoutingPolicy {
-  return value === "round_robin" ? "round_robin" : "depletion_aware";
+  if (value === "drain_first") return "drain_first";
+  if (value === "round_robin") return "round_robin";
+  if (value === "balance_priority") return "balance_priority";
+  if (value === "daily_burn_priority") return "daily_burn_priority";
+  if (value === "depletion_aware") return "daily_burn_priority";
+  return "daily_burn_priority";
 }
 
 function parseEmptyVisibleResponsePolicy(
@@ -97,17 +103,63 @@ function normalizeCommandCodeCredentialAllowedModels(
 
 export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeConfig {
   const env = options.env ?? process.env;
+  const configFilePath = resolveConfigFilePath(env);
+  const dashboardConfig = readDashboardConfigFile(configFilePath);
   const defaultModel = normalizeModelName(env.COMMANDCODE_DEFAULT_MODEL?.trim() || DEFAULT_MODEL);
   const allowedFromEnv = parseCsv(env.COMMANDCODE_ALLOWED_MODELS).map(normalizeModelName);
+  const configuredModelCatalog = dashboardConfig.models
+    ? mergeModelCatalog(dashboardConfig.models, allowedFromEnv, normalizeModelName, false)
+    : allowedFromEnv.length > 0
+      ? mergeModelCatalog(
+          allowedFromEnv.map((model) => ({ id: model, enabled: true })),
+          allowedFromEnv,
+          normalizeModelName,
+        )
+      : defaultModelCatalog();
+  const enabledModels = configuredModelCatalog
+    .filter((model) => model.enabled)
+    .map((model) => normalizeModelName(model.id));
   const allowedModels = uniq(
-    allowedFromEnv.length > 0 ? [...allowedFromEnv, defaultModel] : [DEFAULT_MODEL, FLASH_MODEL],
+    enabledModels.length > 0 ? [...enabledModels, defaultModel] : [DEFAULT_MODEL, FLASH_MODEL],
   );
   const apiKeyOptions =
     options.authPaths === undefined ? { env } : { env, authPaths: options.authPaths };
   const commandCodeCredentials = normalizeCommandCodeCredentialAllowedModels(
     loadCommandCodeCredentialsFromEnvOrFile(apiKeyOptions),
   );
-  const commandCodeBillingRefreshMs = parseNumber(env.COMMANDCODE_BILLING_REFRESH_MS, 300_000);
+  const routingFromFile = normalizeRoutingConfig(dashboardConfig.routing);
+  const routingPolicy = dashboardConfig.routing
+    ? routingFromFile.policy
+    : env.COMMANDCODE_ROUTING_POLICY
+      ? parseRoutingPolicy(env.COMMANDCODE_ROUTING_POLICY)
+      : routingFromFile.policy;
+  const commandCodeBillingRefreshMs = parseNumber(
+    env.COMMANDCODE_BILLING_REFRESH_MS,
+    routingFromFile.billingRefreshMs,
+  );
+  const commandCodeCredentialCooldownMs = parseNumber(
+    env.COMMANDCODE_CREDENTIAL_COOLDOWN_MS,
+    routingFromFile.credentialCooldownMs,
+  );
+  const maxInFlightPerCredential = parseNumber(
+    env.COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL,
+    routingFromFile.maxInFlightPerCredential,
+  );
+  const maxTotalMultiplier = parseNumber(
+    env.COMMANDCODE_MAX_TOTAL_IN_FLIGHT_MULTIPLIER,
+    routingFromFile.maxTotalInFlightMultiplier,
+  );
+  const maxTotalFromEnv = parseNumber(env.COMMANDCODE_MAX_TOTAL_IN_FLIGHT, 0);
+  const computedMaxTotal = Math.max(
+    1,
+    Math.floor(commandCodeCredentials.length * maxTotalMultiplier),
+  );
+  const commandCodeMaxTotalInFlight =
+    maxTotalFromEnv > 0
+      ? maxTotalFromEnv
+      : typeof routingFromFile.maxTotalInFlight === "number"
+        ? routingFromFile.maxTotalInFlight
+        : computedMaxTotal;
   const balanceAlertIntervalMs = parseNumber(
     env.COMMANDCODE_BALANCE_ALERT_INTERVAL_MS,
     commandCodeBillingRefreshMs,
@@ -124,10 +176,16 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     bridgeApiKey: env.BRIDGE_API_KEY?.trim() || undefined,
     commandCodeApiKey: commandCodeCredentials[0]?.apiKey,
     commandCodeCredentials,
-    commandCodeRoutingPolicy: parseRoutingPolicy(env.COMMANDCODE_ROUTING_POLICY),
+    commandCodeRoutingPolicy: routingPolicy,
+    commandCodeFallbackRoutingPolicy: routingFromFile.fallbackPolicy,
+    commandCodeMaxInFlightPerCredential: maxInFlightPerCredential,
+    commandCodeMaxTotalInFlight,
+    commandCodeMaxTotalInFlightMultiplier: maxTotalMultiplier,
+    modelCatalog: configuredModelCatalog,
+    configFilePath,
     commandCodeBillingRefreshMs,
     commandCodeBillingTimeoutMs: parseNumber(env.COMMANDCODE_BILLING_TIMEOUT_MS, 10_000),
-    commandCodeCredentialCooldownMs: parseNumber(env.COMMANDCODE_CREDENTIAL_COOLDOWN_MS, 60_000),
+    commandCodeCredentialCooldownMs,
     requestBodyLimitBytes: parseNumber(env.REQUEST_BODY_LIMIT_BYTES, 1_048_576),
     rateLimitMax: parseNumber(env.RATE_LIMIT_MAX, 60),
     rateLimitWindow: env.RATE_LIMIT_WINDOW?.trim() || "1 minute",

@@ -94,6 +94,8 @@ function credentialFromRecord(
   };
   const allowedModels = stringArrayValue(value.allowedModels ?? value.allowed_models);
   if (allowedModels) credential.allowedModels = allowedModels;
+  const maxInFlight = numberValue(value.maxInFlight ?? value.max_in_flight, 0);
+  if (maxInFlight > 0) credential.maxInFlight = maxInFlight;
   return credential;
 }
 

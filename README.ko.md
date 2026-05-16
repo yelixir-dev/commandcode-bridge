@@ -23,7 +23,8 @@ CommandCode의 DeepSeek V4 Pro 백엔드를 OpenAI-compatible HTTP API로 노출
 - 스트리밍/비스트리밍 OpenAI 클라이언트 지원.
 - CommandCode upstream은 항상 `params.stream: true`로 호출합니다. upstream이 non-streaming 생성을 거부하기 때문입니다.
 - `COMMANDCODE_API_KEY`, `COMMANDCODE_API_KEYS` / credentials file, 또는 `~/.commandcode/auth.json`에서 upstream 인증을 자동 로드합니다.
-- `round_robin` 또는 `depletion_aware` multi-key credential pool을 지원합니다. depletion-aware 모드는 CommandCode billing/usage probe를 캐시하고 남은 구독 기간 대비 현재 잔액 압력(`(monthlyCredits + freeCredits) / daysRemaining`) 기준으로 만료성 credit을 먼저 소진하도록 라우팅합니다.
+- `daily_burn_priority`, `balance_priority`, `round_robin`, `drain_first` multi-key credential pool을 지원합니다. `depletion_aware`는 호환 alias로 `daily_burn_priority`로 정규화됩니다. 기본 정책은 남은 기간 대비 일일 소진 필요량을 우선하는 `daily_burn_priority`입니다.
+- `/dashboard` 모바일 우선 admin 대시보드에서 routing policy, key CRUD/rename, per-key concurrency, model on/off, bridge 상태, JSON 저장, LaunchAgent 재시작을 관리할 수 있습니다.
 - raw API key를 노출하지 않는 인증된 admin credential metrics를 제공합니다.
 - 여러 bridge host/PC로 독립 요청을 least-inflight 방식으로 분산하면서 기존 `/v1` endpoint를 유지할 수 있는 선택적 `commandcode-router` 프로세스를 제공합니다.
 - 잔액 threshold alert를 선택적으로 지원합니다. 기본값은 off이며 `COMMANDCODE_BALANCE_ALERT_ENABLED=true`일 때만 활성화됩니다.
@@ -83,20 +84,35 @@ COMMANDCODE_API_KEY=your_commandcode_api_key
 ```bash
 # 단순 id=key 쌍
 COMMANDCODE_API_KEYS=primary=cmd_key_one,secondary=cmd_key_two
-COMMANDCODE_ROUTING_POLICY=depletion_aware
+COMMANDCODE_ROUTING_POLICY=daily_burn_priority
 ```
 
 weight/model scope가 필요한 credential은 JSON 파일을 만들고 `COMMANDCODE_CREDENTIALS_FILE`을 지정합니다.
 
 ```json
 {
+  "routing": {
+    "policy": "daily_burn_priority",
+    "fallbackPolicy": "round_robin",
+    "maxInFlightPerCredential": 4,
+    "maxTotalInFlight": null,
+    "maxTotalInFlightMultiplier": 3
+  },
+  "models": [
+    { "id": "deepseek/deepseek-v4-pro", "enabled": true },
+    { "id": "deepseek/deepseek-v4-flash", "enabled": true },
+    { "id": "openai/gpt-5.5", "enabled": false },
+    { "id": "anthropic/claude-opus-4.7", "enabled": false },
+    { "id": "anthropic/claude-sonnet-4.6", "enabled": false }
+  ],
   "credentials": [
-    { "id": "primary", "apiKey": "cmd_key_one", "weight": 1 },
+    { "id": "primary", "apiKey": "cmd_key_one", "weight": 1, "maxInFlight": 4 },
     {
       "id": "flash-only",
       "apiKey": "cmd_key_two",
       "weight": 1,
-      "allowedModels": ["deepseek/deepseek-v4-flash"]
+      "allowedModels": ["deepseek/deepseek-v4-flash"],
+      "maxInFlight": 4
     }
   ]
 }
@@ -193,40 +209,43 @@ curl -sS http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true \
 
 ## 설정
 
-| 변수                                                | 기본값                           | 설명                                                                                                     |
-| --------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `HOST`                                              | `127.0.0.1`                      | 바인드 주소. reverse proxy/VPN이 없으면 localhost 유지 권장.                                             |
-| `PORT`                                              | `9992`                           | HTTP 포트.                                                                                               |
-| `COMMANDCODE_API_KEY`                               | 미설정                           | Legacy single upstream CommandCode API 키.                                                               |
-| `COMMANDCODE_API_KEYS`                              | 미설정                           | 선택적 comma-separated multi-key `id=key` 목록. single-key보다 우선.                                     |
-| `COMMANDCODE_CREDENTIALS`                           | 미설정                           | 선택적 JSON credentials 배열/객체 또는 comma-separated multi-key 목록.                                   |
-| `COMMANDCODE_CREDENTIALS_FILE`                      | 미설정                           | 선택적 JSON credentials 파일. upstream credential 최우선순위.                                            |
-| `COMMANDCODE_ROUTING_POLICY`                        | `depletion_aware`                | `depletion_aware` 또는 `round_robin`.                                                                    |
-| `COMMANDCODE_BILLING_REFRESH_MS`                    | `300000`                         | depletion-aware routing용 credential별 billing/usage cache TTL.                                          |
-| `COMMANDCODE_BILLING_TIMEOUT_MS`                    | `10000`                          | credential별 billing probe timeout. stale/error fallback으로 요청 hang 방지.                             |
-| `COMMANDCODE_CREDENTIAL_COOLDOWN_MS`                | `60000`                          | 429/5xx/timeout 이후 cooldown. 402는 이 값과 billing TTL 중 큰 값 사용.                                  |
-| `COMMANDCODE_API_BASE`                              | `https://api.commandcode.ai`     | upstream API base.                                                                                       |
-| `COMMANDCODE_DEFAULT_MODEL`                         | `deepseek/deepseek-v4-pro`       | 기본 upstream 모델.                                                                                      |
-| `COMMANDCODE_ALLOWED_MODELS`                        | Pro + Flash                      | 쉼표 구분 모델 allowlist.                                                                                |
-| `COMMANDCODE_ALLOW_UNKNOWN_MODELS`                  | `false`                          | 임의 모델 ID 통과. 권장하지 않음.                                                                        |
-| `COMMANDCODE_CLI_VERSION`                           | `0.25.12`                        | upstream으로 보내는 CLI 버전 헤더.                                                                       |
-| `COMMANDCODE_TIMEOUT_MS`                            | `300000`                         | upstream 요청 타임아웃.                                                                                  |
-| `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`         | `error_on_length`                | visible content가 비어 있고 `finish_reason: length`이면 fail-closed. `allow`는 legacy 빈 성공 동작 유지. |
-| `BRIDGE_API_KEY`                                    | 미설정                           | 선택적 클라이언트 API 키. 강력 권장.                                                                     |
-| `REQUEST_BODY_LIMIT_BYTES`                          | `1048576`                        | Fastify 요청 크기 제한.                                                                                  |
-| `RATE_LIMIT_MAX`                                    | `60`                             | rate window당 요청 수.                                                                                   |
-| `RATE_LIMIT_WINDOW`                                 | `1 minute`                       | rate limit window.                                                                                       |
-| `LOG_LEVEL`                                         | `info`                           | Fastify/Pino 로그 레벨. 테스트에서는 `silent`.                                                           |
-| `CORS_ORIGIN`                                       | 미설정                           | 설정 시 해당 origin에 CORS 허용.                                                                         |
-| `INCLUDE_REASONING`                                 | `false`                          | true면 reasoning delta를 visible output에 붙임. 기본 false 유지 권장.                                    |
-| `COMMANDCODE_BALANCE_ALERT_ENABLED`                 | `false`                          | 주기적 잔액 threshold check 활성화. 기본 off.                                                            |
-| `COMMANDCODE_BALANCE_ALERT_MIN_CURRENT_BALANCE`     | `1`                              | 현재 전체 balance가 이 값보다 낮으면 alert. `0`이면 비활성화.                                            |
-| `COMMANDCODE_BALANCE_ALERT_MIN_EXPIRING_BALANCE`    | `0`                              | monthly/free expiring balance가 이 값보다 낮으면 alert. `0`이면 비활성화.                                |
-| `COMMANDCODE_BALANCE_ALERT_MAX_REQUIRED_DAILY_BURN` | `0`                              | required daily burn이 이 값보다 높으면 alert. `0`이면 비활성화.                                          |
-| `COMMANDCODE_BALANCE_ALERT_INTERVAL_MS`             | `COMMANDCODE_BILLING_REFRESH_MS` | 주기적 alert check 간격.                                                                                 |
-| `COMMANDCODE_BALANCE_ALERT_REPEAT_MS`               | `3600000`                        | credential/alert type별 최소 반복 간격.                                                                  |
-| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_URL`             | 미설정                           | 선택적 JSON webhook 대상. webhook이 없어도 alert는 log로 남습니다.                                       |
-| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_BEARER`          | 미설정                           | alert webhook용 선택적 bearer token.                                                                     |
+| 변수                                                | 기본값                           | 설명                                                                                                                                                    |
+| --------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOST`                                              | `127.0.0.1`                      | 바인드 주소. reverse proxy/VPN이 없으면 localhost 유지 권장.                                                                                            |
+| `PORT`                                              | `9992`                           | HTTP 포트.                                                                                                                                              |
+| `COMMANDCODE_API_KEY`                               | 미설정                           | Legacy single upstream CommandCode API 키.                                                                                                              |
+| `COMMANDCODE_API_KEYS`                              | 미설정                           | 선택적 comma-separated multi-key `id=key` 목록. single-key보다 우선.                                                                                    |
+| `COMMANDCODE_CREDENTIALS`                           | 미설정                           | 선택적 JSON credentials 배열/객체 또는 comma-separated multi-key 목록.                                                                                  |
+| `COMMANDCODE_CREDENTIALS_FILE`                      | 미설정                           | 선택적 JSON credentials 파일. upstream credential 최우선순위.                                                                                           |
+| `COMMANDCODE_ROUTING_POLICY`                        | `daily_burn_priority`            | `daily_burn_priority`, `balance_priority`, `round_robin`, `drain_first`. Legacy `depletion_aware`는 `daily_burn_priority` alias.                        |
+| `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL`          | `4`                              | credential별 동시 in-flight 요청 상한. JSON/dashboard에서 변경 가능. DeepSeek V4 Flash 테스트에서 8-way 병렬은 안정적이었지만 운영 기본은 key당 4 권장. |
+| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT_MULTIPLIER`        | `3`                              | 전체 in-flight 기본 상한 계산값: `credential_count × multiplier`. 기본은 key 수 × 3.                                                                    |
+| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT`                   | 미설정                           | 설정하면 multiplier 계산 대신 고정 전체 in-flight 상한 사용.                                                                                            |
+| `COMMANDCODE_BILLING_REFRESH_MS`                    | `300000`                         | depletion-aware routing용 credential별 billing/usage cache TTL.                                                                                         |
+| `COMMANDCODE_BILLING_TIMEOUT_MS`                    | `10000`                          | credential별 billing probe timeout. stale/error fallback으로 요청 hang 방지.                                                                            |
+| `COMMANDCODE_CREDENTIAL_COOLDOWN_MS`                | `60000`                          | 429/5xx/timeout 이후 cooldown. 402는 이 값과 billing TTL 중 큰 값 사용.                                                                                 |
+| `COMMANDCODE_API_BASE`                              | `https://api.commandcode.ai`     | upstream API base.                                                                                                                                      |
+| `COMMANDCODE_DEFAULT_MODEL`                         | `deepseek/deepseek-v4-pro`       | 기본 upstream 모델.                                                                                                                                     |
+| `COMMANDCODE_ALLOWED_MODELS`                        | Pro + Flash                      | 쉼표 구분 모델 allowlist.                                                                                                                               |
+| `COMMANDCODE_ALLOW_UNKNOWN_MODELS`                  | `false`                          | 임의 모델 ID 통과. 권장하지 않음.                                                                                                                       |
+| `COMMANDCODE_CLI_VERSION`                           | `0.25.12`                        | upstream으로 보내는 CLI 버전 헤더.                                                                                                                      |
+| `COMMANDCODE_TIMEOUT_MS`                            | `300000`                         | upstream 요청 타임아웃.                                                                                                                                 |
+| `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`         | `error_on_length`                | visible content가 비어 있고 `finish_reason: length`이면 fail-closed. `allow`는 legacy 빈 성공 동작 유지.                                                |
+| `BRIDGE_API_KEY`                                    | 미설정                           | 선택적 클라이언트 API 키. 강력 권장.                                                                                                                    |
+| `REQUEST_BODY_LIMIT_BYTES`                          | `1048576`                        | Fastify 요청 크기 제한.                                                                                                                                 |
+| `RATE_LIMIT_MAX`                                    | `60`                             | rate window당 요청 수.                                                                                                                                  |
+| `RATE_LIMIT_WINDOW`                                 | `1 minute`                       | rate limit window.                                                                                                                                      |
+| `LOG_LEVEL`                                         | `info`                           | Fastify/Pino 로그 레벨. 테스트에서는 `silent`.                                                                                                          |
+| `CORS_ORIGIN`                                       | 미설정                           | 설정 시 해당 origin에 CORS 허용.                                                                                                                        |
+| `INCLUDE_REASONING`                                 | `false`                          | true면 reasoning delta를 visible output에 붙임. 기본 false 유지 권장.                                                                                   |
+| `COMMANDCODE_BALANCE_ALERT_ENABLED`                 | `false`                          | 주기적 잔액 threshold check 활성화. 기본 off.                                                                                                           |
+| `COMMANDCODE_BALANCE_ALERT_MIN_CURRENT_BALANCE`     | `1`                              | 현재 전체 balance가 이 값보다 낮으면 alert. `0`이면 비활성화.                                                                                           |
+| `COMMANDCODE_BALANCE_ALERT_MIN_EXPIRING_BALANCE`    | `0`                              | monthly/free expiring balance가 이 값보다 낮으면 alert. `0`이면 비활성화.                                                                               |
+| `COMMANDCODE_BALANCE_ALERT_MAX_REQUIRED_DAILY_BURN` | `0`                              | required daily burn이 이 값보다 높으면 alert. `0`이면 비활성화.                                                                                         |
+| `COMMANDCODE_BALANCE_ALERT_INTERVAL_MS`             | `COMMANDCODE_BILLING_REFRESH_MS` | 주기적 alert check 간격.                                                                                                                                |
+| `COMMANDCODE_BALANCE_ALERT_REPEAT_MS`               | `3600000`                        | credential/alert type별 최소 반복 간격.                                                                                                                 |
+| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_URL`             | 미설정                           | 선택적 JSON webhook 대상. webhook이 없어도 alert는 log로 남습니다.                                                                                      |
+| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_BEARER`          | 미설정                           | alert webhook용 선택적 bearer token.                                                                                                                    |
 
 ## Admin Metrics와 Balance Alerts
 

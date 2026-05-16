@@ -23,7 +23,8 @@ This project exposes a minimal OpenAI Chat Completions API over CommandCode's up
 - Streaming and non-streaming OpenAI clients supported.
 - Upstream always uses `params.stream: true`, because CommandCode rejects non-streaming generation.
 - Local auth discovery from `COMMANDCODE_API_KEY`, `COMMANDCODE_API_KEYS` / credentials file, or `~/.commandcode/auth.json`.
-- Optional multi-key credential pool with `round_robin` or `depletion_aware` routing. Depletion-aware mode caches CommandCode billing/usage probes and routes by `currentBalance` pressure over the remaining subscription period (`(monthlyCredits + freeCredits) / daysRemaining`), draining expiring credits before reserve purchased credits.
+- Optional multi-key credential pool with `daily_burn_priority`, `balance_priority`, `round_robin`, or `drain_first` routing. `depletion_aware` remains a compatibility alias for `daily_burn_priority`. The default policy prioritizes the credential with the highest required daily burn over the remaining subscription period.
+- Mobile-first `/dashboard` admin console for routing policy, credential CRUD/rename, per-key concurrency, model on/off toggles, bridge status, JSON save, and LaunchAgent restart.
 - Authenticated admin credential metrics for balance/routing diagnostics without exposing raw API keys.
 - Optional `commandcode-router` process for least-inflight routing across multiple bridge hosts/PCs while preserving an existing `/v1` endpoint.
 - Optional balance threshold alerts; disabled by default and enabled only with `COMMANDCODE_BALANCE_ALERT_ENABLED=true`.
@@ -83,20 +84,35 @@ or multi-key mode:
 ```bash
 # Simple id=key pairs
 COMMANDCODE_API_KEYS=primary=cmd_key_one,secondary=cmd_key_two
-COMMANDCODE_ROUTING_POLICY=depletion_aware
+COMMANDCODE_ROUTING_POLICY=daily_burn_priority
 ```
 
 For weighted/model-scoped credentials, use a JSON credentials file and set `COMMANDCODE_CREDENTIALS_FILE`:
 
 ```json
 {
+  "routing": {
+    "policy": "daily_burn_priority",
+    "fallbackPolicy": "round_robin",
+    "maxInFlightPerCredential": 4,
+    "maxTotalInFlight": null,
+    "maxTotalInFlightMultiplier": 3
+  },
+  "models": [
+    { "id": "deepseek/deepseek-v4-pro", "enabled": true },
+    { "id": "deepseek/deepseek-v4-flash", "enabled": true },
+    { "id": "openai/gpt-5.5", "enabled": false },
+    { "id": "anthropic/claude-opus-4.7", "enabled": false },
+    { "id": "anthropic/claude-sonnet-4.6", "enabled": false }
+  ],
   "credentials": [
-    { "id": "primary", "apiKey": "cmd_key_one", "weight": 1 },
+    { "id": "primary", "apiKey": "cmd_key_one", "weight": 1, "maxInFlight": 4 },
     {
       "id": "flash-only",
       "apiKey": "cmd_key_two",
       "weight": 1,
-      "allowedModels": ["deepseek/deepseek-v4-flash"]
+      "allowedModels": ["deepseek/deepseek-v4-flash"],
+      "maxInFlight": 4
     }
   ]
 }
@@ -193,40 +209,43 @@ This returns routing state, billing-derived credit metrics, alert thresholds, an
 
 ## Configuration
 
-| Variable                                            | Default                          | Description                                                                                                                            |
-| --------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `HOST`                                              | `127.0.0.1`                      | Bind address. Keep localhost unless behind VPN/reverse proxy.                                                                          |
-| `PORT`                                              | `9992`                           | HTTP port.                                                                                                                             |
-| `COMMANDCODE_API_KEY`                               | unset                            | Legacy single upstream CommandCode API key.                                                                                            |
-| `COMMANDCODE_API_KEYS`                              | unset                            | Optional comma-separated multi-key `id=key` list. Takes precedence over single-key mode.                                               |
-| `COMMANDCODE_CREDENTIALS`                           | unset                            | Optional JSON credentials array/object or comma-separated multi-key list.                                                              |
-| `COMMANDCODE_CREDENTIALS_FILE`                      | unset                            | Optional JSON credentials file. Highest upstream credential precedence.                                                                |
-| `COMMANDCODE_ROUTING_POLICY`                        | `depletion_aware`                | `depletion_aware` or `round_robin`.                                                                                                    |
-| `COMMANDCODE_BILLING_REFRESH_MS`                    | `300000`                         | Per-credential billing/usage cache TTL for depletion-aware routing.                                                                    |
-| `COMMANDCODE_BILLING_TIMEOUT_MS`                    | `10000`                          | Per-credential billing probe timeout; stale/error fallback avoids request hangs.                                                       |
-| `COMMANDCODE_CREDENTIAL_COOLDOWN_MS`                | `60000`                          | Cooldown after 429/5xx/timeouts; 402 uses at least this and the billing TTL.                                                           |
-| `COMMANDCODE_API_BASE`                              | `https://api.commandcode.ai`     | Upstream API base.                                                                                                                     |
-| `COMMANDCODE_DEFAULT_MODEL`                         | `deepseek/deepseek-v4-pro`       | Default upstream model.                                                                                                                |
-| `COMMANDCODE_ALLOWED_MODELS`                        | Pro + Flash                      | Comma-separated allowlist.                                                                                                             |
-| `COMMANDCODE_ALLOW_UNKNOWN_MODELS`                  | `false`                          | Pass through arbitrary model IDs. Not recommended.                                                                                     |
-| `COMMANDCODE_CLI_VERSION`                           | `0.25.12`                        | Header value sent upstream.                                                                                                            |
-| `COMMANDCODE_TIMEOUT_MS`                            | `300000`                         | Upstream request timeout.                                                                                                              |
-| `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`         | `error_on_length`                | `error_on_length` fails closed on empty visible content with `finish_reason: length`; `allow` preserves legacy blank success behavior. |
-| `BRIDGE_API_KEY`                                    | unset                            | Optional client-facing API key. Strongly recommended.                                                                                  |
-| `REQUEST_BODY_LIMIT_BYTES`                          | `1048576`                        | Fastify request body limit.                                                                                                            |
-| `RATE_LIMIT_MAX`                                    | `60`                             | Requests per rate window.                                                                                                              |
-| `RATE_LIMIT_WINDOW`                                 | `1 minute`                       | Rate limit window.                                                                                                                     |
-| `LOG_LEVEL`                                         | `info`                           | Fastify/Pino log level. Use `silent` for tests.                                                                                        |
-| `CORS_ORIGIN`                                       | unset                            | Enables CORS for a specific origin when set.                                                                                           |
-| `INCLUDE_REASONING`                                 | `false`                          | If true, reasoning deltas are appended to visible output. Keep false by default.                                                       |
-| `COMMANDCODE_BALANCE_ALERT_ENABLED`                 | `false`                          | Enables periodic balance threshold checks. Default is off.                                                                             |
-| `COMMANDCODE_BALANCE_ALERT_MIN_CURRENT_BALANCE`     | `1`                              | Alert when current total balance drops below this value. Set `0` to disable this threshold.                                            |
-| `COMMANDCODE_BALANCE_ALERT_MIN_EXPIRING_BALANCE`    | `0`                              | Alert when monthly/free expiring balance drops below this value. `0` disables.                                                         |
-| `COMMANDCODE_BALANCE_ALERT_MAX_REQUIRED_DAILY_BURN` | `0`                              | Alert when required daily burn exceeds this value. `0` disables.                                                                       |
-| `COMMANDCODE_BALANCE_ALERT_INTERVAL_MS`             | `COMMANDCODE_BILLING_REFRESH_MS` | Periodic alert check interval.                                                                                                         |
-| `COMMANDCODE_BALANCE_ALERT_REPEAT_MS`               | `3600000`                        | Minimum repeat interval per credential/alert type.                                                                                     |
-| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_URL`             | unset                            | Optional JSON webhook target for due alerts. Alerts are logged even without a webhook.                                                 |
-| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_BEARER`          | unset                            | Optional bearer token for the alert webhook.                                                                                           |
+| Variable                                            | Default                          | Description                                                                                                                                                                        |
+| --------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOST`                                              | `127.0.0.1`                      | Bind address. Keep localhost unless behind VPN/reverse proxy.                                                                                                                      |
+| `PORT`                                              | `9992`                           | HTTP port.                                                                                                                                                                         |
+| `COMMANDCODE_API_KEY`                               | unset                            | Legacy single upstream CommandCode API key.                                                                                                                                        |
+| `COMMANDCODE_API_KEYS`                              | unset                            | Optional comma-separated multi-key `id=key` list. Takes precedence over single-key mode.                                                                                           |
+| `COMMANDCODE_CREDENTIALS`                           | unset                            | Optional JSON credentials array/object or comma-separated multi-key list.                                                                                                          |
+| `COMMANDCODE_CREDENTIALS_FILE`                      | unset                            | Optional JSON credentials file. Highest upstream credential precedence.                                                                                                            |
+| `COMMANDCODE_ROUTING_POLICY`                        | `daily_burn_priority`            | `daily_burn_priority`, `balance_priority`, `round_robin`, or `drain_first`. Legacy `depletion_aware` aliases to `daily_burn_priority`.                                             |
+| `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL`          | `4`                              | Per-credential in-flight cap. Editable through JSON/dashboard. DeepSeek V4 Flash was healthy at 8-way parallel in testing, but 4 per key is the routine operations recommendation. |
+| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT_MULTIPLIER`        | `3`                              | Default total in-flight cap calculation: `credential_count × multiplier`. Default is keys × 3.                                                                                     |
+| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT`                   | unset                            | Fixed total in-flight cap; overrides multiplier calculation when set.                                                                                                              |
+| `COMMANDCODE_BILLING_REFRESH_MS`                    | `300000`                         | Per-credential billing/usage cache TTL for depletion-aware routing.                                                                                                                |
+| `COMMANDCODE_BILLING_TIMEOUT_MS`                    | `10000`                          | Per-credential billing probe timeout; stale/error fallback avoids request hangs.                                                                                                   |
+| `COMMANDCODE_CREDENTIAL_COOLDOWN_MS`                | `60000`                          | Cooldown after 429/5xx/timeouts; 402 uses at least this and the billing TTL.                                                                                                       |
+| `COMMANDCODE_API_BASE`                              | `https://api.commandcode.ai`     | Upstream API base.                                                                                                                                                                 |
+| `COMMANDCODE_DEFAULT_MODEL`                         | `deepseek/deepseek-v4-pro`       | Default upstream model.                                                                                                                                                            |
+| `COMMANDCODE_ALLOWED_MODELS`                        | Pro + Flash                      | Comma-separated allowlist.                                                                                                                                                         |
+| `COMMANDCODE_ALLOW_UNKNOWN_MODELS`                  | `false`                          | Pass through arbitrary model IDs. Not recommended.                                                                                                                                 |
+| `COMMANDCODE_CLI_VERSION`                           | `0.25.12`                        | Header value sent upstream.                                                                                                                                                        |
+| `COMMANDCODE_TIMEOUT_MS`                            | `300000`                         | Upstream request timeout.                                                                                                                                                          |
+| `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`         | `error_on_length`                | `error_on_length` fails closed on empty visible content with `finish_reason: length`; `allow` preserves legacy blank success behavior.                                             |
+| `BRIDGE_API_KEY`                                    | unset                            | Optional client-facing API key. Strongly recommended.                                                                                                                              |
+| `REQUEST_BODY_LIMIT_BYTES`                          | `1048576`                        | Fastify request body limit.                                                                                                                                                        |
+| `RATE_LIMIT_MAX`                                    | `60`                             | Requests per rate window.                                                                                                                                                          |
+| `RATE_LIMIT_WINDOW`                                 | `1 minute`                       | Rate limit window.                                                                                                                                                                 |
+| `LOG_LEVEL`                                         | `info`                           | Fastify/Pino log level. Use `silent` for tests.                                                                                                                                    |
+| `CORS_ORIGIN`                                       | unset                            | Enables CORS for a specific origin when set.                                                                                                                                       |
+| `INCLUDE_REASONING`                                 | `false`                          | If true, reasoning deltas are appended to visible output. Keep false by default.                                                                                                   |
+| `COMMANDCODE_BALANCE_ALERT_ENABLED`                 | `false`                          | Enables periodic balance threshold checks. Default is off.                                                                                                                         |
+| `COMMANDCODE_BALANCE_ALERT_MIN_CURRENT_BALANCE`     | `1`                              | Alert when current total balance drops below this value. Set `0` to disable this threshold.                                                                                        |
+| `COMMANDCODE_BALANCE_ALERT_MIN_EXPIRING_BALANCE`    | `0`                              | Alert when monthly/free expiring balance drops below this value. `0` disables.                                                                                                     |
+| `COMMANDCODE_BALANCE_ALERT_MAX_REQUIRED_DAILY_BURN` | `0`                              | Alert when required daily burn exceeds this value. `0` disables.                                                                                                                   |
+| `COMMANDCODE_BALANCE_ALERT_INTERVAL_MS`             | `COMMANDCODE_BILLING_REFRESH_MS` | Periodic alert check interval.                                                                                                                                                     |
+| `COMMANDCODE_BALANCE_ALERT_REPEAT_MS`               | `3600000`                        | Minimum repeat interval per credential/alert type.                                                                                                                                 |
+| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_URL`             | unset                            | Optional JSON webhook target for due alerts. Alerts are logged even without a webhook.                                                                                             |
+| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_BEARER`          | unset                            | Optional bearer token for the alert webhook.                                                                                                                                       |
 
 ## Admin Metrics and Balance Alerts
 

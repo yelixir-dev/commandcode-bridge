@@ -288,6 +288,9 @@ export class CommandCodeClient implements CommandCodeUpstream {
     const routerOptions = {
       credentials: config.commandCodeCredentials,
       policy: config.commandCodeRoutingPolicy,
+      fallbackPolicy: config.commandCodeFallbackRoutingPolicy ?? "round_robin",
+      maxInFlightPerCredential: config.commandCodeMaxInFlightPerCredential ?? 4,
+      maxTotalInFlight: config.commandCodeMaxTotalInFlight,
       billingRefreshMs: config.commandCodeBillingRefreshMs,
       billingTimeoutMs: config.commandCodeBillingTimeoutMs,
       cooldownMs: config.commandCodeCredentialCooldownMs,

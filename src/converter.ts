@@ -127,7 +127,10 @@ function convertMessages(messages: OpenAIChatMessage[]): CommandCodeMessage[] {
     }
 
     if (message.role === "tool") {
-      converted.push({ role: "user", content: asTextContent(priorToolResultText(message, toolCallsById)) });
+      converted.push({
+        role: "user",
+        content: asTextContent(priorToolResultText(message, toolCallsById)),
+      });
       continue;
     }
 

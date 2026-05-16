@@ -185,7 +185,7 @@ describe("Fastify OpenAI-compatible server", () => {
     expect(response.body).not.toContain("commandcode-secret");
     expect(response.json()).toMatchObject({
       object: "commandcode.credential_metrics",
-      routing_policy: "depletion_aware",
+      routing_policy: "daily_burn_priority",
       credential_count: 1,
       alerting: { enabled: false, webhook_configured: false },
       credentials: [

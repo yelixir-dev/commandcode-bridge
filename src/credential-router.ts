@@ -65,6 +65,9 @@ export interface CommandCodeCredentialDiagnostic {
 export interface CommandCodeCredentialRouterOptions {
   credentials: CommandCodeCredential[];
   policy: CommandCodeRoutingPolicy;
+  fallbackPolicy?: CommandCodeRoutingPolicy;
+  maxInFlightPerCredential?: number;
+  maxTotalInFlight?: number | undefined;
   billingRefreshMs: number;
   billingTimeoutMs?: number;
   cooldownMs: number;
@@ -189,6 +192,9 @@ function errorMessage(error: unknown): string {
 export class CommandCodeCredentialRouter {
   private readonly states: CommandCodeCredentialState[];
   private readonly policy: CommandCodeRoutingPolicy;
+  private readonly fallbackPolicy: CommandCodeRoutingPolicy;
+  private readonly maxInFlightPerCredential: number;
+  private readonly maxTotalInFlight: number | undefined;
   private readonly billingRefreshMs: number;
   private readonly billingTimeoutMs: number;
   private readonly cooldownMs: number;
@@ -201,7 +207,13 @@ export class CommandCodeCredentialRouter {
     | undefined;
 
   public constructor(options: CommandCodeCredentialRouterOptions) {
-    this.policy = options.policy;
+    this.policy = options.policy === "depletion_aware" ? "daily_burn_priority" : options.policy;
+    this.fallbackPolicy = options.fallbackPolicy ?? "round_robin";
+    this.maxInFlightPerCredential =
+      options.maxInFlightPerCredential === undefined
+        ? Number.MAX_SAFE_INTEGER
+        : positive(options.maxInFlightPerCredential, 4);
+    this.maxTotalInFlight = options.maxTotalInFlight;
     this.billingRefreshMs = options.billingRefreshMs;
     this.billingTimeoutMs = positive(options.billingTimeoutMs, DEFAULT_BILLING_TIMEOUT_MS);
     this.cooldownMs = options.cooldownMs;
@@ -220,6 +232,12 @@ export class CommandCodeCredentialRouter {
         apiKey: credential.apiKey,
         weight: positive(credential.weight, 1),
       };
+      if (credential.maxInFlight !== undefined) {
+        normalizedCredential.maxInFlight = positive(
+          credential.maxInFlight,
+          this.maxInFlightPerCredential,
+        );
+      }
       if (credential.allowedModels)
         normalizedCredential.allowedModels = [...credential.allowedModels];
       return {
@@ -244,6 +262,9 @@ export class CommandCodeCredentialRouter {
         apiKey: "[REDACTED]",
         weight: state.credential.weight,
       };
+      if (state.credential.maxInFlight !== undefined) {
+        redactedCredential.maxInFlight = state.credential.maxInFlight;
+      }
       if (state.credential.allowedModels) {
         redactedCredential.allowedModels = [...state.credential.allowedModels];
       }
@@ -327,6 +348,11 @@ export class CommandCodeCredentialRouter {
 
     const now = this.now();
     const excludedIds = new Set(options.excludeIds ?? []);
+    if (this.maxTotalInFlight !== undefined && this.totalInFlight() >= this.maxTotalInFlight) {
+      throw new NoAvailableCommandCodeCredentialError(
+        `CommandCode bridge is at max total in-flight capacity (${this.maxTotalInFlight})`,
+      );
+    }
     let candidates = this.basicCandidates(options.model, now, excludedIds);
     if (candidates.length === 0) {
       throw new NoAvailableCommandCodeCredentialError(
@@ -334,9 +360,15 @@ export class CommandCodeCredentialRouter {
       );
     }
 
-    if (this.policy === "depletion_aware") {
+    if (this.policy === "daily_burn_priority") {
       await Promise.all(candidates.map((state) => this.refreshBillingIfStale(state, now)));
       candidates = this.activeCandidates(options.model, now, excludedIds);
+    } else if (this.policy === "balance_priority") {
+      await Promise.all(candidates.map((state) => this.refreshBillingIfStale(state, now)));
+      candidates = this.activeCandidates(options.model, now, excludedIds);
+      if (candidates.some((state) => state.billing === undefined)) {
+        candidates = this.selectableCandidatesForPolicy(this.fallbackPolicy, candidates, now);
+      }
     } else {
       candidates = this.activeCandidates(options.model, now, excludedIds);
     }
@@ -347,7 +379,7 @@ export class CommandCodeCredentialRouter {
       );
     }
 
-    const selected = this.selectSmoothWeighted(candidates, now);
+    const selected = this.selectForPolicy(this.policy, candidates, now);
     selected.inFlight += 1;
     selected.lastSelectedAt = now;
     return selected.credential;
@@ -425,6 +457,7 @@ export class CommandCodeCredentialRouter {
       (state) =>
         !excludedIds.has(state.credential.id) &&
         state.disabledUntil <= now &&
+        state.inFlight < this.maxInFlightForState(state) &&
         isModelAllowed(state.credential, model),
     );
   }
@@ -439,6 +472,60 @@ export class CommandCodeCredentialRouter {
     );
   }
 
+  private maxInFlightForState(state: CommandCodeCredentialState): number {
+    return positive(state.credential.maxInFlight, this.maxInFlightPerCredential);
+  }
+
+  private totalInFlight(): number {
+    return this.states.reduce((sum, state) => sum + state.inFlight, 0);
+  }
+
+  private selectableCandidatesForPolicy(
+    policy: CommandCodeRoutingPolicy,
+    candidates: CommandCodeCredentialState[],
+    now: number,
+  ): CommandCodeCredentialState[] {
+    if (
+      policy === "balance_priority" ||
+      policy === "daily_burn_priority" ||
+      policy === "depletion_aware"
+    ) {
+      return candidates.filter((state) => hasKnownCreditCapacity(state, now));
+    }
+    return candidates;
+  }
+
+  private selectForPolicy(
+    policy: CommandCodeRoutingPolicy,
+    candidates: CommandCodeCredentialState[],
+    now: number,
+  ): CommandCodeCredentialState {
+    if (policy === "drain_first")
+      return candidates[0] ?? this.selectSmoothWeighted(candidates, now);
+    if (policy === "balance_priority") return this.selectHighestBalance(candidates, now);
+    return this.selectSmoothWeighted(candidates, now);
+  }
+
+  private selectHighestBalance(
+    candidates: CommandCodeCredentialState[],
+    now: number,
+  ): CommandCodeCredentialState {
+    let best: CommandCodeCredentialState | undefined;
+    for (const state of candidates) {
+      const balance = remainingCredits(state, now) ?? 0;
+      const bestBalance = best ? (remainingCredits(best, now) ?? 0) : Number.NEGATIVE_INFINITY;
+      if (
+        !best ||
+        balance > bestBalance ||
+        (balance === bestBalance && state.inFlight < best.inFlight)
+      ) {
+        best = state;
+      }
+    }
+    if (!best) throw new NoAvailableCommandCodeCredentialError();
+    return best;
+  }
+
   private selectSmoothWeighted(
     candidates: CommandCodeCredentialState[],
     now: number,
@@ -448,7 +535,7 @@ export class CommandCodeCredentialRouter {
 
     for (const state of candidates) {
       const weight =
-        this.policy === "depletion_aware"
+        this.policy === "daily_burn_priority" || this.policy === "depletion_aware"
           ? calculateDepletionScore(state, now)
           : positive(state.credential.weight, 1);
       const adjustedWeight = Math.max(0.0001, weight);

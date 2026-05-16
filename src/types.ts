@@ -138,9 +138,35 @@ export interface CommandCodeCredential {
   apiKey: string;
   weight: number;
   allowedModels?: string[];
+  maxInFlight?: number;
 }
 
-export type CommandCodeRoutingPolicy = "round_robin" | "depletion_aware";
+export type CommandCodeRoutingPolicy =
+  | "drain_first"
+  | "round_robin"
+  | "balance_priority"
+  | "daily_burn_priority"
+  | "depletion_aware";
+
+export interface CommandCodeModelConfig {
+  id: string;
+  label?: string;
+  provider?: string;
+  family?: string;
+  aliases?: string[];
+  enabled: boolean;
+  notes?: string;
+}
+
+export interface CommandCodeRoutingConfig {
+  policy: CommandCodeRoutingPolicy;
+  fallbackPolicy: CommandCodeRoutingPolicy;
+  maxInFlightPerCredential: number;
+  maxTotalInFlight: number | null;
+  maxTotalInFlightMultiplier: number;
+  billingRefreshMs: number;
+  credentialCooldownMs: number;
+}
 
 export type CommandCodeEmptyVisibleResponsePolicy = "allow" | "error_on_length";
 
@@ -201,6 +227,12 @@ export interface BridgeConfig {
   commandCodeApiKey: string | undefined;
   commandCodeCredentials: CommandCodeCredential[];
   commandCodeRoutingPolicy: CommandCodeRoutingPolicy;
+  commandCodeFallbackRoutingPolicy?: CommandCodeRoutingPolicy | undefined;
+  commandCodeMaxInFlightPerCredential?: number | undefined;
+  commandCodeMaxTotalInFlight?: number | undefined;
+  commandCodeMaxTotalInFlightMultiplier?: number | undefined;
+  modelCatalog?: CommandCodeModelConfig[] | undefined;
+  configFilePath?: string | undefined;
   commandCodeBillingRefreshMs: number;
   commandCodeBillingTimeoutMs: number;
   commandCodeCredentialCooldownMs: number;

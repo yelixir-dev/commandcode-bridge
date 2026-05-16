@@ -1,4 +1,5 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { spawn } from "node:child_process";
 import { Readable } from "node:stream";
 
 import cors from "@fastify/cors";
@@ -9,6 +10,13 @@ import { z, ZodError } from "zod";
 
 import { CommandCodeAuthError, CommandCodeClient, CommandCodeHttpError } from "./commandcode.js";
 import { loadBridgeConfig, ModelNotAllowedError, publicModelList, resolveModel } from "./config.js";
+import {
+  DEFAULT_ROUTING_CONFIG,
+  redactedCredentials,
+  writeDashboardConfigFile,
+  type DashboardConfigUpdate,
+} from "./dashboard-config.js";
+import { dashboardHtml } from "./dashboard.js";
 import {
   type CommandCodeCredentialDiagnostic,
   NoAvailableCommandCodeCredentialError,
@@ -135,6 +143,75 @@ function asOpenAIRequest(
   return value as unknown as OpenAIChatCompletionRequest;
 }
 
+function withExistingCredentialSecrets(
+  update: DashboardConfigUpdate,
+  config: BridgeConfig,
+): DashboardConfigUpdate {
+  const existingById = new Map(
+    config.commandCodeCredentials.map((credential) => [credential.id, credential.apiKey]),
+  );
+  const merged: DashboardConfigUpdate = { ...update };
+  if (update.credentials) {
+    merged.credentials = update.credentials.map((credential) => {
+      const apiKey =
+        typeof credential.apiKey === "string" && credential.apiKey.trim().length > 0
+          ? credential.apiKey
+          : typeof credential.id === "string"
+            ? (existingById.get(credential.id) ??
+              existingById.get((credential as { originalId?: string }).originalId ?? ""))
+            : undefined;
+      const mergedCredential: Partial<(typeof config.commandCodeCredentials)[number]> = {
+        ...credential,
+      };
+      if (apiKey) mergedCredential.apiKey = apiKey;
+      return mergedCredential;
+    });
+  }
+  return merged;
+}
+
+function dashboardConfigResponse(config: BridgeConfig, dirty: boolean) {
+  const routing = {
+    ...DEFAULT_ROUTING_CONFIG,
+    policy: config.commandCodeRoutingPolicy,
+    fallbackPolicy:
+      config.commandCodeFallbackRoutingPolicy ?? DEFAULT_ROUTING_CONFIG.fallbackPolicy,
+    maxInFlightPerCredential:
+      config.commandCodeMaxInFlightPerCredential ?? DEFAULT_ROUTING_CONFIG.maxInFlightPerCredential,
+    maxTotalInFlight: config.commandCodeMaxTotalInFlight ?? null,
+    maxTotalInFlightMultiplier:
+      config.commandCodeMaxTotalInFlightMultiplier ??
+      DEFAULT_ROUTING_CONFIG.maxTotalInFlightMultiplier,
+    billingRefreshMs: config.commandCodeBillingRefreshMs,
+    credentialCooldownMs: config.commandCodeCredentialCooldownMs,
+  };
+  return {
+    object: "commandcode.dashboard_config",
+    configFilePath: config.configFilePath,
+    dirty,
+    restart_required: dirty,
+    routing,
+    models: config.modelCatalog ?? [],
+    credentials: redactedCredentials(config.commandCodeCredentials),
+    bridge: {
+      online: true,
+      endpoint: `${config.host}:${config.port}`,
+      port: config.port,
+      models: publicModelList(config),
+    },
+  };
+}
+
+function restartBridge(): void {
+  const label = process.env.COMMANDCODE_BRIDGE_LAUNCHD_LABEL ?? "com.yorha.commandcode-bridge";
+  const target = `gui/${process.getuid?.() ?? 501}/${label}`;
+  const child = spawn("launchctl", ["kickstart", "-k", target], {
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+}
+
 async function writeStreamingResponse(
   reply: FastifyReply,
   chunks: AsyncIterable<string>,
@@ -189,7 +266,13 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     await balanceAlertManager.check(diagnostics, { reason });
   }
 
-  await app.register(helmet);
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+      },
+    },
+  });
   await app.register(rateLimit, { max: config.rateLimitMax, timeWindow: config.rateLimitWindow });
   if (config.corsOrigin) await app.register(cors, { origin: config.corsOrigin });
 
@@ -237,14 +320,56 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     service: "commandcode-bridge",
     version: "0.1.0",
     upstream: "commandcode-alpha-generate",
+    endpoint: `${config.host}:${config.port}`,
+    port: config.port,
     default_model: config.defaultModel,
+    models: publicModelList(config),
     auth: {
       bridge_api_key_configured: Boolean(config.bridgeApiKey),
       commandcode_api_key_configured: Boolean(config.commandCodeApiKey),
       commandcode_credential_count: config.commandCodeCredentials.length,
       commandcode_routing_policy: config.commandCodeRoutingPolicy,
+      commandcode_max_in_flight_per_credential: config.commandCodeMaxInFlightPerCredential ?? 4,
+      commandcode_max_total_in_flight: config.commandCodeMaxTotalInFlight,
     },
   }));
+
+  app.get("/", async (_request, reply) => reply.redirect("/dashboard"));
+
+  app.get("/dashboard", async (_request, reply) =>
+    reply.type("text/html; charset=utf-8").send(dashboardHtml()),
+  );
+
+  let configDirty = false;
+
+  app.get("/admin/config", async () => dashboardConfigResponse(config, configDirty));
+
+  app.put("/admin/config", async (request, reply) => {
+    if (!config.configFilePath) {
+      return reply
+        .code(400)
+        .send(
+          openAIError(
+            "COMMANDCODE_CREDENTIALS_FILE is required for dashboard edits",
+            "configuration_error",
+            "missing_config_file",
+          ),
+        );
+    }
+    const update = withExistingCredentialSecrets(request.body as DashboardConfigUpdate, config);
+    writeDashboardConfigFile(config.configFilePath, update);
+    configDirty = true;
+    const savedConfig = loadBridgeConfig({
+      env: { ...process.env, COMMANDCODE_CREDENTIALS_FILE: config.configFilePath },
+    });
+    return dashboardConfigResponse({ ...savedConfig, bridgeApiKey: config.bridgeApiKey }, true);
+  });
+
+  app.post("/admin/restart", async () => {
+    restartBridge();
+    configDirty = false;
+    return { ok: true, restart_requested: true };
+  });
 
   app.get("/admin/commandcode/credentials", async (request, reply) => {
     if (!diagnosticsProvider) {
