@@ -116,7 +116,22 @@ describe("dashboard UI", () => {
       bridgeApiKey: "test-admin-token",
     });
 
-    expect(html).toContain("cfg?.bridgeApiKey||localStorage.getItem('bridgeApiKey')");
+    expect(html).toContain("authKey(cfg?.bridgeApiKey)||authKey(localStorage.getItem('bridgeApiKey'))");
     expect(html).toContain("'authorization':'Bearer '+key");
+  });
+
+  it("does not treat redacted admin API key values as usable write credentials", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+      bridgeApiKey: "[REDACTED]",
+    });
+
+    expect(html).toContain("function isRedactedSecret");
+    expect(html).toContain("authKey(cfg?.bridgeApiKey)");
+    expect(html).toContain("const configured=authKey(cfg?.bridgeApiKey)");
+    expect(html).toContain("return isRedactedSecret(key)?''");
   });
 });
