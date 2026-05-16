@@ -35,17 +35,15 @@ describe("dashboard UI", () => {
     expect(html).toContain('id="bridgeApiKey"');
     expect(html).toContain('type="text"');
     expect(html).toContain("bridge-key-row");
-    expect(html).toContain("bridge-key-spacer");
+    expect(html).toContain("bridge-key-help-row");
     expect(html).toContain("bridge-key-prefix");
     expect(html).toContain('id="copyBridgeKey"');
     expect(html).toContain("💾");
     expect(html).toContain("📋");
     expect(html).toContain("sk-");
     expect(html).toContain('id="saveBridgeKey"');
-    expect(html).toContain('id="bridgeKeyInfo"');
-    expect(html).toContain(
-      "0.0.0.0은 Tailscale/LAN에서 접근 가능합니다. 외부 노출 시 BRIDGE_API_KEY를 유지하세요.",
-    );
+    expect(html).not.toContain('id="bridgeKeyInfo"');
+    expect(html).toContain("0.0.0.0/LAN 공개 시 필요");
   });
 
   it("renders a per-credential enable toggle before the delete button", () => {
