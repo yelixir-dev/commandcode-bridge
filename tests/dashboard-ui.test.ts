@@ -15,6 +15,8 @@ describe("dashboard UI", () => {
     expect(html).toContain('id="maxPer"');
     expect(html).toContain("운영 기본값은 키당 4회입니다.");
     expect(html).toContain("concurrencyInfo");
+    expect(html).toContain("concurrency-row");
+    expect(html).toContain("concurrency-spacer");
     expect(html).not.toContain('id="maxMult"');
     expect(html).not.toContain('id="maxTotal"');
     expect(html).not.toContain("총 동시요청");
@@ -31,6 +33,11 @@ describe("dashboard UI", () => {
     expect(html).toContain("bind-grid");
     expect(html).toContain("0.0.0.0은 Tailscale/LAN에서 접근 가능합니다.<br />");
     expect(html).toContain('id="bridgeApiKey"');
+    expect(html).toContain('type="text"');
+    expect(html).toContain("bridge-key-row");
+    expect(html).toContain('id="saveBridgeKey"');
+    expect(html).toContain('id="bridgeKeyInfo"');
+    expect(html).toContain("외부 노출 시 BRIDGE_API_KEY를 유지하세요.");
   });
 
   it("renders a per-credential enable toggle before the delete button", () => {
