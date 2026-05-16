@@ -114,7 +114,10 @@ class AbortAwareCommandCodeClient implements CommandCodeUpstream {
 function createTestApp(options: Parameters<typeof createApp>[0] = {}) {
   return createApp({
     ...options,
-    configEnv: options.configEnv ?? {},
+    configEnv: {
+      COMMANDCODE_CREDENTIALS_FILE: `/tmp/commandcode-bridge-test-${process.pid}-${Math.random()}.json`,
+      ...(options.configEnv ?? {}),
+    },
     configAuthPaths: options.configAuthPaths ?? [],
     configOverrides: { logLevel: "silent", ...options.configOverrides },
   });

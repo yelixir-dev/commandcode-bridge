@@ -36,7 +36,7 @@ describe("dashboard UI", () => {
     expect(html).not.toContain("총 동시요청");
   });
 
-  it("lays out bind host and port on one compact row with an admin key field", () => {
+  it("lays out bind host and port on one compact row with a client key field", () => {
     const html = dashboardHtml({
       server: { host: "0.0.0.0", port: 9992 },
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -52,6 +52,7 @@ describe("dashboard UI", () => {
     expect(html).toContain("bridge-key-row");
     expect(html).toContain("bridge-key-help-row");
     expect(html).toContain("bridge-key-prefix");
+    expect(html).toContain("cmdbr-랜덤6");
     expect(html).toContain('id="generateBridgeKey"');
     expect(html.indexOf('id="generateBridgeKey"')).toBeLessThan(html.indexOf('id="copyBridgeKey"'));
     expect(html).toContain('id="copyBridgeKey"');
@@ -61,7 +62,7 @@ describe("dashboard UI", () => {
     expect(html).toContain("sk-");
     expect(html).toContain('id="saveBridgeKey"');
     expect(html).not.toContain('id="bridgeKeyInfo"');
-    expect(html).toContain("0.0.0.0/LAN 공개 시 필요");
+    expect(html).toContain("외부 /v1 호출용 key");
     expect(html).toContain("sk-cmdbridge-a1b2c3");
     expect(html).toContain("cfg?.bridgeApiKey");
   });
@@ -138,7 +139,7 @@ describe("dashboard UI", () => {
     expect(html).toContain("return isRedactedSecret(key)?''");
   });
 
-  it("can generate and persist a random admin API key from the dashboard", () => {
+  it("can generate and persist a random client API key from the dashboard", () => {
     const html = dashboardHtml({
       server: { host: "0.0.0.0", port: 9992 },
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -148,11 +149,11 @@ describe("dashboard UI", () => {
     });
 
     expect(html).toContain("function randomBridgeKey");
-    expect(html).toContain("cmdbridge-");
+    expect(html).toContain("cmdbr-");
     expect(html).toContain("generateBridgeKey");
     expect(html).toContain("pendingBridgeApiKey");
     expect(html).toContain("currentBridgeAuthKey()||(!pendingBridgeKey?fullBridgeKey():'')");
     expect(html).toContain("bridgeApiKey:pendingKey");
-    expect(html).toContain("Pending Admin API key saved");
+    expect(html).toContain("Pending Client API key saved");
   });
 });

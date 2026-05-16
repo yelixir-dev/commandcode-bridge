@@ -134,9 +134,17 @@ function isAdminRequest(request: FastifyRequest): boolean {
   return request.url.startsWith("/admin/");
 }
 
+function isDashboardAdminWrite(request: FastifyRequest): boolean {
+  return (
+    (request.method === "PUT" && request.url.startsWith("/admin/config")) ||
+    (request.method === "POST" && request.url.startsWith("/admin/restart"))
+  );
+}
+
 function shouldRequireAuth(request: FastifyRequest): boolean {
   if (request.method === "OPTIONS") return false;
   if (request.method === "GET" && request.url.startsWith("/admin/config")) return false;
+  if (isDashboardAdminWrite(request)) return false;
   if (request.method === "GET" && request.url.startsWith("/admin/commandcode/credentials")) {
     return false;
   }
@@ -146,6 +154,7 @@ function shouldRequireAuth(request: FastifyRequest): boolean {
 function isPublicAdminRequest(request: FastifyRequest): boolean {
   return (
     request.method === "OPTIONS" ||
+    isDashboardAdminWrite(request) ||
     (request.method === "GET" &&
       (request.url.startsWith("/admin/config") ||
         request.url.startsWith("/admin/commandcode/credentials")))
@@ -165,6 +174,29 @@ function sameHostnameOrigin(request: FastifyRequest): string | undefined {
     return undefined;
   }
   return undefined;
+}
+
+function isLoopbackHost(host: string | undefined): boolean {
+  const hostname = host?.split(":")[0];
+  return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
+}
+
+function hasSameHostnameReferer(request: FastifyRequest): boolean {
+  const referer = request.headers.referer;
+  const host = request.headers.host;
+  if (!referer || !host) return false;
+  try {
+    const refererUrl = new URL(referer);
+    return refererUrl.protocol === "http:" && refererUrl.hostname === host.split(":")[0];
+  } catch {
+    return false;
+  }
+}
+
+function isDashboardWriteSourceAllowed(request: FastifyRequest): boolean {
+  if (sameHostnameOrigin(request)) return true;
+  if (hasSameHostnameReferer(request)) return true;
+  return !request.headers.origin && !request.headers.referer && isLoopbackHost(request.headers.host);
 }
 
 function asOpenAIRequest(
@@ -373,6 +405,17 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   }
 
   app.addHook("preHandler", async (request, reply) => {
+    if (isDashboardAdminWrite(request) && !isDashboardWriteSourceAllowed(request)) {
+      return reply
+        .code(403)
+        .send(
+          openAIError(
+            "Dashboard config writes must come from the same host as the bridge dashboard",
+            "authentication_error",
+            "admin_origin_forbidden",
+          ),
+        );
+    }
     if (isAdminRequest(request) && !isPublicAdminRequest(request) && !config.bridgeApiKey) {
       return reply
         .code(403)
