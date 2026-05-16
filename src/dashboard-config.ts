@@ -16,6 +16,7 @@ export interface DashboardServerConfig {
 }
 
 export interface CommandCodeDashboardConfigFile {
+  bridgeApiKey?: string;
   server?: Partial<DashboardServerConfig>;
   routing?: Partial<CommandCodeRoutingConfig>;
   models?: Array<Partial<CommandCodeModelConfig>>;
@@ -45,6 +46,7 @@ export interface DashboardConfigView {
 }
 
 export interface DashboardConfigUpdate {
+  bridgeApiKey?: string;
   server?: Partial<DashboardServerConfig>;
   routing?: Partial<CommandCodeRoutingConfig>;
   models?: Array<Partial<CommandCodeModelConfig>>;
@@ -261,7 +263,9 @@ export function redactedCredentials(
 export function buildWritableDashboardConfig(
   update: DashboardConfigUpdate,
 ): CommandCodeDashboardConfigFile {
+  const bridgeApiKey = stringValue(update.bridgeApiKey);
   return {
+    ...(bridgeApiKey ? { bridgeApiKey } : {}),
     server: normalizeServerConfig(update.server),
     routing: normalizeRoutingConfig(update.routing),
     models: normalizeModelUpdate(update.models ?? []),

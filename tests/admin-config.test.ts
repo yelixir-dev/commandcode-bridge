@@ -52,6 +52,24 @@ describe("JSON dashboard configuration", () => {
     expect((statSync(file).mode & 0o777).toString(8)).toBe("600");
   });
 
+  it("persists and loads dashboard-managed admin API keys", () => {
+    const dir = mkdtempSync(join(tmpdir(), "commandcode-bridge-admin-key-"));
+    const file = join(dir, "credentials.json");
+    writeDashboardConfigFile(file, {
+      bridgeApiKey: "sk-cmdbridge-123abc",
+      credentials: [{ id: "alpha", apiKey: "alpha-secret" }],
+    });
+
+    const persisted = JSON.parse(readFileSync(file, "utf8")) as { bridgeApiKey?: string };
+    expect(persisted.bridgeApiKey).toBe("sk-cmdbridge-123abc");
+
+    const config = loadBridgeConfig({
+      env: { COMMANDCODE_CREDENTIALS_FILE: file, BRIDGE_API_KEY: "old-env-key" },
+      authPaths: [],
+    });
+    expect(config.bridgeApiKey).toBe("sk-cmdbridge-123abc");
+  });
+
   it("lets JSON routing policy drive dashboard-managed configuration over legacy env", () => {
     const file = tempConfigFile({
       routing: { policy: "round_robin", maxInFlightPerCredential: 4 },

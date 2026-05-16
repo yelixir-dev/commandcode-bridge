@@ -426,6 +426,9 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       request.body as DashboardConfigUpdate,
       secretSourceConfig,
     );
+    if (!update.bridgeApiKey && secretSourceConfig.bridgeApiKey) {
+      update.bridgeApiKey = secretSourceConfig.bridgeApiKey;
+    }
     const duplicateIds = duplicateCommandCodeApiKeyIds(update);
     if (duplicateIds.length > 0) {
       return reply.code(409).send({

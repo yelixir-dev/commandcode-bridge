@@ -81,6 +81,10 @@ function parseCsv(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
 function uniq(values: string[]): string[] {
   return Array.from(new Set(values));
 }
@@ -174,7 +178,7 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     defaultModel,
     allowedModels,
     allowUnknownModels: parseBoolean(env.COMMANDCODE_ALLOW_UNKNOWN_MODELS, false),
-    bridgeApiKey: env.BRIDGE_API_KEY?.trim() || undefined,
+    bridgeApiKey: stringValue(dashboardConfig.bridgeApiKey) || env.BRIDGE_API_KEY?.trim() || undefined,
     commandCodeApiKey: commandCodeCredentials[0]?.apiKey,
     commandCodeCredentials,
     commandCodeRoutingPolicy: routingPolicy,

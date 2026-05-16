@@ -150,6 +150,6 @@ describe("dashboard UI", () => {
     expect(html).toContain("function randomBridgeKey");
     expect(html).toContain("cmdbridge-");
     expect(html).toContain("generateBridgeKey");
-    expect(html).toContain("saveBridgeKey(key)");
+    expect(html).toContain("bridgeApiKey:pendingBridgeKey");
   });
 });
