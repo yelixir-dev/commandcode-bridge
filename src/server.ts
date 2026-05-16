@@ -135,6 +135,7 @@ function isAdminRequest(request: FastifyRequest): boolean {
 }
 
 function shouldRequireAuth(request: FastifyRequest): boolean {
+  if (request.method === "OPTIONS") return false;
   if (request.method === "GET" && request.url.startsWith("/admin/config")) return false;
   if (request.method === "GET" && request.url.startsWith("/admin/commandcode/credentials")) {
     return false;
@@ -144,10 +145,26 @@ function shouldRequireAuth(request: FastifyRequest): boolean {
 
 function isPublicAdminRequest(request: FastifyRequest): boolean {
   return (
-    request.method === "GET" &&
-    (request.url.startsWith("/admin/config") ||
-      request.url.startsWith("/admin/commandcode/credentials"))
+    request.method === "OPTIONS" ||
+    (request.method === "GET" &&
+      (request.url.startsWith("/admin/config") ||
+        request.url.startsWith("/admin/commandcode/credentials")))
   );
+}
+
+function sameHostnameOrigin(request: FastifyRequest): string | undefined {
+  const origin = request.headers.origin;
+  if (!origin) return undefined;
+  const host = request.headers.host;
+  if (!host) return undefined;
+  try {
+    const originUrl = new URL(origin);
+    const hostName = host.split(":")[0];
+    if (originUrl.protocol === "http:" && originUrl.hostname === hostName) return origin;
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 function asOpenAIRequest(
@@ -320,8 +337,22 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       },
     },
   });
-  await app.register(rateLimit, { max: config.rateLimitMax, timeWindow: config.rateLimitWindow });
   if (config.corsOrigin) await app.register(cors, { origin: config.corsOrigin });
+  app.addHook("onRequest", async (request, reply) => {
+    if (config.corsOrigin) return;
+    const origin = sameHostnameOrigin(request);
+    if (!origin) return;
+    reply.header("access-control-allow-origin", origin);
+    reply.header("vary", "origin");
+    reply.header("access-control-allow-methods", "GET,PUT,POST,OPTIONS");
+    reply.header("access-control-allow-headers", "authorization,content-type,x-api-key");
+  });
+  app.options("*", async (request, reply) => {
+    const origin = config.corsOrigin ? request.headers.origin : sameHostnameOrigin(request);
+    if (!origin && !config.corsOrigin) return reply.code(404).send();
+    return reply.code(204).send();
+  });
+  await app.register(rateLimit, { max: config.rateLimitMax, timeWindow: config.rateLimitWindow });
 
   let balanceAlertTimer: NodeJS.Timeout | undefined;
   if (balanceAlertManager) {

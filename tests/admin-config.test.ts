@@ -248,4 +248,33 @@ describe("JSON dashboard configuration", () => {
     );
     await app.close();
   });
+
+  it("allows same-host dashboard fallback writes from portless mobile origins", async () => {
+    const file = tempConfigFile({
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
+    });
+
+    const preflight = await app.inject({
+      method: "OPTIONS",
+      url: "/admin/config",
+      headers: {
+        origin: "http://100.88.251.70",
+        "access-control-request-method": "PUT",
+        "access-control-request-headers": "authorization,content-type",
+        host: "100.88.251.70:9992",
+      },
+    });
+    expect(preflight.statusCode).toBe(204);
+    expect(preflight.headers["access-control-allow-origin"]).toBe("http://100.88.251.70");
+    expect(preflight.headers["access-control-allow-headers"]).toContain("authorization");
+
+    await app.close();
+  });
 });
