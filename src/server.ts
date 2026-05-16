@@ -272,7 +272,6 @@ function dashboardConfigResponse(
   };
   return {
     object: "commandcode.dashboard_config",
-    configFilePath: config.configFilePath,
     dirty,
     restart_required: dirty,
     bridgeApiKey: config.bridgeApiKey,

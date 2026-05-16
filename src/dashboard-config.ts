@@ -35,7 +35,6 @@ export interface RedactedCommandCodeCredential {
 
 export interface DashboardConfigView {
   object: "commandcode.dashboard_config";
-  configFilePath: string | undefined;
   dirty: boolean;
   restart_required: boolean;
   bridgeApiKey?: string | undefined;

@@ -400,6 +400,8 @@ describe("JSON dashboard configuration", () => {
     expect(response.body).toContain("CommandCode Bridge Console");
     expect(response.body).toContain("Client API Key");
     expect(response.body).not.toContain("Admin API Key");
+    expect(response.body).not.toContain("configFilePath");
+    expect(response.body).not.toContain(process.env.HOME ?? "__NO_HOME__");
     expect(response.headers["content-security-policy"]).toContain(
       "script-src 'self' 'unsafe-inline'",
     );

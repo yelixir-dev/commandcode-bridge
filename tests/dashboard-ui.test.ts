@@ -156,4 +156,20 @@ describe("dashboard UI", () => {
     expect(html).toContain("bridgeApiKey:pendingKey");
     expect(html).toContain("Pending Client API key saved");
   });
+
+  it("builds save payloads from current relative-page DOM inputs instead of stale cfg state", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [{ id: "default", apiKeyConfigured: true }],
+      models: [],
+    });
+
+    expect(html).toContain("function credentialPayloads");
+    expect(html).toContain("document.querySelectorAll('[data-cid]')");
+    expect(html).toContain("document.querySelector('[data-ckey=\"'+i+'\"]')");
+    expect(html).toContain("api('/admin/config'");
+    expect(html).toContain("api('/admin/restart'");
+    expect(html).not.toContain("/Users/yorha");
+  });
 });
