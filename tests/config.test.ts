@@ -8,6 +8,16 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
+  it("shows CommandCode pricing instead of descriptive model notes", () => {
+    const config = loadBridgeConfig({ env: {} });
+    expect(config.modelCatalog?.find((model) => model.id === "openai/gpt-5.5")?.notes).toBe(
+      "CommandCode: $5/M in · $30/M out",
+    );
+    expect(
+      config.modelCatalog?.find((model) => model.id === "deepseek/deepseek-v4-pro")?.notes,
+    ).toContain("CommandCode OSS credits");
+  });
+
   it("keeps balance alerts off by default while failing closed on empty length responses", () => {
     const config = loadBridgeConfig({ env: {} });
     expect(config.balanceAlerts.enabled).toBe(false);

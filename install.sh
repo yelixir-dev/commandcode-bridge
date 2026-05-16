@@ -182,6 +182,90 @@ generate_key() {
   fi
 }
 
+commandcode_bin() {
+  if command -v cmd >/dev/null 2>&1; then
+    command -v cmd
+    return 0
+  fi
+  if command -v command-code >/dev/null 2>&1; then
+    command -v command-code
+    return 0
+  fi
+  return 1
+}
+
+confirm_default_yes() {
+  local prompt="$1"
+  [ "$ASSUME_YES" -eq 0 ] || return 0
+  [ -t 0 ] || return 0
+  printf '%s [Y/n]: ' "$prompt"
+  read -r answer || true
+  case "${answer:-}" in
+    ""|y|Y|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+ensure_commandcode_cli() {
+  if commandcode_bin >/dev/null 2>&1; then
+    log "Command Code CLI found: $(commandcode_bin)"
+    return 0
+  fi
+
+  if confirm_default_yes "Command Code CLI가 없습니다. npm i -g command-code 후 계속 진행할까요?"; then
+    log "Installing Command Code CLI with npm."
+    npm install -g command-code
+  else
+    fail "Command Code CLI가 필요합니다. 'npm i -g command-code' 후 'cmd login'을 완료하고 다시 설치를 실행하세요."
+  fi
+
+  commandcode_bin >/dev/null 2>&1 || fail "Command Code CLI install finished but 'cmd' was not found on PATH. Add npm global bin to PATH and retry."
+}
+
+extract_commandcode_api_key() {
+  local auth_file="$HOME/.commandcode/auth.json"
+  [ -f "$auth_file" ] || return 1
+  node -e '
+const fs = require("fs");
+const file = process.argv[1];
+const data = JSON.parse(fs.readFileSync(file, "utf8"));
+function stringValue(value) {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+function walk(value) {
+  const scalar = stringValue(value);
+  if (scalar) return scalar;
+  if (!value || typeof value !== "object") return undefined;
+  for (const key of ["apiKey", "api_key", "access", "accessToken", "token", "key", "commandcode", "commandCode", "command_code", "auth", "credentials", "oauth", "account"]) {
+    const found = walk(value[key]);
+    if (found) return found;
+  }
+  return undefined;
+}
+const key = walk(data);
+if (!key) process.exit(1);
+process.stdout.write(key);
+' "$auth_file"
+}
+
+DETECTED_COMMANDCODE_API_KEY=""
+ensure_commandcode_auth() {
+  ensure_commandcode_cli
+  DETECTED_COMMANDCODE_API_KEY="$(extract_commandcode_api_key 2>/dev/null || true)"
+  if [ -n "$DETECTED_COMMANDCODE_API_KEY" ]; then
+    if [ -z "$COMMANDCODE_API_KEY" ]; then
+      COMMANDCODE_API_KEY="$DETECTED_COMMANDCODE_API_KEY"
+      log "기존 Command Code 인증 키를 브릿지 key1로 가져왔습니다."
+    else
+      log "Command Code 인증은 확인됐고, 입력한 COMMANDCODE_API_KEY를 우선 사용합니다."
+    fi
+  else
+    log "Command Code CLI는 설치되어 있지만 인증 키가 없습니다. 설치 후 'cmd login'을 실행하고 브릿지를 재시작하세요."
+  fi
+}
+
 require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
 }
@@ -216,6 +300,7 @@ validate_env_value COMMANDCODE_API_KEY "$COMMANDCODE_API_KEY"
 require_command node
 require_command npm
 require_command systemctl
+ensure_commandcode_auth
 
 NODE_MAJOR="$(node -p "Number(process.versions.node.split('.')[0])")"
 if [ "$NODE_MAJOR" -lt 20 ]; then

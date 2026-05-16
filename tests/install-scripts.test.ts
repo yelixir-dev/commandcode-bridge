@@ -39,6 +39,9 @@ describe("installer scripts", () => {
     expect(script).toContain("sk-cmdbridge-");
     expect(script).toContain("randomBytes(3)");
     expect(script).toContain("read -rs key_input");
+    expect(script).toContain("ensure_commandcode_cli");
+    expect(script).toContain("extract_commandcode_api_key");
+    expect(script).toContain('COMMANDCODE_API_KEY="$DETECTED_COMMANDCODE_API_KEY"');
     expect(script).toContain("refusing unexpected INSTALL_DIR");
   });
 
