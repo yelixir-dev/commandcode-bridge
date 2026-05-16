@@ -1,96 +1,352 @@
 # CommandCode Bridge
 
-> **CommandCode CLI 환경 전제:** 이 브리지는 공식 CommandCode CLI(`cmd`, npm package `command-code`)를 사용할 수 있도록 준비된 머신/계정에서 쓰는 내부용 브리지입니다. CLI 다운로드/설치는 [commandcode.ai/install](https://commandcode.ai/install) (공식 사이트: [commandcode.ai](https://commandcode.ai/))에서 진행한 뒤, CLI 인증을 완료하거나 동등한 `COMMANDCODE_*` credential을 제공하십시오. 즉, 공개 독립형 DeepSeek 프록시가 아니라 CommandCode 계정/upstream API를 이용하는 브리지입니다.
+[English README](./README.md)
 
-CommandCode의 DeepSeek V4 Pro 백엔드를 OpenAI-compatible HTTP API로 노출하는 브리지입니다.
+CommandCode Bridge는 CommandCode 계정을 OpenAI-compatible HTTP API로 노출하는 신뢰 환경용 브리지입니다. 로컬, LAN, VPN, tailnet 클라이언트가 표준 `/v1/models`, `/v1/chat/completions` 형식으로 CommandCode-backed 모델을 호출할 수 있게 해줍니다.
 
-이 프로젝트는 신뢰 가능한 로컬/테일넷 클라이언트가 표준 `/v1/chat/completions` 형식으로 CommandCode-backed DeepSeek 모델을 사용할 수 있도록, CommandCode upstream `/alpha/generate` 엔드포인트를 최소한의 OpenAI Chat Completions API로 변환합니다.
+> **CommandCode가 필요합니다.** 이 프로젝트는 공개 독립형 DeepSeek 프록시가 아니며, CommandCode CLI 번들을 포함하거나 재배포하지 않습니다. 공식 CommandCode CLI/account 환경(`command-code` npm package의 `cmd`) 또는 동등한 CommandCode API credential이 필요합니다. 공식 설치/인증은 <https://commandcode.ai/install>에서 진행하십시오.
 
-> **상태:** 내부 사용용 브리지입니다. CommandCode `/alpha/generate`는 공식 안정 API가 아니라 alpha 성격의 엔드포인트이므로 변경될 수 있습니다.
+> **상태.** 내부/신뢰 환경용 브리지입니다. upstream CommandCode `/alpha/generate` 경로는 alpha/internal API 성격이므로 변경될 수 있습니다.
 
-## 기능
+## 이 브리지가 하는 일
 
-- OpenAI-compatible 엔드포인트:
+- OpenAI-compatible 엔드포인트 제공:
   - `GET /health`
-  - `GET /admin/commandcode/credentials` (인증된 admin metrics; `BRIDGE_API_KEY` 필요)
+  - `GET /dashboard`
   - `GET /v1/models`
   - `POST /v1/chat/completions`
-- 기본 모델: `deepseek/deepseek-v4-pro`
-- 모델 별칭:
-  - `default` → `deepseek/deepseek-v4-pro`
-  - `commandcode/deepseek-v4-pro` → `deepseek/deepseek-v4-pro`
-  - `deepseek-v4-flash` → `deepseek/deepseek-v4-flash`
-- 스트리밍/비스트리밍 OpenAI 클라이언트 지원.
-- CommandCode upstream은 항상 `params.stream: true`로 호출합니다. upstream이 non-streaming 생성을 거부하기 때문입니다.
-- `COMMANDCODE_API_KEY`, `COMMANDCODE_API_KEYS` / credentials file, 또는 `~/.commandcode/auth.json`에서 upstream 인증을 자동 로드합니다.
-- `daily_burn_priority`, `balance_priority`, `round_robin`, `drain_first` multi-key credential pool을 지원합니다. `depletion_aware`는 호환 alias로 `daily_burn_priority`로 정규화됩니다. 기본 정책은 남은 기간 대비 일일 소진 필요량을 우선하는 `daily_burn_priority`입니다.
-- `/dashboard` 모바일 우선 admin 대시보드에서 routing policy, key CRUD/rename, per-key concurrency, model on/off, bridge 상태, JSON 저장, LaunchAgent 재시작을 관리할 수 있습니다.
-- raw API key를 노출하지 않는 인증된 admin credential metrics를 제공합니다.
-- 여러 bridge host/PC로 독립 요청을 least-inflight 방식으로 분산하면서 기존 `/v1` endpoint를 유지할 수 있는 선택적 `commandcode-router` 프로세스를 제공합니다.
-- 잔액 threshold alert를 선택적으로 지원합니다. 기본값은 off이며 `COMMANDCODE_BALANCE_ALERT_ENABLED=true`일 때만 활성화됩니다.
-- upstream HTTP error 및 `statusCode: 402` 같은 application-level stream error 발생 시 자동 failover/cooldown을 적용합니다.
-- visible content가 비어 있고 `finish_reason: length`인 응답은 기본적으로 빈 성공 대신 fail-closed 처리합니다.
-- 요청 크기 제한, 모델 allowlist, rate limit, helmet 보안 헤더, 선택적 CORS.
-- Strict TypeScript, Vitest, ESLint, Prettier, Docker, systemd, GitHub Actions, GitLab CI 포함.
+  - redacted read-only 대시보드 상태용 `GET /admin/config`, `GET /admin/commandcode/credentials`
+  - 인증된 대시보드 저장/재시작용 `PUT /admin/config`, `POST /admin/restart`
+- CommandCode streaming event를 OpenAI chat completion 응답 또는 SSE chunk로 변환합니다.
+- non-streaming/streaming OpenAI 클라이언트를 모두 지원합니다. `stream_options.include_usage`도 지원합니다.
+- CommandCode가 emit한 tool call을 OpenAI `tool_calls`로 다시 매핑합니다.
+- `developer`, `system`, `user`, `assistant`, `tool` 메시지를 지원합니다.
+- reasoning delta는 기본적으로 숨깁니다(`INCLUDE_REASONING=false`).
+- visible output 없이 `finish_reason: length`로 끝난 응답은 기본적으로 빈 성공이 아니라 fail-closed 오류로 반환합니다.
+- CommandCode upstream credential을 CLI auth file, 단일 API key, multi-key env, JSON credentials file에서 로드합니다.
+- 여러 CommandCode key를 안전하게 돌려 쓰는 multi-key credential router를 포함합니다.
+- 서버 bind, routing policy, key 관리, model toggle, diagnostics, JSON 저장, restart를 관리하는 모바일 우선 `/dashboard`를 포함합니다.
+- 선택적 balance alert와, 여러 bridge host를 묶는 선택적 `commandcode-router` 프로세스를 포함합니다.
+
+## 버전
+
+현재 bridge version: **v0.1.0**.
+
+버전은 `/health` 응답과 웹 대시보드 오른쪽 위에 표시됩니다.
 
 ## 구조
 
 ```text
-Single-host mode:
 OpenAI-compatible client
-  → CommandCode Bridge :9992
-  → POST https://api.commandcode.ai/alpha/generate
-  → CommandCode stream events
-  → OpenAI chat.completion 또는 chat.completion.chunk
-
-여러 PC를 쓰는 router mode:
-OpenAI-compatible client
-  → commandcode-router :9992
-  → healthy backend 중 least-inflight 선택
-  → PC별 CommandCode Bridge, 예: local :19992 + remote Tailscale :9992
-  → CommandCode upstream
+  -> CommandCode Bridge :9992
+  -> POST https://api.commandcode.ai/alpha/generate
+  -> CommandCode stream events
+  -> OpenAI chat.completion 또는 chat.completion.chunk
 ```
 
-단일 chat-completion 요청은 시작부터 끝까지 하나의 backend에 고정됩니다. 병렬성은 서로 독립된 요청을 독립 bridge host로 분산하는 방식으로 확보합니다.
+브리지는 요청마다 `cmd`를 실행하지 않습니다. CommandCode CLI가 사용하는 upstream API 경로를 직접 호출하고 응답 형식만 OpenAI-compatible 형태로 정규화합니다. 그래서 CLI stdout 파싱을 피하고 지연시간을 줄이며, CLI-side local tools/memory로 인한 토큰 낭비를 막습니다.
 
-이 브리지는 요청마다 `cmd` 프로세스를 실행하지 않습니다. CLI가 사용하는 upstream API를 직접 호출합니다. 따라서 지연시간과 stdout 파싱 문제가 줄고, CLI가 추가하는 로컬 도구/메모리로 인한 토큰 낭비를 피할 수 있습니다.
+하나의 chat-completion 요청은 시작부터 끝까지 하나의 upstream credential에 고정됩니다. 병렬성은 독립 요청을 여러 eligible key, 필요 시 여러 bridge host로 분산해서 확보합니다.
 
 ## 요구 사항
 
-- Node.js 20 이상
-- npm 10 이상
-- 공식 CommandCode CLI 환경(`cmd`, npm package `command-code`); 다운로드/설치: [commandcode.ai/install](https://commandcode.ai/install)
-- 정상 동작하는 CommandCode 계정/API 키 또는 인증된 CommandCode CLI auth 파일
-- Linux/macOS/WSL 권장
+- Node.js **20+**
+- npm **10+**
+- 수동/source 실행은 Linux, macOS, WSL 지원
+- 번들 `install.sh` 사용 시 Linux user systemd 필요
+- 공식 CommandCode CLI(`cmd`, npm package `command-code`) 또는 동등한 CommandCode upstream API key
+- 실제 generation에는 usable balance/credit이 있는 CommandCode 계정 필요
 
-## 빠른 시작
+### CommandCode 사전 상태별 동작
+
+설치/수동 설정은 다음 세 상태를 기준으로 설계되어 있습니다.
+
+1. **CommandCode CLI가 이미 설치·인증되어 있음**
+   - 브리지가 기존 `~/.commandcode/auth.json` credential을 첫 upstream key로 가져올 수 있습니다.
+2. **CommandCode CLI는 설치되어 있지만 인증되지 않음**
+   - `cmd login`을 실행한 뒤 브리지를 재시작하십시오.
+3. **CommandCode CLI가 없음**
+   - 먼저 설치·인증하십시오.
+     ```bash
+     npm install -g command-code
+     cmd login
+     ```
+   - Linux installer는 CLI가 없을 때 `npm install -g command-code`를 실행할지 물어볼 수 있습니다.
+
+## 설치 방법
+
+### Option A — Linux rootless installer
+
+source checkout 또는 package root에서 실행합니다.
 
 ```bash
-git clone http://100.113.251.30:8929/root/commandcode-bridge.git commandcode-bridge
+./install.sh
+```
+
+installer가 하는 일:
+
+- Node.js, npm, user systemd, CommandCode CLI 확인;
+- CLI가 없으면 npm으로 `command-code` 설치를 제안;
+- 기존 CommandCode CLI auth key가 있으면 가져오기;
+- 입력하지 않으면 client-facing `BRIDGE_API_KEY` 생성;
+- 브리지를 `~/.local/share/commandcode-bridge`에 설치;
+- private runtime env를 `~/.config/commandcode-bridge/env`에 작성;
+- `commandcode-bridge` user systemd service 생성;
+- `--no-start`가 없으면 service 시작.
+
+예시:
+
+```bash
+# 대화형, 안전한 local-only 기본값: 127.0.0.1:9992
+./install.sh
+
+# 비대화형 local 설치
+./install.sh --yes --host 127.0.0.1 --port 9992
+
+# Tailnet/LAN 노출; BRIDGE_API_KEY 유지 필수
+./install.sh --host 0.0.0.0 --port 9992
+```
+
+유용한 service 명령:
+
+```bash
+systemctl --user status commandcode-bridge --no-pager
+systemctl --user restart commandcode-bridge
+journalctl --user -u commandcode-bridge -f
+curl -fsS http://127.0.0.1:9992/health | jq
+```
+
+Linux host에서 로그인 전에도 service가 떠야 하면:
+
+```bash
+sudo loginctl enable-linger "$USER"
+```
+
+private config는 보존하고 제거:
+
+```bash
+./uninstall.sh
+```
+
+service, 설치 파일, private config까지 제거:
+
+```bash
+./uninstall.sh --purge-config
+```
+
+### Option B — source 수동 실행
+
+```bash
+git clone <your-commandcode-bridge-repository-url> commandcode-bridge
 cd commandcode-bridge
 npm install --include=dev
 cp .env.example .env
 ```
 
-single-key 모드:
+`.env`를 편집하거나 환경 변수를 export합니다. CommandCode CLI auth file을 쓰는 최소 local-only 설정:
 
-```bash
-# 서비스/컨테이너 운영 권장 방식
+```env
+HOST=127.0.0.1
+PORT=9992
+BRIDGE_API_KEY=replace-with-a-long-random-client-key
+COMMANDCODE_ROUTING_POLICY=daily_burn_priority
+COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length
+```
+
+upstream key를 명시하려면:
+
+```env
 COMMANDCODE_API_KEY=your_commandcode_api_key
 ```
 
-또는 multi-key 모드:
+빌드 및 실행:
 
 ```bash
-# 단순 id=key 쌍
+npm run build
+npm start
+```
+
+### Option C — Docker / Compose
+
+Docker는 full source checkout이 있는 배포에서 지원됩니다. Dockerfile은 runtime image를 만들기 전에 검증/빌드 파이프라인을 실행합니다.
+
+```bash
+docker build -t commandcode-bridge .
+docker run --rm -p 127.0.0.1:9992:9992 \
+  -e HOST=0.0.0.0 \
+  -e COMMANDCODE_API_KEY="$COMMANDCODE_API_KEY" \
+  -e BRIDGE_API_KEY="$BRIDGE_API_KEY" \
+  commandcode-bridge
+```
+
+또는:
+
+```bash
+cd release
+docker compose up -d --build
+```
+
+운영 세부 사항은 `docs/DEPLOYMENT.ko.md`와 `release/docker-compose.yml`을 참고하십시오.
+
+## 첫 검증
+
+Health check:
+
+```bash
+curl -fsS http://127.0.0.1:9992/health | jq
+```
+
+`BRIDGE_API_KEY`가 설정되어 있다면 인증된 model list:
+
+```bash
+export BRIDGE_API_KEY='<bridge env와 같은 값>'
+curl -fsS http://127.0.0.1:9992/v1/models \
+  -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
+```
+
+Non-streaming chat completion:
+
+```bash
+curl -sS http://127.0.0.1:9992/v1/chat/completions \
+  -H "Authorization: Bearer $BRIDGE_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "default",
+    "messages": [{"role": "user", "content": "Reply exactly: OK"}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq
+```
+
+Streaming:
+
+```bash
+curl -N http://127.0.0.1:9992/v1/chat/completions \
+  -H "Authorization: Bearer $BRIDGE_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "deepseek/deepseek-v4-pro",
+    "stream": true,
+    "messages": [{"role": "user", "content": "Count to three."}],
+    "stream_options": {"include_usage": true}
+  }'
+```
+
+프로젝트 smoke script:
+
+```bash
+npm run smoke
+```
+
+계정은 도달 가능하지만 balance/credit 때문에 일시적으로 generation이 막힌 경우 routing-only fail-closed smoke mode를 사용할 수 있습니다.
+
+```bash
+SMOKE_ACCEPT_UPSTREAM_ERRORS=1 npm run smoke
+```
+
+이 모드는 브리지가 빈 성공을 반환하지 않고 명시적 upstream/fail-closed 오류를 보여주는지만 확인합니다. 실제 generation readiness canary는 아닙니다.
+
+## 웹 대시보드
+
+열기:
+
+```text
+http://127.0.0.1:9992/dashboard
+```
+
+브리지를 Tailscale/VPN/LAN 뒤에서 `0.0.0.0`으로 bind했다면:
+
+```text
+http://<host-or-tailnet-ip>:9992/dashboard
+```
+
+대시보드는 의도적으로 모바일 우선입니다. 같은 trusted tailnet의 휴대폰에서도 운영하기 좋게 설계되어 있습니다.
+
+### 대시보드 섹션
+
+- **Header**
+  - bridge online/offline 상태 표시.
+  - `v0.1.0` 같은 bridge version 표시.
+- **Server Bind**
+  - local-only면 `127.0.0.1`.
+  - LAN/Tailscale/VPN/reverse proxy 뒤에서만 `0.0.0.0`.
+  - port 수정.
+  - 인증 write용 Admin API Key를 브라우저 local storage에 저장/복사.
+- **Routing Policy**
+  - eligible upstream key 선택 정책 변경.
+  - key당 동시 요청 수 수정. 운영 기본값은 **key당 in-flight 4회**입니다.
+- **Credentials**
+  - upstream CommandCode key 추가, 이름 변경, enable/disable, 삭제, refresh.
+  - key 이름을 바꾸거나 secret field를 비워도 기존 secret을 보존합니다.
+  - billing/diagnostics는 redacted operator summary로 표시합니다.
+- **Models**
+  - configured model catalog를 on/off.
+  - 변경 후 restart 필요.
+- **Footer**
+  - `Save JSON`은 대시보드 JSON config를 저장합니다.
+  - `Restart Bridge`는 지원되는 LaunchAgent/system service 경로로 브리지를 재시작합니다.
+
+### 대시보드 인증 모델
+
+- `GET /dashboard`, `GET /admin/config`, redacted `GET /admin/commandcode/credentials`는 trusted network에서 휴대폰 브라우저가 상태와 저장된 redacted config를 바로 볼 수 있도록 `BRIDGE_API_KEY` 없이도 읽을 수 있습니다.
+- 단, public read-only 대시보드 endpoint도 metadata-bearing입니다. service version, bind/port, configured model ID, credential ID/preview, 개수, redacted balance summary가 보일 수 있으므로 localhost 또는 신뢰하는 VPN/tailnet 안에서만 노출하십시오.
+- write/restart는 `BRIDGE_API_KEY`가 필요합니다.
+  - `PUT /admin/config`
+  - `POST /admin/restart`
+  - `BRIDGE_API_KEY`가 설정된 경우 모든 `/v1/*` inference call
+- 대시보드는 raw CommandCode upstream key를 반환하지 않습니다.
+- 대시보드는 public internet control plane으로 설계되지 않았습니다. Cookie session이 아니라 trusted network boundary와 bearer-token-protected write를 전제로 합니다.
+
+### 저장/재시작 흐름
+
+1. bind host, port, routing policy, credentials, models를 변경합니다.
+2. **Save JSON**을 누릅니다.
+3. **Restart Bridge**를 누릅니다.
+4. `/health`, `/v1/models`로 확인합니다.
+
+client-facing bridge key를 회전했다면 그 key를 쓰는 모든 client를 갱신해야 합니다. Hermes의 경우 bridge의 `BRIDGE_API_KEY`와 Hermes 쪽 `COMMANDCODE_BRIDGE_API_KEY`를 함께 맞추고, bridge/Hermes gateway 또는 해당 session을 재시작하십시오.
+
+## Upstream CommandCode 인증
+
+브리지는 다음 순서로 upstream CommandCode credential을 로드합니다.
+
+1. `COMMANDCODE_CREDENTIALS_FILE`
+2. `COMMANDCODE_CREDENTIALS` 또는 `COMMANDCODE_API_KEYS`
+3. legacy single-key `COMMANDCODE_API_KEY`
+4. `~/.commandcode/auth.json`
+5. `~/.config/commandcode/auth.json`
+
+credential이 여러 개여도 `/health`는 개수와 routing policy만 반환합니다. Raw key는 포함하지 않습니다.
+
+### Single-key env
+
+```env
+COMMANDCODE_API_KEY=your_commandcode_api_key
+```
+
+### 간단한 multi-key env
+
+```env
 COMMANDCODE_API_KEYS=primary=cmd_key_one,secondary=cmd_key_two
 COMMANDCODE_ROUTING_POLICY=daily_burn_priority
 ```
 
-weight/model scope가 필요한 credential은 JSON 파일을 만들고 `COMMANDCODE_CREDENTIALS_FILE`을 지정합니다.
+### JSON credentials file
+
+대시보드로 관리하거나 key가 여러 개인 경우 권장합니다.
+
+```env
+COMMANDCODE_CREDENTIALS_FILE=/home/you/.config/commandcode-bridge/credentials.json
+```
+
+예시 `credentials.json`:
 
 ```json
 {
+  "server": {
+    "host": "127.0.0.1",
+    "port": 9992
+  },
   "routing": {
     "policy": "daily_burn_priority",
     "fallbackPolicy": "round_robin",
@@ -101,90 +357,92 @@ weight/model scope가 필요한 credential은 JSON 파일을 만들고 `COMMANDC
   "models": [
     { "id": "deepseek/deepseek-v4-pro", "enabled": true },
     { "id": "deepseek/deepseek-v4-flash", "enabled": true },
+    { "id": "MiniMaxAI/MiniMax-M2.7", "enabled": true },
+    { "id": "Qwen/Qwen3.6-Plus", "enabled": true },
+    { "id": "zai-org/GLM-5.1", "enabled": true },
+    { "id": "moonshotai/Kimi-K2.6", "enabled": true },
     { "id": "openai/gpt-5.5", "enabled": false },
     { "id": "anthropic/claude-opus-4.7", "enabled": false },
     { "id": "anthropic/claude-sonnet-4.6", "enabled": false }
   ],
   "credentials": [
-    { "id": "primary", "apiKey": "cmd_key_one", "weight": 1, "maxInFlight": 4 },
+    { "id": "primary", "apiKey": "cmd_key_one", "weight": 1, "enabled": true },
     {
       "id": "flash-only",
       "apiKey": "cmd_key_two",
       "weight": 1,
-      "allowedModels": ["deepseek/deepseek-v4-flash"],
-      "maxInFlight": 4
+      "enabled": true,
+      "allowedModels": ["deepseek/deepseek-v4-flash"]
     }
   ]
 }
 ```
 
-또는 일반 CommandCode 인증 파일을 유지합니다.
-
-```text
-~/.commandcode/auth.json
-```
-
-로컬 실행:
+파일 권한 보호:
 
 ```bash
-npm run build
-npm start
+chmod 600 ~/.config/commandcode-bridge/credentials.json
 ```
 
-상태 확인:
+## Multi-key routing — 핵심 장점
 
-```bash
-curl http://127.0.0.1:9992/health | jq
+CommandCode Bridge는 여러 upstream CommandCode key를 등록하고 요청마다 적절한 key를 선택할 수 있습니다. 이것이 이 브리지의 핵심 운영 기능입니다. 트래픽을 분산하고, 한 key만 두드리는 일을 피하며, 건강하지 않거나 만료된 credential을 자동으로 제외할 수 있습니다.
+
+### Routing policies
+
+| Policy                | 목적                                                                                                                                    |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `daily_burn_priority` | 기본값. 현재 billing/credit 기간이 끝나기 전에 더 많이 써야 하는 key를 우선합니다. Legacy `depletion_aware`는 이 정책으로 정규화됩니다. |
+| `balance_priority`    | usable balance가 큰 key를 우선합니다.                                                                                                   |
+| `round_robin`         | eligible key를 weight와 availability에 따라 순환합니다.                                                                                 |
+| `drain_first`         | 앞 key부터 blocked/exhausted될 때까지 쓰고 다음 key로 이동합니다.                                                                       |
+
+### Eligibility와 failover
+
+Credential은 다음 경우 선택에서 제외될 수 있습니다.
+
+- dashboard/JSON에서 수동 disabled;
+- 요청 model이 `allowedModels` 범위 밖;
+- key당 in-flight limit 도달;
+- 429/5xx/timeout 이후 cooldown 중;
+- usable billing balance가 없거나 current period가 만료됨.
+
+Visible output이 나오기 전에 upstream error가 오고 다른 eligible credential이 있으면 bridge는 retry/failover할 수 있습니다. 이미 visible output이 시작된 뒤에는 중복 partial output을 피하기 위해 retry하지 않고 error를 표면화합니다.
+
+### Concurrency
+
+운영 기본값:
+
+```env
+COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4
 ```
 
-Chat completion:
+DeepSeek V4 Flash load test에서는 더 높은 병렬성도 안정적이었지만, 일반 운영 권장값은 **key당 in-flight 4회**입니다. 증설은 diagnostics와 upstream behavior를 관찰한 뒤 진행하십시오.
 
-```bash
-curl -sS http://127.0.0.1:9992/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "model": "default",
-    "messages": [{"role": "user", "content": "Reply exactly: OK"}],
-    "max_tokens": 64,
-    "temperature": 0
-  }' | jq
+### Multi-key rotation 증명
+
+1. 서로 다른 ID의 credential을 최소 2개 설정합니다.
+2. bridge를 재시작합니다.
+3. diagnostics refresh:
+
+   ```bash
+   curl -sS 'http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true' \
+     -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
+   ```
+
+4. low-token 요청을 여러 개 동시에 보냅니다.
+5. diagnostics를 다시 보고 여러 credential에서 selection/in-flight movement가 보이는지 확인합니다.
+6. 모든 응답이 성공 generation이거나 명시적 upstream/fail-closed 오류인지 확인합니다.
+
+## Client authentication
+
+`BRIDGE_API_KEY`를 설정하면 client 인증이 필요합니다.
+
+```env
+BRIDGE_API_KEY=replace-with-a-long-random-client-key
 ```
 
-스트리밍:
-
-```bash
-curl -N http://127.0.0.1:9992/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "model": "deepseek/deepseek-v4-pro",
-    "stream": true,
-    "messages": [{"role": "user", "content": "Count to three."}]
-  }'
-```
-
-## 인증
-
-### upstream CommandCode 인증
-
-브리지는 다음 순서로 CommandCode credential을 로드합니다.
-
-1. `COMMANDCODE_CREDENTIALS_FILE` (JSON 배열 또는 `{ "credentials": [...] }`)
-2. `COMMANDCODE_CREDENTIALS` / `COMMANDCODE_API_KEYS` (JSON 또는 `id=key,id2=key2`)
-3. legacy single-key `COMMANDCODE_API_KEY`
-4. `~/.commandcode/auth.json`
-5. `~/.config/commandcode/auth.json`
-
-credential이 여러 개여도 `/health`는 개수와 routing policy만 반환하며 raw key는 반환하지 않습니다.
-
-### 클라이언트 인증
-
-`BRIDGE_API_KEY`를 설정하면 클라이언트 인증이 필요합니다.
-
-```bash
-BRIDGE_API_KEY=change-me-to-a-long-random-secret
-```
-
-클라이언트는 다음 중 하나를 보낼 수 있습니다.
+Client는 둘 중 하나를 보낼 수 있습니다.
 
 ```text
 Authorization: Bearer <BRIDGE_API_KEY>
@@ -196,63 +454,41 @@ Authorization: Bearer <BRIDGE_API_KEY>
 x-api-key: <BRIDGE_API_KEY>
 ```
 
-`/health`는 의도적으로 인증 없이 열려 있지만, 비밀값은 반환하지 않습니다. Admin endpoint는 항상 `BRIDGE_API_KEY`가 필요합니다. 설정되지 않은 경우 `/admin/*`는 `admin_auth_not_configured`를 반환합니다.
+`/health`는 의도적으로 인증 없이 열려 있으며 secret-free입니다. Admin writes와 `/v1/*` 요청은 key가 설정된 경우 인증이 필요합니다.
 
-Credential metrics endpoint:
+## 설정 reference
 
-```bash
-curl -sS http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true \
-  -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
-```
-
-이 응답에는 routing state, billing 기반 credit metrics, alert threshold, credential ID만 포함됩니다. upstream CommandCode API key나 bridge key는 반환하지 않습니다.
-
-## 설정
-
-| 변수                                                | 기본값                           | 설명                                                                                                                                                    |
-| --------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HOST`                                              | `127.0.0.1`                      | 바인드 주소. reverse proxy/VPN이 없으면 localhost 유지 권장.                                                                                            |
-| `PORT`                                              | `9992`                           | HTTP 포트.                                                                                                                                              |
-| `COMMANDCODE_API_KEY`                               | 미설정                           | Legacy single upstream CommandCode API 키.                                                                                                              |
-| `COMMANDCODE_API_KEYS`                              | 미설정                           | 선택적 comma-separated multi-key `id=key` 목록. single-key보다 우선.                                                                                    |
-| `COMMANDCODE_CREDENTIALS`                           | 미설정                           | 선택적 JSON credentials 배열/객체 또는 comma-separated multi-key 목록.                                                                                  |
-| `COMMANDCODE_CREDENTIALS_FILE`                      | 미설정                           | 선택적 JSON credentials 파일. upstream credential 최우선순위.                                                                                           |
-| `COMMANDCODE_ROUTING_POLICY`                        | `daily_burn_priority`            | `daily_burn_priority`, `balance_priority`, `round_robin`, `drain_first`. Legacy `depletion_aware`는 `daily_burn_priority` alias.                        |
-| `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL`          | `4`                              | credential별 동시 in-flight 요청 상한. JSON/dashboard에서 변경 가능. DeepSeek V4 Flash 테스트에서 8-way 병렬은 안정적이었지만 운영 기본은 key당 4 권장. |
-| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT_MULTIPLIER`        | `3`                              | 전체 in-flight 기본 상한 계산값: `credential_count × multiplier`. 기본은 key 수 × 3.                                                                    |
-| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT`                   | 미설정                           | 설정하면 multiplier 계산 대신 고정 전체 in-flight 상한 사용.                                                                                            |
-| `COMMANDCODE_BILLING_REFRESH_MS`                    | `300000`                         | depletion-aware routing용 credential별 billing/usage cache TTL.                                                                                         |
-| `COMMANDCODE_BILLING_TIMEOUT_MS`                    | `10000`                          | credential별 billing probe timeout. stale/error fallback으로 요청 hang 방지.                                                                            |
-| `COMMANDCODE_CREDENTIAL_COOLDOWN_MS`                | `60000`                          | 429/5xx/timeout 이후 cooldown. 402는 이 값과 billing TTL 중 큰 값 사용.                                                                                 |
-| `COMMANDCODE_API_BASE`                              | `https://api.commandcode.ai`     | upstream API base.                                                                                                                                      |
-| `COMMANDCODE_DEFAULT_MODEL`                         | `deepseek/deepseek-v4-pro`       | 기본 upstream 모델.                                                                                                                                     |
-| `COMMANDCODE_ALLOWED_MODELS`                        | Pro + Flash                      | 쉼표 구분 모델 allowlist.                                                                                                                               |
-| `COMMANDCODE_ALLOW_UNKNOWN_MODELS`                  | `false`                          | 임의 모델 ID 통과. 권장하지 않음.                                                                                                                       |
-| `COMMANDCODE_CLI_VERSION`                           | `0.25.12`                        | upstream으로 보내는 CLI 버전 헤더.                                                                                                                      |
-| `COMMANDCODE_TIMEOUT_MS`                            | `300000`                         | upstream 요청 타임아웃.                                                                                                                                 |
-| `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`         | `error_on_length`                | visible content가 비어 있고 `finish_reason: length`이면 fail-closed. `allow`는 legacy 빈 성공 동작 유지.                                                |
-| `BRIDGE_API_KEY`                                    | 미설정                           | 선택적 클라이언트 API 키. 강력 권장.                                                                                                                    |
-| `REQUEST_BODY_LIMIT_BYTES`                          | `1048576`                        | Fastify 요청 크기 제한.                                                                                                                                 |
-| `RATE_LIMIT_MAX`                                    | `60`                             | rate window당 요청 수.                                                                                                                                  |
-| `RATE_LIMIT_WINDOW`                                 | `1 minute`                       | rate limit window.                                                                                                                                      |
-| `LOG_LEVEL`                                         | `info`                           | Fastify/Pino 로그 레벨. 테스트에서는 `silent`.                                                                                                          |
-| `CORS_ORIGIN`                                       | 미설정                           | 설정 시 해당 origin에 CORS 허용.                                                                                                                        |
-| `INCLUDE_REASONING`                                 | `false`                          | true면 reasoning delta를 visible output에 붙임. 기본 false 유지 권장.                                                                                   |
-| `COMMANDCODE_BALANCE_ALERT_ENABLED`                 | `false`                          | 주기적 잔액 threshold check 활성화. 기본 off.                                                                                                           |
-| `COMMANDCODE_BALANCE_ALERT_MIN_CURRENT_BALANCE`     | `1`                              | 현재 전체 balance가 이 값보다 낮으면 alert. `0`이면 비활성화.                                                                                           |
-| `COMMANDCODE_BALANCE_ALERT_MIN_EXPIRING_BALANCE`    | `0`                              | monthly/free expiring balance가 이 값보다 낮으면 alert. `0`이면 비활성화.                                                                               |
-| `COMMANDCODE_BALANCE_ALERT_MAX_REQUIRED_DAILY_BURN` | `0`                              | required daily burn이 이 값보다 높으면 alert. `0`이면 비활성화.                                                                                         |
-| `COMMANDCODE_BALANCE_ALERT_INTERVAL_MS`             | `COMMANDCODE_BILLING_REFRESH_MS` | 주기적 alert check 간격.                                                                                                                                |
-| `COMMANDCODE_BALANCE_ALERT_REPEAT_MS`               | `3600000`                        | credential/alert type별 최소 반복 간격.                                                                                                                 |
-| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_URL`             | 미설정                           | 선택적 JSON webhook 대상. webhook이 없어도 alert는 log로 남습니다.                                                                                      |
-| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_BEARER`          | 미설정                           | alert webhook용 선택적 bearer token.                                                                                                                    |
-
-## Admin Metrics와 Balance Alerts
-
-- `GET /admin/commandcode/credentials`는 운영자용 metrics endpoint입니다. `BRIDGE_API_KEY`가 설정되어 있고 호출자가 이를 제공해야만 접근 가능합니다.
-- `?refresh=true`는 응답 전 fresh billing/usage probe를 강제합니다. 생략하면 cached diagnostics를 사용합니다.
-- Balance alert는 의도적으로 opt-in입니다. 기본값 `COMMANDCODE_BALANCE_ALERT_ENABLED=false`에서는 timer, webhook, alert 평가가 모두 비활성화됩니다.
-- 활성화하면 startup 및 `COMMANDCODE_BALANCE_ALERT_INTERVAL_MS`마다 실행되며, structured warning log를 남기고 선택적으로 `COMMANDCODE_BALANCE_ALERT_WEBHOOK_URL`에 JSON을 POST합니다.
+| 변수                                         | 기본값                       | 설명                                                                                                       |
+| -------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `HOST`                                       | `127.0.0.1`                  | bind 주소. VPN, tailnet, reverse proxy 뒤가 아니면 localhost 권장.                                         |
+| `PORT`                                       | `9992`                       | HTTP port.                                                                                                 |
+| `BRIDGE_API_KEY`                             | 미설정                       | client-facing API key. 강력 권장; admin write에는 필요.                                                    |
+| `COMMANDCODE_API_KEY`                        | 미설정                       | legacy single upstream CommandCode key.                                                                    |
+| `COMMANDCODE_API_KEYS`                       | 미설정                       | `primary=...,secondary=...` 형태의 comma-separated multi-key 목록.                                         |
+| `COMMANDCODE_CREDENTIALS`                    | 미설정                       | JSON credentials 배열/객체 또는 comma-separated multi-key 목록.                                            |
+| `COMMANDCODE_CREDENTIALS_FILE`               | 미설정                       | JSON dashboard/credential file. upstream credential 최우선순위.                                            |
+| `COMMANDCODE_ROUTING_POLICY`                 | `daily_burn_priority`        | `daily_burn_priority`, `balance_priority`, `round_robin`, `drain_first`. `depletion_aware`는 legacy alias. |
+| `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL`   | `4`                          | key당 동시 요청 상한.                                                                                      |
+| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT`            | 미설정                       | 선택적 전체 in-flight 고정 상한.                                                                           |
+| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT_MULTIPLIER` | `3`                          | explicit total cap이 없을 때 쓰는 legacy/default multiplier.                                               |
+| `COMMANDCODE_BILLING_REFRESH_MS`             | `300000`                     | routing diagnostics용 billing/usage cache TTL.                                                             |
+| `COMMANDCODE_BILLING_TIMEOUT_MS`             | `10000`                      | billing probe timeout.                                                                                     |
+| `COMMANDCODE_CREDENTIAL_COOLDOWN_MS`         | `60000`                      | upstream failure 이후 cooldown.                                                                            |
+| `COMMANDCODE_API_BASE`                       | `https://api.commandcode.ai` | upstream API base. 알려진 대체 upstream 테스트 외에는 바꾸지 마십시오.                                     |
+| `COMMANDCODE_DEFAULT_MODEL`                  | `deepseek/deepseek-v4-pro`   | `default`가 사용할 model.                                                                                  |
+| `COMMANDCODE_ALLOWED_MODELS`                 | Pro + Flash/catalog defaults | comma-separated allowlist.                                                                                 |
+| `COMMANDCODE_ALLOW_UNKNOWN_MODELS`           | `false`                      | 임의 model ID를 upstream으로 통과. 운영 비권장.                                                            |
+| `COMMANDCODE_CLI_VERSION`                    | `0.25.12`                    | upstream으로 보내는 version header.                                                                        |
+| `COMMANDCODE_TIMEOUT_MS`                     | `300000`                     | upstream request timeout.                                                                                  |
+| `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`  | `error_on_length`            | empty visible `finish_reason: length`를 fail-closed. `allow`는 legacy blank success 유지.                  |
+| `REQUEST_BODY_LIMIT_BYTES`                   | `1048576`                    | Fastify body limit.                                                                                        |
+| `RATE_LIMIT_MAX`                             | `60`                         | rate-limit window당 요청 수.                                                                               |
+| `RATE_LIMIT_WINDOW`                          | `1 minute`                   | rate-limit window 문자열.                                                                                  |
+| `LOG_LEVEL`                                  | `info`                       | Fastify/Pino log level.                                                                                    |
+| `CORS_ORIGIN`                                | 미설정                       | 선택적 CORS origin.                                                                                        |
+| `INCLUDE_REASONING`                          | `false`                      | reasoning delta를 visible output에 붙임. 일반 client는 false 권장.                                         |
+| `COMMANDCODE_BALANCE_ALERT_ENABLED`          | `false`                      | periodic balance alert 활성화. 기본 off.                                                                   |
+| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_URL`      | 미설정                       | alert용 선택적 JSON webhook.                                                                               |
 
 ## OpenAI 호환성 메모
 
@@ -265,122 +501,131 @@ curl -sS http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true \
 - `temperature`
 - `top_p`
 - `stop`
-- function schema 기반 `tools`. CommandCode가 emit한 tool call은 OpenAI `tool_calls`로 다시 매핑합니다.
-- `tool_choice`는 미지정, `"auto"`, `"none"`만 지원합니다. CommandCode `/alpha/generate`에 안정적인 forced-tool selector가 없으므로 특정 tool 강제 선택은 `unsupported_tool_choice`로 거부합니다.
-- `response_format` (`json_object`, `json_schema` 요청에는 JSON-only 안내를 보강)
-- `stream_options.include_usage`; streaming usage는 `[DONE]` 전 `choices: []`인 OpenAI-style usage-only final chunk로 emit합니다.
+- function schema 기반 `tools`
+- `tool_choice`는 미지정, `"auto"`, `"none"`만 지원
+- `response_format` (`json_object` / `json_schema` 요청에는 JSON-only prompt reinforcement 적용)
+- `stream_options.include_usage`
+- `user`
 
-upstream event 변환:
+특정 tool 강제 선택은 `unsupported_tool_choice`를 반환합니다. CommandCode `/alpha/generate`가 안정적인 forced-tool selector를 제공하지 않기 때문입니다.
 
-| CommandCode event                           | OpenAI mapping                                                                                                                                                                           |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `text-delta`                                | `choices[0].delta.content` 또는 집계된 `message.content`                                                                                                                                 |
-| `tool-call`                                 | `choices[0].delta.tool_calls` 또는 집계된 `message.tool_calls`                                                                                                                           |
-| `finish.finishReason`                       | `finish_reason`                                                                                                                                                                          |
-| `finish.totalUsage.inputTokens`             | `usage.prompt_tokens`                                                                                                                                                                    |
-| `finish.totalUsage.outputTokens`            | `usage.completion_tokens`                                                                                                                                                                |
-| `finish.totalUsage.totalTokens`             | `usage.total_tokens`                                                                                                                                                                     |
-| `error`                                     | 비스트리밍은 upstream error로 반환합니다. 스트리밍은 SSE error frame과 `[DONE]`을 반환합니다. visible output 전 error이고 다른 credential이 있으면 먼저 retry/failover합니다.            |
-| 빈 visible content + `finishReason: length` | 기본 `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`에서는 빈 성공 대신 `commandcode_empty_visible_response`를 반환합니다. legacy 호환이 필요할 때만 `allow`를 사용하십시오. |
+## 선택적 commandcode-router
 
-Reasoning delta는 기본적으로 숨깁니다.
+`commandcode-router`는 multi-host 배포용 별도 프로세스입니다. 하나의 `/v1` endpoint를 유지하면서 독립 요청을 in-flight가 가장 적은 healthy bridge backend로 라우팅합니다.
+
+```env
+COMMANDCODE_ROUTER_BACKENDS=local=http://127.0.0.1:19992,pc2=http://<tailnet-ip>:9992
+COMMANDCODE_ROUTER_BACKEND_MAX_INFLIGHT=1
+COMMANDCODE_ROUTER_BACKEND_TIMEOUT_MS=300000
+COMMANDCODE_ROUTER_HEALTH_TIMEOUT_MS=3000
+COMMANDCODE_ROUTER_COOLDOWN_MS=60000
+```
+
+bridge host가 여러 대일 때만 사용하십시오. 대부분의 경우 단일 bridge process 안의 built-in multi-key credential router로 충분합니다.
 
 ## 개발
 
 ```bash
 npm install --include=dev
-npm test
 npm run typecheck
 npm run lint
+npm run format:check
+npm test
 npm run build
 npm run verify
 ```
 
-실행 중인 브리지에 대한 smoke test:
+`npm run verify`는 typecheck, lint, format check, test, build를 모두 실행합니다.
+
+## 보안과 non-goals
+
+- TLS, 인증, trusted network boundary 없이 public internet에 노출하지 마십시오.
+- `HOST=0.0.0.0`은 머신의 모든 interface에 listen한다는 뜻입니다. Tailscale/WireGuard/VPN/firewall/reverse proxy 뒤에서만 사용하십시오. 그 자체가 보안 장치는 아닙니다.
+- `127.0.0.1`, Tailscale, WireGuard, VPN, private reverse proxy를 권장합니다.
+- non-localhost 배포에서는 항상 `BRIDGE_API_KEY`를 설정하십시오.
+- Read-only dashboard endpoint도 redacted metadata를 노출할 수 있다고 취급하십시오.
+- `.env`, `~/.commandcode/auth.json`, `credentials.json`, upstream API key, bridge key, billing detail, router backend topology, dashboard-exported secret을 commit하지 마십시오.
+- CommandCode credential은 개인 upstream credential로 취급하십시오.
+- 이 저장소는 CommandCode의 proprietary/UNLICENSED CLI bundle source를 포함하지 않습니다.
+- 이 브리지는 CommandCode account limits, billing, rate limits, terms를 우회하지 않습니다.
+- 이 브리지는 일반 public proxy service가 아닙니다.
+
+자세한 내용은 `docs/SECURITY.md`를 참고하십시오.
+
+## 문제 해결
+
+### `/health`는 되는데 `/v1/models` 또는 chat이 401
+
+`/health`는 public입니다. `BRIDGE_API_KEY`가 설정되어 있으면 `/v1/*`는 인증이 필요합니다.
 
 ```bash
-npm run smoke
+export BRIDGE_API_KEY='<bridge env와 같은 값>'
+curl -fsS http://127.0.0.1:9992/v1/models \
+  -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
 ```
 
-`BRIDGE_API_KEY`를 설정했다면 smoke script 실행 전 동일한 값을 export하십시오.
+### bridge key 회전 뒤 Hermes compression 또는 client가 갑자기 401
 
-CommandCode 계정은 도달 가능하지만 balance/credit 문제로 생성이 막힌 경우, routing-only smoke mode로 브리지가 빈 성공을 반환하지 않고 upstream 실패를 명시적으로 전파하는지 확인할 수 있습니다.
+bridge의 client-facing key는 바뀌었지만 client가 예전 key를 들고 있는 상태입니다. Hermes에서는 다음 둘을 함께 맞추십시오.
+
+- bridge runtime env: `BRIDGE_API_KEY`
+- Hermes env/client setting: `COMMANDCODE_BRIDGE_API_KEY`
+
+둘 다 갱신한 뒤 bridge/Hermes gateway 또는 해당 session을 재시작하십시오.
+
+### CommandCode CLI는 설치됐는데 upstream key가 없다고 generation 실패
+
+실행:
+
+```bash
+cmd login
+```
+
+그 뒤 bridge를 재시작하십시오. 또는 `COMMANDCODE_API_KEY`, `COMMANDCODE_API_KEYS`, `COMMANDCODE_CREDENTIALS_FILE`을 명시적으로 제공하십시오.
+
+### 계정은 도달하지만 balance/credit 때문에 generation 실패
+
+Diagnostics 확인:
+
+```bash
+curl -sS 'http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true' \
+  -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
+```
+
+브리지 동작 테스트만 할 때:
 
 ```bash
 SMOKE_ACCEPT_UPSTREAM_ERRORS=1 npm run smoke
 ```
 
-이 모드는 명시적 `commandcode_event_error`, `commandcode_empty_response`, `commandcode_empty_visible_response`만 허용합니다. 실제 content generation 통과에는 계정 balance가 필요합니다.
+진짜 generation readiness는 이 flag 없이 normal smoke가 통과해야 합니다.
 
-실 multi-key canary는 CommandCode 계정에 generation 가능한 balance가 확보될 때까지 의도적으로 보류합니다. 그 전에는 `SMOKE_ACCEPT_UPSTREAM_ERRORS=1`로 routing/auth/fail-closed 동작만 검증하십시오. 결제/top-up 후 checklist:
+### 대시보드에서 저장했는데 적용되지 않음
 
-1. `COMMANDCODE_API_KEYS` 또는 `COMMANDCODE_CREDENTIALS_FILE`에 서로 다른 ID의 credential 최소 2개를 설정합니다.
-2. `/admin/commandcode/credentials?refresh=true`에서 canary credential 각각의 positive balance를 확인합니다.
-3. `SMOKE_ACCEPT_UPSTREAM_ERRORS` 없이 `npm run smoke`를 실행합니다.
-4. low-token 요청을 여러 번 보내고 admin metrics에서 `COMMANDCODE_ROUTING_POLICY`에 따른 selection 회전이 보이는지 확인합니다.
-5. tailnet 또는 non-localhost 테스트에서는 `BRIDGE_API_KEY`를 계속 활성화합니다.
+대부분의 대시보드 변경은 JSON을 저장하고 restart가 필요합니다. **Restart Bridge**를 누르거나 service를 수동 재시작하십시오.
 
-## Docker
-
-운영 배포와 관리 절차는 먼저 다음 문서를 보십시오.
-
-- `docs/DEPLOYMENT.md` — 기본 영문 배포 가이드.
-- `docs/DEPLOYMENT.ko.md` — 상세 한국어 배포 가이드.
-- `release/README_RELEASE.md` — 복사해서 쓰는 release 자산 설명.
-
-Docker 빌드는 전체 source checkout을 기준으로 합니다. Dockerfile이 runtime image 생성 전에 검증/빌드 파이프라인을 실행하므로 `src/`, `tests/`, lockfile, config 파일이 모두 필요합니다. npm package는 runtime 중심이며 전체 Docker build context를 포함하지 않습니다.
+### 9992 포트가 이미 사용 중
 
 ```bash
-docker build -t commandcode-bridge .
-docker run --rm -p 127.0.0.1:9992:9992 \
-  -e HOST=0.0.0.0 \
-  -e COMMANDCODE_API_KEY="$COMMANDCODE_API_KEY" \
-  -e BRIDGE_API_KEY="$BRIDGE_API_KEY" \
-  commandcode-bridge
+lsof -nP -iTCP:9992 -sTCP:LISTEN
+# Linux
+ss -ltnp '( sport = :9992 )'
 ```
 
-컨테이너 내부에서는 `0.0.0.0`으로 listen하지만, 위 예시는 localhost에만 publish합니다. Tailnet 또는 외부 interface에 bind할 경우 `BRIDGE_API_KEY`를 설정하십시오.
+충돌 process를 멈추거나 `PORT`를 바꾸십시오.
 
-또는:
-
-```bash
-docker compose up -d --build
-```
-
-`release/docker-compose.yml` 참고.
-
-## systemd
-
-권장 user-systemd 배포는 `docs/DEPLOYMENT.ko.md`를 참고하십시오. system-level host unit 예시는 `release/systemd/commandcode-bridge.service`에 있습니다.
-
-권장 설치 경로:
-
-```text
-/opt/commandcode-bridge
-```
-
-## 보안
-
-- TLS와 인증 없이 공개 인터넷에 노출하지 마십시오.
-- `127.0.0.1`, Tailscale, VPN, private reverse proxy를 권장합니다.
-- non-localhost 배포에서는 반드시 `BRIDGE_API_KEY`를 설정하십시오.
-- CommandCode API 키는 개인 credential로 취급하십시오.
-- 이 프로젝트는 CommandCode의 UNLICENSED CLI 번들 소스를 복사하지 않습니다.
-
-자세한 내용은 `docs/SECURITY.md`를 보십시오.
-
-## 문서
+## 문서 지도
 
 - `README.md` — 영어 README.
 - `docs/DEPLOYMENT.md` — 배포와 운영 가이드.
 - `docs/DEPLOYMENT.ko.md` — 한국어 배포와 운영 가이드.
-- `docs/PRD.md` — 제품 요구사항.
-- `docs/IMPLEMENTATION_PLAN.md` — 구현 계획.
-- `docs/ARCHITECTURE.md` — 구조와 데이터 흐름.
-- `docs/KNOW_HOW.md` — CommandCode API 노트와 운영 노하우.
+- `docs/ARCHITECTURE.md` — 구조와 data flow.
+- `docs/KNOW_HOW.md` — CommandCode API notes와 운영 노하우.
 - `docs/SECURITY.md` — 보안 모델과 배포 가드레일.
-- `docs/PROCESS_LOG.md` — 작업 로그.
+- `docs/PRD.md` — product requirements.
+- `docs/IMPLEMENTATION_PLAN.md` — implementation plan.
+- `docs/PROCESS_LOG.md` — work log.
 
-## 라이선스
+## License
 
-MIT. CommandCode 자체는 별도 소프트웨어이며 다른 약관을 가질 수 있습니다.
+MIT. CommandCode 자체는 별도 software이며 다른 terms를 가질 수 있습니다.
