@@ -88,5 +88,9 @@ describe("dashboard UI", () => {
     expect(html).toContain(".toast{position:fixed");
     expect(html).toContain("z-index:20;pointer-events:none");
     expect(html).toContain("env(safe-area-inset-bottom)");
+    expect(html).toContain("@media(max-width:520px)");
+    expect(html).toContain(".footerbar{grid-template-columns:minmax(0,1fr) minmax(0,1fr)");
+    expect(html).toContain(".footerbar .token{grid-column:1/-1");
+    expect(html).toContain(".footerbar button{width:100%;min-width:0}");
   });
 });
