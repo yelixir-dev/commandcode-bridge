@@ -75,7 +75,7 @@ describe("dashboard UI", () => {
     expect(html.indexOf("data-cenabled")).toBeLessThan(html.indexOf("data-del"));
   });
 
-  it("keeps toast notifications from blocking the floating save/restart bar", () => {
+  it("keeps save/restart actions in normal document flow with no overlay hit-target", () => {
     const html = dashboardHtml({
       server: { host: "127.0.0.1", port: 9992 },
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -83,11 +83,11 @@ describe("dashboard UI", () => {
       models: [],
     });
 
-    expect(html).toContain(".footerbar{position:fixed");
-    expect(html).toContain("z-index:30");
+    expect(html).toContain(".footerbar{position:relative");
+    expect(html).not.toContain(".footerbar{position:fixed");
     expect(html).toContain(".toast{position:fixed");
-    expect(html).toContain("z-index:20;pointer-events:none");
-    expect(html).toContain("env(safe-area-inset-bottom)");
+    expect(html).toContain("top:10px");
+    expect(html).toContain("pointer-events:none");
     expect(html).toContain("@media(max-width:520px)");
     expect(html).toContain(".footerbar{grid-template-columns:minmax(0,1fr) minmax(0,1fr)");
     expect(html).toContain(".footerbar .token{grid-column:1/-1");

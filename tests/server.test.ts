@@ -133,6 +133,16 @@ describe("Fastify OpenAI-compatible server", () => {
     await app.close();
   });
 
+  it("serves dashboard CSP without upgrading HTTP admin calls to HTTPS", async () => {
+    const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
+    const response = await app.inject({ method: "GET", url: "/dashboard" });
+    const csp = String(response.headers["content-security-policy"] ?? "");
+    expect(response.statusCode).toBe(200);
+    expect(csp).toContain("connect-src 'self' http:");
+    expect(csp).not.toContain("upgrade-insecure-requests");
+    await app.close();
+  });
+
   it("requires bridge API key when configured", async () => {
     const app = await createTestApp({
       upstream: new FakeCommandCodeClient(),

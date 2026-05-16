@@ -297,6 +297,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     contentSecurityPolicy: {
       directives: {
         scriptSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: ["'self'", "http:"],
+        upgradeInsecureRequests: null,
       },
     },
   });
