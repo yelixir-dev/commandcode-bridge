@@ -148,6 +148,36 @@ COMMANDCODE_ROUTER_COOLDOWN_MS=60000
 
 단일 streaming 요청은 출력이 시작된 뒤 다른 PC로 이동할 수 없습니다. failover와 load distribution은 서로 독립된 요청 경계에서만 일어납니다.
 
+## 원클릭 user systemd 설치/제거 스크립트
+
+라즈베리파이 또는 일반 Linux host에서 현재 사용자 권한으로 bridge를 서비스 등록하려면 저장소 루트에서 다음을 실행합니다.
+
+```bash
+./install.sh
+```
+
+설치 중 bind 주소를 `127.0.0.1` 또는 `0.0.0.0` 중에서 고르고 port를 입력할 수 있습니다. 기본값은 안전한 `127.0.0.1:9992`입니다.
+
+사전 조건은 Linux user systemd, Node.js >= 20, npm, 그리고 `~/.commandcode/auth.json`의 CommandCode CLI 인증 또는 `COMMANDCODE_API_KEY`입니다. headless host에서 로그인 전에도 떠야 하면 한 번 `sudo loginctl enable-linger "$USER"`를 실행하십시오. `0.0.0.0`은 LAN/Tailscale/VPN/firewall 뒤에서만 사용하고 강한 `BRIDGE_API_KEY`를 유지하십시오.
+
+비대화형 설치:
+
+```bash
+./install.sh --yes --host 127.0.0.1 --port 9992
+```
+
+서비스와 설치 파일 제거, credential/env 보존:
+
+```bash
+./uninstall.sh
+```
+
+credential/env까지 제거:
+
+```bash
+./uninstall.sh --purge-config
+```
+
 ## User systemd 배포 방식
 
 root 권한이 없거나, 현재 사용자 계정의 `~/.commandcode/auth.json`을 그대로 읽게 하려면 user systemd 방식이 가장 적합합니다.

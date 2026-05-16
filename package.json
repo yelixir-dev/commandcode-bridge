@@ -16,7 +16,9 @@
     "README.md",
     "README.ko.md",
     "LICENSE",
-    ".env.example"
+    ".env.example",
+    "install.sh",
+    "uninstall.sh"
   ],
   "engines": {
     "node": ">=20.0.0"
