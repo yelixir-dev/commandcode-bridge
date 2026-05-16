@@ -27,6 +27,7 @@ function diagnostic(overrides: {
   const id = overrides.id ?? "alpha";
   return {
     id,
+    enabled: true,
     weight: 1,
     allowedModels: undefined,
     disabledUntil: null,

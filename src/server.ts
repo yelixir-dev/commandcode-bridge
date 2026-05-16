@@ -396,7 +396,13 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
           ),
         );
     }
-    const update = withExistingCredentialSecrets(request.body as DashboardConfigUpdate, config);
+    const secretSourceConfig = loadBridgeConfig({
+      env: { ...process.env, COMMANDCODE_CREDENTIALS_FILE: config.configFilePath },
+    });
+    const update = withExistingCredentialSecrets(
+      request.body as DashboardConfigUpdate,
+      secretSourceConfig,
+    );
     writeDashboardConfigFile(config.configFilePath, update);
     configDirty = true;
     const savedConfig = loadBridgeConfig({

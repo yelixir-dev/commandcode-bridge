@@ -28,6 +28,16 @@ function numberValue(value: unknown, fallback = 1): number {
   return fallback;
 }
 
+function booleanValue(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) return true;
+    if (["0", "false", "no", "off"].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
 function stringArrayValue(value: unknown): string[] | undefined {
   if (Array.isArray(value)) {
     const values = value.map(stringValue).filter((entry): entry is string => Boolean(entry));
@@ -91,6 +101,7 @@ function credentialFromRecord(
     id: stringValue(value.id) ?? stringValue(value.name) ?? `key-${index + 1}`,
     apiKey,
     weight: numberValue(value.weight, 1),
+    enabled: booleanValue(value.enabled, true),
   };
   const allowedModels = stringArrayValue(value.allowedModels ?? value.allowed_models);
   if (allowedModels) credential.allowedModels = allowedModels;

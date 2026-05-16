@@ -1,4 +1,4 @@
-import { mkdtempSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -93,7 +93,7 @@ describe("JSON dashboard configuration", () => {
     expect(config.port).toBe(9992);
     expect(config.commandCodeRoutingPolicy).toBe("daily_burn_priority");
     expect(config.commandCodeMaxInFlightPerCredential).toBe(4);
-    expect(config.commandCodeMaxTotalInFlight).toBe(6);
+    expect(config.commandCodeMaxTotalInFlight).toBeUndefined();
     expect(config.allowedModels).toEqual([
       "deepseek/deepseek-v4-flash",
       "deepseek/deepseek-v4-pro",
@@ -152,6 +152,29 @@ describe("JSON dashboard configuration", () => {
     expect(putResponse.json()).toMatchObject({ dirty: true, restart_required: true });
     expect(putResponse.body).not.toContain("alpha-secret");
     expect(putResponse.body).not.toContain("beta-secret");
+
+    const secondPutResponse = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers,
+      payload: {
+        server: { host: "0.0.0.0", port: 9992 },
+        routing: { policy: "round_robin", maxInFlightPerCredential: 4 },
+        models: [{ id: "deepseek/deepseek-v4-flash", enabled: true }],
+        credentials: [
+          { id: "renamed", originalId: "renamed", weight: 1, enabled: false },
+          { id: "key2", originalId: "key2", weight: 1, enabled: true },
+        ],
+      },
+    });
+    expect(secondPutResponse.statusCode).toBe(200);
+    const persisted = JSON.parse(readFileSync(file, "utf8")) as {
+      credentials: Array<{ id: string; apiKey?: string; enabled?: boolean }>;
+    };
+    expect(persisted.credentials).toMatchObject([
+      { id: "renamed", apiKey: "alpha-secret", enabled: false },
+      { id: "key2", apiKey: "beta-secret", enabled: true },
+    ]);
 
     await app.close();
   });

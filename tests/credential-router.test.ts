@@ -25,6 +25,7 @@ function state(id: string, remainingCredits: number, daysLeft: number): CommandC
       currentPeriodEnd: new Date(now + daysLeft * 86_400_000).toISOString(),
     },
     billingError: undefined,
+    disabledReason: undefined,
     disabledUntil: 0,
     inFlight: 0,
     lastSelectedAt: 0,
@@ -118,6 +119,99 @@ describe("CommandCode credential routing", () => {
     await expect(router.select({ model: "deepseek/deepseek-v4-flash" })).resolves.toMatchObject({
       id: "flash",
     });
+  });
+
+  it("does not select manually disabled credentials", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [{ ...credential("off"), enabled: false }, credential("on")],
+      policy: "round_robin",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      now: () => now,
+    });
+
+    for (let index = 0; index < 3; index += 1) {
+      await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+        id: "on",
+      });
+    }
+  });
+
+  it("automatically disables expired credentials before any routing policy can select them", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("expired"), credential("active")],
+      policy: "round_robin",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) =>
+        selected.id === "expired"
+          ? {
+              fetchedAt: now,
+              monthlyCredits: 10,
+              purchasedCredits: 0,
+              freeCredits: 0,
+              currentPeriodEnd: new Date(now - 86_400_000).toISOString(),
+            }
+          : {
+              fetchedAt: now,
+              monthlyCredits: 1,
+              purchasedCredits: 0,
+              freeCredits: 0,
+              currentPeriodEnd: new Date(now + 86_400_000).toISOString(),
+            },
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "active",
+    });
+    const expired = router.snapshot().find((entry) => entry.credential.id === "expired");
+    expect(expired?.disabledUntil).toBe(Number.MAX_SAFE_INTEGER);
+    expect(expired?.disabledReason).toBe("expired");
+  });
+
+  it("re-enables expired credentials after a refreshed billing period becomes valid", async () => {
+    let currentTime = now;
+    let expiredPeriod = true;
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("renewed"), credential("active")],
+      policy: "round_robin",
+      billingRefreshMs: 1,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => currentTime,
+      billingProvider: async (selected) =>
+        selected.id === "renewed" && expiredPeriod
+          ? {
+              fetchedAt: currentTime,
+              monthlyCredits: 10,
+              purchasedCredits: 0,
+              freeCredits: 0,
+              currentPeriodEnd: new Date(currentTime - 86_400_000).toISOString(),
+            }
+          : {
+              fetchedAt: currentTime,
+              monthlyCredits: 1,
+              purchasedCredits: 0,
+              freeCredits: 0,
+              currentPeriodEnd: new Date(currentTime + 86_400_000).toISOString(),
+            },
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "active",
+    });
+
+    expiredPeriod = false;
+    currentTime += 2;
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "renewed",
+    });
+    const renewed = router.snapshot().find((entry) => entry.credential.id === "renewed");
+    expect(renewed?.disabledUntil).toBe(0);
+    expect(renewed?.disabledReason).toBeUndefined();
   });
 
   it("excludes already attempted credentials from retry selection", async () => {

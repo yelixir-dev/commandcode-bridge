@@ -89,6 +89,31 @@ async function collectEvents(events: AsyncIterable<CommandCodeEvent>): Promise<C
   return collected;
 }
 
+function billingResponse(url: string): Response | undefined {
+  if (url.includes("/alpha/whoami")) return Response.json({ org: { id: "org_test" } });
+  if (url.includes("/alpha/billing/credits")) {
+    return Response.json({
+      credits: { monthlyCredits: 10, purchasedCredits: 0, freeCredits: 0 },
+    });
+  }
+  if (url.includes("/alpha/billing/subscriptions")) {
+    return Response.json({
+      data: {
+        currentPeriodStart: "2026-05-01T00:00:00.000Z",
+        currentPeriodEnd: "2099-01-01T00:00:00.000Z",
+      },
+    });
+  }
+  if (url.includes("/alpha/usage/summary")) return Response.json({ totalCost: 0, totalCount: 0 });
+  return undefined;
+}
+
+function postCalls(fetchMock: ReturnType<typeof vi.fn<typeof fetch>>) {
+  return fetchMock.mock.calls.filter(
+    (call) => (call[1] as RequestInit | undefined)?.method === "POST",
+  );
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -204,58 +229,59 @@ describe("CommandCode client credential routing", () => {
   });
 
   it("uses configured credential pool instead of one fixed API key", async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () =>
-      Promise.resolve(
-        new Response(
-          'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
-          {
-            status: 200,
-          },
-        ),
-      ),
-    );
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      const billing = billingResponse(url);
+      if (billing) return billing;
+      return new Response(
+        'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+        { status: 200 },
+      );
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const client = new CommandCodeClient(baseConfig);
     await collectEvents(client.generate(generateBody));
     await collectEvents(client.generate(generateBody));
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).headers).toMatchObject({
+    const posts = postCalls(fetchMock);
+    expect(posts).toHaveLength(2);
+    expect((posts[0]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer alpha-secret",
     });
-    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).headers).toMatchObject({
+    expect((posts[1]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer beta-secret",
     });
   });
 
   it("fails over to another credential when an upstream stream error marks the first key depleted", async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        new Response(
-          'data: {"type":"error","error":{"message":"Insufficient Balance","statusCode":402}}\n',
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
-          {
-            status: 200,
-          },
-        ),
-      );
+    const postResponses = [
+      new Response(
+        'data: {"type":"error","error":{"message":"Insufficient Balance","statusCode":402}}\n',
+        { status: 200 },
+      ),
+      new Response(
+        'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+        { status: 200 },
+      ),
+    ];
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      if (init?.method === "POST") return postResponses.shift()!;
+      throw new Error(`Unexpected fetch ${String(input)}`);
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const client = new CommandCodeClient(baseConfig);
     const events = await collectEvents(client.generate(generateBody));
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).headers).toMatchObject({
+    const posts = postCalls(fetchMock);
+    expect(posts).toHaveLength(2);
+    expect((posts[0]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer alpha-secret",
     });
-    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).headers).toMatchObject({
+    expect((posts[1]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer beta-secret",
     });
     expect(events).toContainEqual(expect.objectContaining({ type: "text-delta", text: "ok" }));
@@ -263,21 +289,21 @@ describe("CommandCode client credential routing", () => {
   });
 
   it("does not retry the same credential after an opaque retryable stream error", async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        new Response('data: {"type":"error","message":"temporary upstream error"}\n', {
-          status: 200,
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
-          {
-            status: 200,
-          },
-        ),
-      );
+    const postResponses = [
+      new Response('data: {"type":"error","message":"temporary upstream error"}\n', {
+        status: 200,
+      }),
+      new Response(
+        'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+        { status: 200 },
+      ),
+    ];
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      if (init?.method === "POST") return postResponses.shift()!;
+      throw new Error(`Unexpected fetch ${String(input)}`);
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const client = new CommandCodeClient({
@@ -289,11 +315,12 @@ describe("CommandCode client credential routing", () => {
     });
     const events = await collectEvents(client.generate(generateBody));
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).headers).toMatchObject({
+    const posts = postCalls(fetchMock);
+    expect(posts).toHaveLength(2);
+    expect((posts[0]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer alpha-secret",
     });
-    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).headers).toMatchObject({
+    expect((posts[1]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer beta-secret",
     });
     expect(events).toContainEqual(expect.objectContaining({ type: "text-delta", text: "ok" }));

@@ -296,6 +296,7 @@ export class CommandCodeClient implements CommandCodeUpstream {
       cooldownMs: config.commandCodeCredentialCooldownMs,
       billingProvider: (credential: CommandCodeCredential, signal: AbortSignal) =>
         billingClient.getSnapshot(credential, signal),
+      validateBillingBeforeSelect: true,
     };
     this.router = new CommandCodeCredentialRouter(routerOptions);
   }

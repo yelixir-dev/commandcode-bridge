@@ -32,6 +32,7 @@ class FakeDiagnosticsCommandCodeClient extends FakeCommandCodeClient {
     return [
       {
         id: "alpha",
+        enabled: true,
         weight: 1,
         allowedModels: ["deepseek/deepseek-v4-pro"],
         disabledUntil: null,

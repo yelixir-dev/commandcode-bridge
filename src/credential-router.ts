@@ -12,6 +12,7 @@ export interface CommandCodeCredentialState {
   credential: CommandCodeCredential;
   billing?: CommandCodeBillingSnapshot;
   billingError: string | undefined;
+  disabledReason: "auth" | "billing" | "cooldown" | "expired" | undefined;
   disabledUntil: number;
   inFlight: number;
   lastSelectedAt: number;
@@ -33,6 +34,7 @@ export interface CommandCodeCreditMetrics {
 
 export interface CommandCodeCredentialDiagnostic {
   id: string;
+  enabled: boolean;
   weight: number;
   allowedModels: string[] | undefined;
   disabledUntil: number | null;
@@ -76,6 +78,7 @@ export interface CommandCodeCredentialRouterOptions {
     credential: CommandCodeCredential,
     signal: AbortSignal,
   ) => Promise<CommandCodeBillingSnapshot>;
+  validateBillingBeforeSelect?: boolean;
 }
 
 export interface SelectCredentialOptions {
@@ -205,6 +208,7 @@ export class CommandCodeCredentialRouter {
         signal: AbortSignal,
       ) => Promise<CommandCodeBillingSnapshot>)
     | undefined;
+  private readonly validateBillingBeforeSelect: boolean;
 
   public constructor(options: CommandCodeCredentialRouterOptions) {
     this.policy = options.policy === "depletion_aware" ? "daily_burn_priority" : options.policy;
@@ -219,6 +223,7 @@ export class CommandCodeCredentialRouter {
     this.cooldownMs = options.cooldownMs;
     this.now = options.now ?? Date.now;
     this.billingProvider = options.billingProvider;
+    this.validateBillingBeforeSelect = options.validateBillingBeforeSelect ?? false;
 
     const ids = new Set<string>();
     this.states = options.credentials.map((credential) => {
@@ -231,6 +236,7 @@ export class CommandCodeCredentialRouter {
         id: credential.id,
         apiKey: credential.apiKey,
         weight: positive(credential.weight, 1),
+        enabled: credential.enabled !== false,
       };
       if (credential.maxInFlight !== undefined) {
         normalizedCredential.maxInFlight = positive(
@@ -243,6 +249,7 @@ export class CommandCodeCredentialRouter {
       return {
         credential: normalizedCredential,
         billingError: undefined,
+        disabledReason: undefined,
         disabledUntil: 0,
         inFlight: 0,
         lastSelectedAt: 0,
@@ -261,6 +268,7 @@ export class CommandCodeCredentialRouter {
         id: state.credential.id,
         apiKey: "[REDACTED]",
         weight: state.credential.weight,
+        enabled: state.credential.enabled !== false,
       };
       if (state.credential.maxInFlight !== undefined) {
         redactedCredential.maxInFlight = state.credential.maxInFlight;
@@ -271,6 +279,7 @@ export class CommandCodeCredentialRouter {
       const snapshot: CommandCodeCredentialState = {
         credential: redactedCredential,
         billingError: state.billingError,
+        disabledReason: state.disabledReason,
         disabledUntil: state.disabledUntil,
         inFlight: state.inFlight,
         lastSelectedAt: state.lastSelectedAt,
@@ -298,6 +307,7 @@ export class CommandCodeCredentialRouter {
       const metrics = billing ? calculateCreditMetrics(billing, now) : undefined;
       return {
         id: state.credential.id,
+        enabled: state.credential.enabled !== false,
         weight: state.credential.weight,
         allowedModels: state.credential.allowedModels
           ? [...state.credential.allowedModels]
@@ -347,6 +357,9 @@ export class CommandCodeCredentialRouter {
     }
 
     const now = this.now();
+    if (this.billingProvider && this.validateBillingBeforeSelect) {
+      await Promise.all(this.states.map((state) => this.refreshBillingIfStale(state, now)));
+    }
     const excludedIds = new Set(options.excludeIds ?? []);
     if (this.maxTotalInFlight !== undefined && this.totalInFlight() >= this.maxTotalInFlight) {
       throw new NoAvailableCommandCodeCredentialError(
@@ -396,14 +409,17 @@ export class CommandCodeCredentialRouter {
     const statusCode = options.statusCode;
     if (statusCode === 401) {
       state.disabledUntil = Number.MAX_SAFE_INTEGER;
+      state.disabledReason = "auth";
     } else if (statusCode === 402) {
       state.disabledUntil = this.now() + Math.max(this.cooldownMs, this.billingRefreshMs);
+      state.disabledReason = "billing";
     } else if (
       statusCode === undefined ||
       statusCode === 429 ||
       (statusCode !== undefined && statusCode >= 500)
     ) {
       state.disabledUntil = this.now() + this.cooldownMs;
+      state.disabledReason = "cooldown";
     }
 
     this.release(id);
@@ -438,10 +454,16 @@ export class CommandCodeCredentialRouter {
       );
       state.billingError = undefined;
       const remaining = remainingCredits(state, this.now()) ?? 0;
-      if (remaining > 0 && state.disabledUntil !== Number.MAX_SAFE_INTEGER) {
+      const expired = daysUntil(state.billing.currentPeriodEnd, this.now()) === 0;
+      if (expired) {
+        state.disabledUntil = Number.MAX_SAFE_INTEGER;
+        state.disabledReason = "expired";
+      } else if (remaining > 0 && state.disabledReason !== "auth") {
         state.disabledUntil = 0;
+        state.disabledReason = undefined;
       } else if (state.disabledUntil !== Number.MAX_SAFE_INTEGER) {
         state.disabledUntil = this.now() + this.billingRefreshMs;
+        state.disabledReason = "billing";
       }
     } catch (error) {
       state.billingError = errorMessage(error);
@@ -456,6 +478,7 @@ export class CommandCodeCredentialRouter {
     return this.states.filter(
       (state) =>
         !excludedIds.has(state.credential.id) &&
+        state.credential.enabled !== false &&
         state.disabledUntil <= now &&
         state.inFlight < this.maxInFlightForState(state) &&
         isModelAllowed(state.credential, model),

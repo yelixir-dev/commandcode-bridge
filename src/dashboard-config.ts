@@ -27,6 +27,7 @@ export interface RedactedCommandCodeCredential {
   apiKeyConfigured: boolean;
   apiKeyPreview: string | undefined;
   weight: number;
+  enabled: boolean;
   allowedModels: string[] | undefined;
   maxInFlight: number | undefined;
 }
@@ -196,6 +197,7 @@ export function normalizeCredentialUpdate(
         id,
         apiKey,
         weight: numberValue(credential.weight, 1),
+        enabled: booleanValue(credential.enabled, true),
       };
       if (Array.isArray(credential.allowedModels)) {
         normalized.allowedModels = credential.allowedModels.filter(
@@ -249,6 +251,7 @@ export function redactedCredentials(
         ? `${credential.apiKey.slice(0, 4)}…${credential.apiKey.slice(-4)}`
         : undefined,
     weight: credential.weight,
+    enabled: credential.enabled !== false,
     allowedModels: credential.allowedModels ? [...credential.allowedModels] : undefined,
     maxInFlight: credential.maxInFlight,
   }));

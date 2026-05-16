@@ -137,6 +137,7 @@ export interface CommandCodeCredential {
   id: string;
   apiKey: string;
   weight: number;
+  enabled?: boolean;
   allowedModels?: string[];
   maxInFlight?: number;
 }

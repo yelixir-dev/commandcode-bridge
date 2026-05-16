@@ -155,16 +155,12 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     routingFromFile.maxTotalInFlightMultiplier,
   );
   const maxTotalFromEnv = parseNumber(env.COMMANDCODE_MAX_TOTAL_IN_FLIGHT, 0);
-  const computedMaxTotal = Math.max(
-    1,
-    Math.floor(commandCodeCredentials.length * maxTotalMultiplier),
-  );
   const commandCodeMaxTotalInFlight =
     maxTotalFromEnv > 0
       ? maxTotalFromEnv
       : typeof routingFromFile.maxTotalInFlight === "number"
         ? routingFromFile.maxTotalInFlight
-        : computedMaxTotal;
+        : undefined;
   const balanceAlertIntervalMs = parseNumber(
     env.COMMANDCODE_BALANCE_ALERT_INTERVAL_MS,
     commandCodeBillingRefreshMs,
