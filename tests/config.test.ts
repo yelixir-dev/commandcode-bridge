@@ -8,14 +8,43 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
+  it("advertises the current CommandCode CLI version by default while allowing override", () => {
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.26.7");
+    expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.26.7-test" } }).cliVersion).toBe(
+      "0.26.7-test",
+    );
+  });
+
   it("shows CommandCode pricing instead of descriptive model notes", () => {
     const config = loadBridgeConfig({ env: {} });
     expect(config.modelCatalog?.find((model) => model.id === "openai/gpt-5.5")?.notes).toBe(
       "$5/M in · $30/M out",
     );
+    expect(config.modelCatalog?.find((model) => model.id === "openai/gpt-5.4")?.notes).toBe(
+      "$2.50/M in · $15/M out",
+    );
     expect(
       config.modelCatalog?.find((model) => model.id === "deepseek/deepseek-v4-pro")?.notes,
     ).toBe("$0.435/M in · $0.87/M out · cache hit $0.003625/M");
+  });
+
+  it("keeps the CommandCode 0.26.7 discovered model catalog available but conservative", () => {
+    const config = loadBridgeConfig({ env: {} });
+    const catalog = new Map(config.modelCatalog?.map((model) => [model.id, model]));
+
+    for (const id of [
+      "MiniMaxAI/MiniMax-M2.5",
+      "Qwen/Qwen3.6-Max-Preview",
+      "zai-org/GLM-5",
+      "moonshotai/Kimi-K2.5",
+      "openai/gpt-5.4",
+      "openai/gpt-5.3-codex",
+      "openai/gpt-5.4-mini",
+      "anthropic/claude-haiku-4-5-20251001",
+    ]) {
+      expect(catalog.has(id)).toBe(true);
+      expect(catalog.get(id)?.enabled).toBe(false);
+    }
   });
 
   it("keeps balance alerts off by default while failing closed on empty length responses", () => {

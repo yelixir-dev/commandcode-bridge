@@ -9,11 +9,11 @@ describe("dashboard UI", () => {
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
       credentials: [],
       models: [],
-      bridge: { online: true, endpoint: "0.0.0.0:9992", version: "0.1.0" },
+      bridge: { online: true, endpoint: "0.0.0.0:9992", version: "0.26.7" },
     });
 
     expect(html).toContain('id="bridgeVersion"');
-    expect(html).toContain("v0.1.0");
+    expect(html).toContain("v0.26.7");
     expect(html).not.toContain('id="endpoint"');
   });
 

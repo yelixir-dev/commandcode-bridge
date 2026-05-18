@@ -454,7 +454,7 @@ export async function createRouterApp(
     return {
       status: healthyCount > 0 ? "ok" : "degraded",
       service: "commandcode-router",
-      version: "0.1.0",
+      version: "0.26.7",
       external_port: config.port,
       backend_count: backends.length,
       healthy_backend_count: healthyCount,
