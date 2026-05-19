@@ -27,12 +27,12 @@ CommandCode Bridge는 CommandCode 계정을 OpenAI-compatible HTTP API로 노출
 
 ## 한눈에 보기
 
-| 영역 | 요약 |
-| --- | --- |
-| API 표면 | `/health`, `/dashboard`, `/v1/models`, `/v1/chat/completions`, redacted admin diagnostics. |
-| 핵심 가치 | OpenAI-compatible client가 요청마다 `cmd`를 실행하지 않고 CommandCode-backed model을 호출합니다. |
-| 라우팅 | daily-burn, balance-priority, round-robin, drain-first 정책 기반 multi-key credential 선택. |
-| 운영 | bind, routing, credential, model toggle, diagnostics, save, restart를 다루는 모바일 우선 dashboard. |
+| 영역      | 요약                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------- |
+| API 표면  | `/health`, `/dashboard`, `/v1/models`, `/v1/chat/completions`, redacted admin diagnostics.            |
+| 핵심 가치 | OpenAI-compatible client가 요청마다 `cmd`를 실행하지 않고 CommandCode-backed model을 호출합니다.      |
+| 라우팅    | daily-burn, balance-priority, round-robin, drain-first 정책 기반 multi-key credential 선택.           |
+| 운영      | bind, routing, credential, model toggle, diagnostics, save, restart를 다루는 모바일 우선 dashboard.   |
 | 안전 경계 | upstream secret은 번들하지 않으며 localhost 또는 신뢰하는 VPN/tailnet/private proxy에서만 노출합니다. |
 
 설치 후 one-shot smoke test:
