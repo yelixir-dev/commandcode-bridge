@@ -588,7 +588,7 @@ npm run verify
 - The bridge does not bypass CommandCode account limits, billing, rate limits, or terms.
 - The bridge is not a general public proxy service.
 
-See `docs/SECURITY.md` for more details.
+See `docs/SECURITY.md` for more details. For private security reports, use GitHub security advisories when available or contact `yelixir.dev@gmail.com`.
 
 ## Troubleshooting
 

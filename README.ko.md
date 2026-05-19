@@ -588,7 +588,7 @@ npm run verify
 - 이 브리지는 CommandCode account limits, billing, rate limits, terms를 우회하지 않습니다.
 - 이 브리지는 일반 public proxy service가 아닙니다.
 
-자세한 내용은 `docs/SECURITY.md`를 참고하십시오.
+자세한 내용은 `docs/SECURITY.md`를 참고하십시오. 비공개 보안 제보는 가능한 경우 GitHub security advisory를 사용하거나 `yelixir.dev@gmail.com`으로 연락하세요.
 
 ## 문제 해결
 
