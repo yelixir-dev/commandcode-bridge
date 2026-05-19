@@ -35,6 +35,16 @@ CommandCode Bridge is a trusted-environment HTTP bridge that exposes a small Ope
 | Operations | Mobile-first dashboard for bind settings, routing, credentials, model toggles, diagnostics, save, and restart. |
 | Safety boundary | No upstream secrets are bundled; expose only on localhost or a trusted VPN/tailnet/private proxy. |
 
+One-shot smoke test after install:
+
+```bash
+BRIDGE=http://127.0.0.1:9992; \
+curl -fsS "$BRIDGE/health" && echo && \
+curl -fsS "$BRIDGE/v1/models" | head -c 400
+```
+
+A healthy bridge returns JSON health/version data and a non-empty OpenAI-compatible model list. Run a chat completion only after confirming your CommandCode account has usable credits.
+
 ## What this bridge does
 
 - Provides OpenAI-compatible endpoints:
@@ -588,7 +598,7 @@ npm run verify
 - The bridge does not bypass CommandCode account limits, billing, rate limits, or terms.
 - The bridge is not a general public proxy service.
 
-See `docs/SECURITY.md` for more details. For private security reports, use GitHub security advisories when available or contact `yelixir.dev@gmail.com`.
+See `docs/SECURITY.md` for more details. For private security reports, use the GitHub Security Advisory form at `https://github.com/yelixir-dev/commandcode-bridge/security/advisories/new` or email `yelixir.dev@gmail.com`.
 
 ## Troubleshooting
 

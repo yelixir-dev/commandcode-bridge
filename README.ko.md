@@ -35,6 +35,16 @@ CommandCode Bridge는 CommandCode 계정을 OpenAI-compatible HTTP API로 노출
 | 운영 | bind, routing, credential, model toggle, diagnostics, save, restart를 다루는 모바일 우선 dashboard. |
 | 안전 경계 | upstream secret은 번들하지 않으며 localhost 또는 신뢰하는 VPN/tailnet/private proxy에서만 노출합니다. |
 
+설치 후 one-shot smoke test:
+
+```bash
+BRIDGE=http://127.0.0.1:9992; \
+curl -fsS "$BRIDGE/health" && echo && \
+curl -fsS "$BRIDGE/v1/models" | head -c 400
+```
+
+정상 상태에서는 JSON health/version 정보와 비어 있지 않은 OpenAI-compatible model list가 반환됩니다. 실제 chat completion은 CommandCode 계정에 사용 가능한 credit이 있는지 확인한 뒤 실행하세요.
+
 ## 이 브리지가 하는 일
 
 - OpenAI-compatible 엔드포인트 제공:
@@ -588,7 +598,7 @@ npm run verify
 - 이 브리지는 CommandCode account limits, billing, rate limits, terms를 우회하지 않습니다.
 - 이 브리지는 일반 public proxy service가 아닙니다.
 
-자세한 내용은 `docs/SECURITY.md`를 참고하십시오. 비공개 보안 제보는 가능한 경우 GitHub security advisory를 사용하거나 `yelixir.dev@gmail.com`으로 연락하세요.
+자세한 내용은 `docs/SECURITY.md`를 참고하십시오. 비공개 보안 제보는 GitHub Security Advisory form(`https://github.com/yelixir-dev/commandcode-bridge/security/advisories/new`)을 사용하거나 `yelixir.dev@gmail.com`으로 연락하세요.
 
 ## 문제 해결
 
