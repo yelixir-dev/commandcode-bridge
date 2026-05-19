@@ -1,12 +1,39 @@
+<p align="right">
+  🌐 <a href="README.md">English</a> · 한국어
+</p>
+
 # CommandCode Bridge
 
-[English README](./README.md)
+<p align="center">
+  <img src="docs/assets/readme/commandcode-bridge-overview.png" alt="CommandCode Bridge 구조 개요" width="760">
+</p>
+
+<p align="center">
+  <strong>신뢰 환경에서 CommandCode를 OpenAI-compatible API로 쓰기 위한 게이트웨이.</strong>
+</p>
+
+<p align="center">
+  <a href=".github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-GitHub%20Actions-5865f2?style=flat-square" alt="CI workflow"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2ea44f?style=flat-square" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/Node.js-20%2B-5fa04e?style=flat-square" alt="Node.js 20+">
+  <img src="https://img.shields.io/badge/API-OpenAI--compatible-6b7280?style=flat-square" alt="OpenAI-compatible API">
+</p>
 
 CommandCode Bridge는 CommandCode 계정을 OpenAI-compatible HTTP API로 노출하는 신뢰 환경용 브리지입니다. 로컬, LAN, VPN, tailnet 클라이언트가 표준 `/v1/models`, `/v1/chat/completions` 형식으로 CommandCode-backed 모델을 호출할 수 있게 해줍니다.
 
 > **CommandCode가 필요합니다.** 이 프로젝트는 공개 독립형 DeepSeek 프록시가 아니며, CommandCode CLI 번들을 포함하거나 재배포하지 않습니다. 공식 CommandCode CLI/account 환경(`command-code` npm package의 `cmd`) 또는 동등한 CommandCode API credential이 필요합니다. 공식 설치/인증은 <https://commandcode.ai/install>에서 진행하십시오.
 
 > **상태.** 내부/신뢰 환경용 브리지입니다. upstream CommandCode `/alpha/generate` 경로는 alpha/internal API 성격이므로 변경될 수 있습니다.
+
+## 한눈에 보기
+
+| 영역 | 요약 |
+| --- | --- |
+| API 표면 | `/health`, `/dashboard`, `/v1/models`, `/v1/chat/completions`, redacted admin diagnostics. |
+| 핵심 가치 | OpenAI-compatible client가 요청마다 `cmd`를 실행하지 않고 CommandCode-backed model을 호출합니다. |
+| 라우팅 | daily-burn, balance-priority, round-robin, drain-first 정책 기반 multi-key credential 선택. |
+| 운영 | bind, routing, credential, model toggle, diagnostics, save, restart를 다루는 모바일 우선 dashboard. |
+| 안전 경계 | upstream secret은 번들하지 않으며 localhost 또는 신뢰하는 VPN/tailnet/private proxy에서만 노출합니다. |
 
 ## 이 브리지가 하는 일
 
@@ -624,6 +651,16 @@ ss -ltnp '( sport = :9992 )'
 ```
 
 충돌 process를 멈추거나 `PORT`를 바꾸십시오.
+
+## Contributing
+
+브리지의 신뢰 경계를 유지하는 변경은 환영합니다. Upstream secret을 번들하지 않고, public internet 기본 노출을 만들지 않으며, CommandCode CLI를 재배포하지 않는 방향이어야 합니다. 변경 전 다음을 실행하십시오.
+
+```bash
+npm run verify
+```
+
+보안에 민감한 변경은 먼저 `docs/SECURITY.md`를 읽고, issue/log/screenshot/fixture에 credential, local env file, private topology, billing detail이 들어가지 않게 하십시오.
 
 ## 문서 지도
 

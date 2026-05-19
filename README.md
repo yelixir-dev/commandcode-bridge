@@ -1,12 +1,39 @@
+<p align="right">
+  🌐 English · <a href="README.ko.md">한국어</a>
+</p>
+
 # CommandCode Bridge
 
-[한국어 README](./README.ko.md)
+<p align="center">
+  <img src="docs/assets/readme/commandcode-bridge-overview.png" alt="CommandCode Bridge architecture overview" width="760">
+</p>
+
+<p align="center">
+  <strong>OpenAI-compatible gateway for trusted CommandCode deployments.</strong>
+</p>
+
+<p align="center">
+  <a href=".github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-GitHub%20Actions-5865f2?style=flat-square" alt="CI workflow"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2ea44f?style=flat-square" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/Node.js-20%2B-5fa04e?style=flat-square" alt="Node.js 20+">
+  <img src="https://img.shields.io/badge/API-OpenAI--compatible-6b7280?style=flat-square" alt="OpenAI-compatible API">
+</p>
 
 CommandCode Bridge is a trusted-environment HTTP bridge that exposes a small OpenAI-compatible API for a CommandCode account. It lets local, LAN, VPN, or tailnet clients call CommandCode-backed models through standard `/v1/models` and `/v1/chat/completions` endpoints.
 
 > **CommandCode required.** This project is not a public standalone DeepSeek proxy and does not include or repackage CommandCode's CLI bundle. You need the official CommandCode CLI/account environment (`cmd` from the `command-code` npm package) or equivalent CommandCode API credentials. Install/authenticate CommandCode from the official site: <https://commandcode.ai/install>.
 
 > **Status.** Internal/trusted-environment bridge. The upstream CommandCode `/alpha/generate` path behaves like an alpha/internal API and may change.
+
+## At a glance
+
+| Area | Summary |
+| --- | --- |
+| API surface | `/health`, `/dashboard`, `/v1/models`, `/v1/chat/completions`, and redacted admin diagnostics. |
+| Core value | OpenAI-compatible clients can use CommandCode-backed models without spawning `cmd` per request. |
+| Routing | Multi-key credential selection with daily-burn, balance-priority, round-robin, and drain-first policies. |
+| Operations | Mobile-first dashboard for bind settings, routing, credentials, model toggles, diagnostics, save, and restart. |
+| Safety boundary | No upstream secrets are bundled; expose only on localhost or a trusted VPN/tailnet/private proxy. |
 
 ## What this bridge does
 
@@ -624,6 +651,16 @@ ss -ltnp '( sport = :9992 )'
 ```
 
 Stop the conflicting process or change `PORT`.
+
+## Contributing
+
+Contributions are welcome when they preserve the bridge's trust boundary: no bundled upstream secrets, no public-internet-by-default exposure, and no CommandCode CLI redistribution. Before opening a change, run:
+
+```bash
+npm run verify
+```
+
+For security-sensitive changes, read `docs/SECURITY.md` first and avoid including credentials, local env files, private topology, or billing details in issues, logs, screenshots, or fixtures.
 
 ## Documentation map
 
