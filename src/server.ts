@@ -9,7 +9,13 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { z, ZodError } from "zod";
 
 import { CommandCodeAuthError, CommandCodeClient, CommandCodeHttpError } from "./commandcode.js";
-import { loadBridgeConfig, ModelNotAllowedError, publicModelList, resolveModel } from "./config.js";
+import {
+  loadBridgeConfig,
+  ModelNotAllowedError,
+  publicModelList,
+  publicModelOwnedBy,
+  resolveModel,
+} from "./config.js";
 import {
   DEFAULT_ROUTING_CONFIG,
   redactedCredentials,
@@ -583,7 +589,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       id: model,
       object: "model",
       created: 1_778_454_400,
-      owned_by: model.startsWith("commandcode/") ? "commandcode" : "deepseek",
+      owned_by: publicModelOwnedBy(model, config),
     })),
   }));
 

@@ -174,7 +174,7 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     host: serverFromFile.host,
     port: serverFromFile.port,
     apiBase: (env.COMMANDCODE_API_BASE?.trim() || "https://api.commandcode.ai").replace(/\/+$/, ""),
-    cliVersion: env.COMMANDCODE_CLI_VERSION?.trim() || "0.26.7",
+    cliVersion: env.COMMANDCODE_CLI_VERSION?.trim() || "0.26.8",
     defaultModel,
     allowedModels,
     allowUnknownModels: parseBoolean(env.COMMANDCODE_ALLOW_UNKNOWN_MODELS, false),
@@ -254,4 +254,20 @@ export function publicModelList(config: BridgeConfig): string[] {
     "commandcode/default",
     ...aliasModels,
   ]);
+}
+
+function ownedBySlug(value: string | undefined): string {
+  const slug = value
+    ?.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "commandcode";
+}
+
+export function publicModelOwnedBy(model: string, config: BridgeConfig): string {
+  if (model.startsWith("commandcode/")) return "commandcode";
+  const upstreamModel = normalizeModelName(model);
+  const catalogEntry = config.modelCatalog?.find((entry) => entry.id === upstreamModel);
+  return ownedBySlug(catalogEntry?.provider ?? upstreamModel.split("/")[0]);
 }

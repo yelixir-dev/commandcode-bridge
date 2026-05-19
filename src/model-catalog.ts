@@ -45,7 +45,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "minimax",
     aliases: ["minimax-m2.5", "MiniMax-M2.5"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.26.7",
+    notes: "OSS pool model exposed by CommandCode 0.26.8",
   },
   {
     id: "Qwen/Qwen3.6-Max-Preview",
@@ -54,7 +54,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "qwen",
     aliases: ["qwen3.6-max-preview", "Qwen3.6-Max-Preview"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.26.7",
+    notes: "OSS pool model exposed by CommandCode 0.26.8",
   },
   {
     id: "Qwen/Qwen3.6-Plus",
@@ -100,6 +100,24 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     aliases: ["kimi-k2.5", "Kimi-K2.5"],
     enabledByDefault: false,
     notes: "$0.60/M in · $3/M out",
+  },
+  {
+    id: "stepfun/Step-3.5-Flash",
+    label: "Step 3.5 Flash",
+    provider: "StepFun",
+    family: "stepfun",
+    aliases: ["step-3.5-flash", "Step-3.5-Flash"],
+    enabledByDefault: false,
+    notes: "OSS pool model exposed by CommandCode 0.26.8",
+  },
+  {
+    id: "google/gemini-3.1-flash-lite",
+    label: "Gemini 3.1 Flash Lite",
+    provider: "Google",
+    family: "gemini",
+    aliases: ["gemini-3.1-flash-lite", "Gemini-3.1-Flash-Lite"],
+    enabledByDefault: false,
+    notes: "High-volume workhorse model with implicit caching",
   },
   {
     id: "openai/gpt-5.5",

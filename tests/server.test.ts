@@ -230,6 +230,56 @@ describe("Fastify OpenAI-compatible server", () => {
     await app.close();
   });
 
+  it("requires bridge API key for /v1/models when configured", async () => {
+    const app = await createTestApp({
+      upstream: new FakeCommandCodeClient(),
+      configOverrides: { bridgeApiKey: "bridge-secret" },
+    });
+    const unauthorized = await app.inject({ method: "GET", url: "/v1/models" });
+    const authorized = await app.inject({
+      method: "GET",
+      url: "/v1/models",
+      headers: { authorization: "Bearer bridge-secret" },
+    });
+    expect(unauthorized.statusCode).toBe(401);
+    expect(authorized.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it("reports model ownership from the enabled catalog instead of defaulting to deepseek", async () => {
+    const app = await createTestApp({
+      upstream: new FakeCommandCodeClient(),
+      configOverrides: {
+        allowedModels: ["deepseek/deepseek-v4-pro", "Qwen/Qwen3.6-Plus"],
+        modelCatalog: [
+          {
+            id: "deepseek/deepseek-v4-pro",
+            provider: "DeepSeek",
+            family: "deepseek",
+            enabled: true,
+          },
+          {
+            id: "Qwen/Qwen3.6-Plus",
+            provider: "Qwen",
+            family: "qwen",
+            aliases: ["qwen3.6-plus"],
+            enabled: true,
+          },
+        ],
+      },
+    });
+    const response = await app.inject({ method: "GET", url: "/v1/models" });
+    const modelRows = response.json().data as Array<{ id: string; owned_by: string }>;
+    const byId = new Map<string, { id: string; owned_by: string }>(
+      modelRows.map((model) => [model.id, model]),
+    );
+    expect(byId.get("deepseek/deepseek-v4-pro")?.owned_by).toBe("deepseek");
+    expect(byId.get("Qwen/Qwen3.6-Plus")?.owned_by).toBe("qwen");
+    expect(byId.get("qwen3.6-plus")?.owned_by).toBe("qwen");
+    expect(byId.get("commandcode/default")?.owned_by).toBe("commandcode");
+    await app.close();
+  });
+
   it("returns non-streaming OpenAI chat completions", async () => {
     const fake = new FakeCommandCodeClient();
     const app = await createTestApp({ upstream: fake });

@@ -1,10 +1,9 @@
-import "dotenv/config";
+import { isUsableModelsResponse, loadSmokeRuntimeConfig } from "./smoke-config.js";
 
-const baseUrl =
-  process.env.BRIDGE_BASE_URL ??
-  `http://${process.env.HOST ?? "127.0.0.1"}:${process.env.PORT ?? "9992"}`;
-const bridgeApiKey = process.env.BRIDGE_API_KEY;
-const acceptUpstreamErrors = process.env.SMOKE_ACCEPT_UPSTREAM_ERRORS === "1";
+const runtimeConfig = loadSmokeRuntimeConfig();
+const baseUrl = runtimeConfig.baseUrl;
+const bridgeApiKey = runtimeConfig.bridgeApiKey;
+const acceptUpstreamErrors = runtimeConfig.acceptUpstreamErrors;
 const expectedToken = "COMMANDCODE_BRIDGE_SMOKE_OK";
 
 const headers = {
@@ -34,6 +33,15 @@ const healthBody = await readJsonResponse(health);
 console.log("HEALTH", health.status, health.statusText);
 console.log(healthBody.text);
 if (!health.ok) process.exit(1);
+
+const models = await fetch(`${baseUrl}/v1/models`, { headers });
+const modelsBody = await readJsonResponse(models);
+console.log("MODELS", models.status, models.statusText);
+console.log(modelsBody.text);
+if (!models.ok || !isUsableModelsResponse(modelsBody.json)) {
+  console.error("Smoke failed: expected authenticated /v1/models to return at least one model.");
+  process.exit(1);
+}
 
 const response = await fetch(`${baseUrl}/v1/chat/completions`, {
   method: "POST",
