@@ -382,7 +382,7 @@ fi
   write_env_line COMMANDCODE_DEFAULT_MODEL deepseek/deepseek-v4-pro
   write_env_line COMMANDCODE_ALLOWED_MODELS "$DEFAULT_ALLOWED_MODELS"
   write_env_line COMMANDCODE_ALLOW_UNKNOWN_MODELS false
-  write_env_line COMMANDCODE_CLI_VERSION 0.26.8
+  write_env_line COMMANDCODE_CLI_VERSION 0.26.12
   write_env_line COMMANDCODE_TIMEOUT_MS 300000
   write_env_line COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY error_on_length
   write_env_line COMMANDCODE_BALANCE_ALERT_ENABLED false
