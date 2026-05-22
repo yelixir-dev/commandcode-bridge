@@ -67,18 +67,18 @@ A healthy bridge returns JSON health/version data and a non-empty OpenAI-compati
 
 ## Version
 
-Current bridge version: **v0.26.15**.
+Current bridge version: **v0.26.21**.
 
 The version is also returned from `/health` and shown in the top-right of the web dashboard.
 
-### v0.26.15 CommandCode compatibility update
+### v0.26.21 CommandCode compatibility update
 
-This bridge release is aligned with the official `command-code` npm package `0.26.15`:
+This bridge release is aligned with the official `command-code` npm package `0.26.21`:
 
-- The default upstream `x-command-code-version` header now advertises `0.26.15` unless `COMMANDCODE_CLI_VERSION` overrides it.
-- The bridge package/runtime version is also `0.26.15` so `/health`, the dashboard, and the npm metadata match the CommandCode CLI version being targeted.
-- Direct inspection of the `command-code@0.26.15` bundle confirmed that the bridge-critical API paths remain compatible: `/alpha/generate`, `/alpha/whoami`, `/alpha/billing/credits`, `/alpha/billing/subscriptions`, and `/alpha/usage/summary`.
-- The model catalog was refreshed from the `0.26.15` CLI bundle. Existing enabled defaults stay conservative, while additional discovered entries such as Qwen 3.6 Max Preview, MiniMax M2.5, Kimi K2.5, Step 3.5 Flash, Gemini 3.5 Flash, Gemini 3.1 Flash Lite, GLM-5, GPT 5.4/5.3 Codex/5.4 Mini, and older Claude variants are present but disabled by default until an operator enables them.
+- The default upstream `x-command-code-version` header now advertises `0.26.21` unless `COMMANDCODE_CLI_VERSION` overrides it.
+- The bridge package/runtime version is also `0.26.21` so `/health`, the dashboard, and the npm metadata match the CommandCode CLI version being targeted.
+- Direct inspection of the `command-code@0.26.21` bundle confirmed that the bridge-critical API paths remain compatible: `/alpha/generate`, `/alpha/whoami`, `/alpha/billing/credits`, `/alpha/billing/subscriptions`, and `/alpha/usage/summary`.
+- The model catalog was refreshed from the `0.26.21` CLI bundle. Existing enabled defaults stay conservative, while additional discovered entries such as Qwen 3.6 Max Preview, MiniMax M2.5, Kimi K2.5, Step 3.5 Flash, Gemini 3.5 Flash, Gemini 3.1 Flash Lite, GLM-5, GPT 5.4/5.3 Codex/5.4 Mini, and older Claude variants are present but disabled by default until an operator enables them.
 
 ## Architecture
 
@@ -314,7 +314,7 @@ The dashboard is intentionally mobile-first. It is useful from a phone on the sa
 
 - **Header**
   - Shows bridge online/offline state.
-  - Shows bridge version, for example `v0.26.15`.
+  - Shows bridge version, for example `v0.26.21`.
 - **Server Bind**
   - Choose `127.0.0.1` for local-only use.
   - Choose `0.0.0.0` only for LAN/Tailscale/VPN/reverse-proxy use.
@@ -526,7 +526,7 @@ x-api-key: <BRIDGE_API_KEY>
 | `COMMANDCODE_DEFAULT_MODEL`                  | `deepseek/deepseek-v4-pro`   | Model used for `default`.                                                                                                    |
 | `COMMANDCODE_ALLOWED_MODELS`                 | Pro + Flash/catalog defaults | Comma-separated allowlist.                                                                                                   |
 | `COMMANDCODE_ALLOW_UNKNOWN_MODELS`           | `false`                      | Pass arbitrary model IDs upstream. Not recommended.                                                                          |
-| `COMMANDCODE_CLI_VERSION`                    | `0.26.15`                    | Version header sent upstream.                                                                                                |
+| `COMMANDCODE_CLI_VERSION`                    | `0.26.21`                    | Version header sent upstream.                                                                                                |
 | `COMMANDCODE_TIMEOUT_MS`                     | `300000`                     | Upstream request timeout.                                                                                                    |
 | `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`  | `error_on_length`            | `error_on_length` fails closed on empty visible `finish_reason: length`; `allow` preserves legacy blank success behavior.    |
 | `REQUEST_BODY_LIMIT_BYTES`                   | `1048576`                    | Fastify body limit.                                                                                                          |

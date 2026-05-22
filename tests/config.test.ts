@@ -9,9 +9,9 @@ describe("configuration and model aliases", () => {
   });
 
   it("advertises the current CommandCode CLI version by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.26.15");
-    expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.26.15-test" } }).cliVersion).toBe(
-      "0.26.15-test",
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.26.21");
+    expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.26.21-test" } }).cliVersion).toBe(
+      "0.26.21-test",
     );
   });
 
@@ -28,13 +28,14 @@ describe("configuration and model aliases", () => {
     ).toBe("$0.435/M in · $0.87/M out · cache hit $0.003625/M");
   });
 
-  it("keeps the CommandCode 0.26.15 discovered model catalog available but conservative", () => {
+  it("keeps the CommandCode 0.26.21 discovered model catalog available but conservative", () => {
     const config = loadBridgeConfig({ env: {} });
     const catalog = new Map(config.modelCatalog?.map((model) => [model.id, model]));
 
     for (const id of [
       "MiniMaxAI/MiniMax-M2.5",
       "Qwen/Qwen3.6-Max-Preview",
+      "alibaba/qwen3.7-max",
       "zai-org/GLM-5",
       "moonshotai/Kimi-K2.5",
       "stepfun/Step-3.5-Flash",
