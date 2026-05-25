@@ -1,5 +1,5 @@
 <p align="right">
-  🌐 English · <a href="README.ko.md">한국어</a>
+  🌐 English · <a href="README.ko.md">한국어</a> · <a href="README.zh.md">中文</a>
 </p>
 
 # CommandCode Bridge
@@ -27,13 +27,13 @@ CommandCode Bridge is a trusted-environment HTTP bridge that exposes a small Ope
 
 ## At a glance
 
-| Area            | Summary                                                                                                        |
-| --------------- | -------------------------------------------------------------------------------------------------------------- |
-| API surface     | `/health`, `/dashboard`, `/v1/models`, `/v1/chat/completions`, and redacted admin diagnostics.                 |
-| Core value      | OpenAI-compatible clients can use CommandCode-backed models without spawning `cmd` per request.                |
-| Routing         | Multi-key credential selection with daily-burn, balance-priority, round-robin, and drain-first policies.       |
-| Operations      | Mobile-first dashboard for bind settings, routing, credentials, model toggles, diagnostics, save, and restart. |
-| Safety boundary | No upstream secrets are bundled; expose only on localhost or a trusted VPN/tailnet/private proxy.              |
+| Area            | Summary                                                                                                                                   |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| API surface     | `/health`, `/dashboard`, `/v1/models`, `/v1/chat/completions`, and redacted admin diagnostics.                                            |
+| Core value      | OpenAI-compatible clients can use CommandCode-backed models without spawning `cmd` per request.                                           |
+| Routing         | Multi-key credential selection with daily-burn, balance-priority, round-robin, and drain-first policies.                                  |
+| Operations      | Mobile-first dashboard for bind settings, routing, credentials, model toggles, diagnostics, save, restart, and Korean/English/Chinese UI. |
+| Safety boundary | No upstream secrets are bundled; expose only on localhost or a trusted VPN/tailnet/private proxy.                                         |
 
 One-shot smoke test after install:
 
@@ -62,7 +62,7 @@ A healthy bridge returns JSON health/version data and a non-empty OpenAI-compati
 - Fails closed on empty visible `finish_reason: length` responses by default instead of returning a blank success.
 - Loads CommandCode upstream credentials from a CLI auth file, a single API key, a multi-key env var, or a JSON credentials file.
 - Includes a multi-key credential router with routing policies designed for rotating multiple CommandCode keys safely.
-- Includes a mobile-first `/dashboard` for server bind settings, routing policy, key management, model toggles, diagnostics, JSON save, and restart.
+- Includes a mobile-first `/dashboard` for server bind settings, routing policy, key management, model toggles, diagnostics, JSON save, restart, and Korean/English/Chinese localization.
 - Includes optional balance alerts and an optional `commandcode-router` process for routing across multiple bridge hosts.
 
 ## Version
@@ -309,6 +309,14 @@ http://<host-or-tailnet-ip>:9992/dashboard
 ```
 
 The dashboard is intentionally mobile-first. It is useful from a phone on the same trusted tailnet.
+
+### Dashboard languages
+
+- The dashboard ships with Korean, English, and Chinese UI strings.
+- Korean is the hard fallback language. On first load, the dashboard chooses English or Chinese when the browser locale starts with `en` or `zh`; otherwise it uses Korean.
+- Use the flag buttons beside the compact `CommandCode Bridge` title to switch manually: 🇰🇷 Korean, 🇺🇸 English, 🇨🇳 Chinese.
+- The selected language is stored in browser `localStorage`, so subsequent dashboard visits keep the operator preference.
+- Active language flags render in color; inactive language flags are desaturated/grayscale.
 
 ### Dashboard sections
 

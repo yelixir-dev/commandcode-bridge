@@ -15,6 +15,7 @@
     "release/",
     "README.md",
     "README.ko.md",
+    "README.zh.md",
     "LICENSE",
     ".env.example",
     "install.sh",

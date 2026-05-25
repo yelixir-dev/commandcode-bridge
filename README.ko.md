@@ -1,5 +1,5 @@
 <p align="right">
-  🌐 <a href="README.md">English</a> · 한국어
+  🌐 <a href="README.md">English</a> · 한국어 · <a href="README.zh.md">中文</a>
 </p>
 
 # CommandCode Bridge
@@ -27,13 +27,13 @@ CommandCode Bridge는 CommandCode 계정을 OpenAI-compatible HTTP API로 노출
 
 ## 한눈에 보기
 
-| 영역      | 요약                                                                                                  |
-| --------- | ----------------------------------------------------------------------------------------------------- |
-| API 표면  | `/health`, `/dashboard`, `/v1/models`, `/v1/chat/completions`, redacted admin diagnostics.            |
-| 핵심 가치 | OpenAI-compatible client가 요청마다 `cmd`를 실행하지 않고 CommandCode-backed model을 호출합니다.      |
-| 라우팅    | daily-burn, balance-priority, round-robin, drain-first 정책 기반 multi-key credential 선택.           |
-| 운영      | bind, routing, credential, model toggle, diagnostics, save, restart를 다루는 모바일 우선 dashboard.   |
-| 안전 경계 | upstream secret은 번들하지 않으며 localhost 또는 신뢰하는 VPN/tailnet/private proxy에서만 노출합니다. |
+| 영역      | 요약                                                                                                                        |
+| --------- | --------------------------------------------------------------------------------------------------------------------------- |
+| API 표면  | `/health`, `/dashboard`, `/v1/models`, `/v1/chat/completions`, redacted admin diagnostics.                                  |
+| 핵심 가치 | OpenAI-compatible client가 요청마다 `cmd`를 실행하지 않고 CommandCode-backed model을 호출합니다.                            |
+| 라우팅    | daily-burn, balance-priority, round-robin, drain-first 정책 기반 multi-key credential 선택.                                 |
+| 운영      | bind, routing, credential, model toggle, diagnostics, save, restart와 한국어/영어/중국어 UI를 다루는 모바일 우선 dashboard. |
+| 안전 경계 | upstream secret은 번들하지 않으며 localhost 또는 신뢰하는 VPN/tailnet/private proxy에서만 노출합니다.                       |
 
 설치 후 one-shot smoke test:
 
@@ -62,7 +62,7 @@ curl -fsS "$BRIDGE/v1/models" | head -c 400
 - visible output 없이 `finish_reason: length`로 끝난 응답은 기본적으로 빈 성공이 아니라 fail-closed 오류로 반환합니다.
 - CommandCode upstream credential을 CLI auth file, 단일 API key, multi-key env, JSON credentials file에서 로드합니다.
 - 여러 CommandCode key를 안전하게 돌려 쓰는 multi-key credential router를 포함합니다.
-- 서버 bind, routing policy, key 관리, model toggle, diagnostics, JSON 저장, restart를 관리하는 모바일 우선 `/dashboard`를 포함합니다.
+- 서버 bind, routing policy, key 관리, model toggle, diagnostics, JSON 저장, restart와 한국어/영어/중국어 localization을 관리하는 모바일 우선 `/dashboard`를 포함합니다.
 - 선택적 balance alert와, 여러 bridge host를 묶는 선택적 `commandcode-router` 프로세스를 포함합니다.
 
 ## 버전
@@ -309,6 +309,14 @@ http://<host-or-tailnet-ip>:9992/dashboard
 ```
 
 대시보드는 의도적으로 모바일 우선입니다. 같은 trusted tailnet의 휴대폰에서도 운영하기 좋게 설계되어 있습니다.
+
+### 대시보드 언어
+
+- 대시보드는 한국어, 영어, 중국어 UI 문구를 내장합니다.
+- 한국어가 hard fallback 언어입니다. 첫 로드 시 브라우저 locale이 `en`으로 시작하면 영어, `zh`로 시작하면 중국어를 선택하고, 그 외에는 한국어를 사용합니다.
+- 좌상단의 작은 `CommandCode Bridge` 제목 옆 국기 버튼으로 수동 전환할 수 있습니다: 🇰🇷 한국어, 🇺🇸 영어, 🇨🇳 중국어.
+- 선택한 언어는 브라우저 `localStorage`에 저장되어 다음 방문에도 유지됩니다.
+- 활성 언어 국기는 컬러로, 비활성 언어 국기는 desaturated/grayscale로 표시됩니다.
 
 ### 대시보드 섹션
 
