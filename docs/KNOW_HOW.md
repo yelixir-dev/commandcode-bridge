@@ -54,7 +54,7 @@ Smoke-test modes:
 
 ## Billing and Multi-Key Routing
 
-CommandCode CLI 0.26.24 `/usage` uses these account endpoints with the same bearer token:
+CommandCode CLI 0.26.25 `/usage` uses these account endpoints with the same bearer token:
 
 - `GET /alpha/whoami` to discover the organization id.
 - `GET /alpha/billing/credits?orgId=...`
