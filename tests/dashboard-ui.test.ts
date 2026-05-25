@@ -189,7 +189,7 @@ describe("dashboard UI", () => {
     expect(html).toContain(".modal{position:fixed");
     expect(html).toContain("function showPopup(t,ms=0)");
     expect(html).toContain("function popup(t,ms=3000)");
-    expect(html).toContain("popup('JSON saved. Restart required.',3000)");
+    expect(html).toContain("popup(tr('jsonSaved'),3000)");
   });
 
   it("keeps the restart popup open in five-second health/config polling windows", () => {
@@ -207,11 +207,53 @@ describe("dashboard UI", () => {
     expect(html).toContain("async function waitForRestart()");
     expect(html).toContain("elapsed=5;elapsed<=30;elapsed+=5");
     expect(html).toContain("setTimeout(r,5000)");
-    expect(html).toContain("showPopup('Restart requested. Checking bridge state in '");
+    expect(html).toContain("showPopup(tr('restartRequested')+");
     expect(html).toContain(
       "if(state?.ok&&!state.dirty&&!state.restartRequired){hidePopup(); return true;}",
     );
     expect(html).toContain("Restart did not finish cleanly within 30s");
     expect(html).not.toContain("if($('online').textContent==='online')return");
+  });
+
+  it("adds a flag language selector beside the compact brand title", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+    });
+
+    expect(html).toContain('class="brand-row"');
+    expect(html).toContain('class="lang-switch"');
+    expect(html).toContain('data-lang="ko"');
+    expect(html).toContain('data-lang="en"');
+    expect(html).toContain('data-lang="zh"');
+    expect(html).toContain("🇰🇷");
+    expect(html).toContain("🇺🇸");
+    expect(html).toContain("🇨🇳");
+    expect(html).toContain("filter:grayscale(1)");
+    expect(html).toContain(".brand h1{font-size:16px");
+  });
+
+  it("contains Korean, English, and Chinese dashboard translations with locale fallback", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [{ id: "default", apiKeyConfigured: true }],
+      models: [],
+    });
+
+    expect(html).toContain("const translations=");
+    expect(html).toContain("navigator.language");
+    expect(html).toContain("function detectLang()");
+    expect(html).toContain("CommandCode Bridge 콘솔");
+    expect(html).toContain("CommandCode Bridge Console");
+    expect(html).toContain("CommandCode Bridge 控制台");
+    expect(html).toContain("설정 로드 실패");
+    expect(html).toContain("Config load failed");
+    expect(html).toContain("配置加载失败");
+    expect(html).toContain("잔액/남은일수 우선");
+    expect(html).toContain("Balance / days remaining first");
+    expect(html).toContain("优先余额/剩余天数");
   });
 });
