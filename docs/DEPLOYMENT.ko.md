@@ -398,7 +398,7 @@ npm run smoke
 | `COMMANDCODE_DEFAULT_MODEL`        | `deepseek/deepseek-v4-pro`   | `model: "default"` 요청이 실제로 사용할 upstream model입니다.                                                            |
 | `COMMANDCODE_ALLOWED_MODELS`       | Pro + Flash                  | 허용할 model ID 목록입니다. 이 목록 밖 요청은 unknown model 허용 옵션을 켜지 않는 한 거부됩니다.                         |
 | `COMMANDCODE_ALLOW_UNKNOWN_MODELS` | `false`                      | 임의 model ID를 upstream으로 통과시킵니다. 운영에서는 권장하지 않습니다.                                                 |
-| `COMMANDCODE_CLI_VERSION`          | `0.27.2`                     | 테스트된 CommandCode CLI 동작과 맞추기 위해 upstream에 보내는 version header입니다.                                      |
+| `COMMANDCODE_CLI_VERSION`          | `0.28.1`                     | 테스트된 CommandCode CLI 동작과 맞추기 위해 upstream에 보내는 version header입니다.                                      |
 | `COMMANDCODE_TIMEOUT_MS`           | `300000`                     | upstream generation timeout입니다.                                                                                       |
 
 Credential JSON 파일 예시:
