@@ -9,9 +9,9 @@ describe("configuration and model aliases", () => {
   });
 
   it("advertises the current CommandCode CLI version by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.28.1");
-    expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.28.1-test" } }).cliVersion).toBe(
-      "0.28.1-test",
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.29.0");
+    expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.29.0-test" } }).cliVersion).toBe(
+      "0.29.0-test",
     );
   });
 
@@ -28,7 +28,7 @@ describe("configuration and model aliases", () => {
     ).toBe("$0.435/M in · $0.87/M out · cache hit $0.003625/M");
   });
 
-  it("keeps the CommandCode 0.28.1 discovered model catalog available but conservative", () => {
+  it("keeps the CommandCode 0.29.0 discovered model catalog available but conservative", () => {
     const config = loadBridgeConfig({ env: {} });
     const catalog = new Map(config.modelCatalog?.map((model) => [model.id, model]));
 
@@ -44,6 +44,7 @@ describe("configuration and model aliases", () => {
       "openai/gpt-5.4",
       "openai/gpt-5.3-codex",
       "openai/gpt-5.4-mini",
+      "anthropic/claude-opus-4.8",
       "anthropic/claude-haiku-4-5-20251001",
     ]) {
       expect(catalog.has(id)).toBe(true);

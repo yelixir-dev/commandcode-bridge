@@ -45,7 +45,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "minimax",
     aliases: ["minimax-m2.5", "MiniMax-M2.5"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.28.1",
+    notes: "OSS pool model exposed by CommandCode 0.29.0",
   },
   {
     id: "Qwen/Qwen3.6-Max-Preview",
@@ -54,7 +54,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "qwen",
     aliases: ["qwen3.6-max-preview", "Qwen3.6-Max-Preview"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.28.1",
+    notes: "OSS pool model exposed by CommandCode 0.29.0",
   },
   {
     id: "Qwen/Qwen3.6-Plus",
@@ -72,7 +72,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "qwen",
     aliases: ["qwen3.7-max", "Qwen3.7-Max"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.28.1",
+    notes: "OSS pool model exposed by CommandCode 0.29.0",
   },
   {
     id: "zai-org/GLM-5.1",
@@ -117,7 +117,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "stepfun",
     aliases: ["step-3.5-flash", "Step-3.5-Flash"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.28.1",
+    notes: "OSS pool model exposed by CommandCode 0.29.0",
   },
   {
     id: "google/gemini-3.5-flash",
@@ -172,6 +172,15 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     aliases: ["gpt-5.4-mini", "GPT-5.4-Mini"],
     enabledByDefault: false,
     notes: "$0.75/M in · $4.50/M out",
+  },
+  {
+    id: "anthropic/claude-opus-4.8",
+    label: "Claude Opus 4.8",
+    provider: "Anthropic",
+    family: "claude",
+    aliases: ["claude-opus-4.8", "opus-4.8", "anthropic:claude-opus-4-8"],
+    enabledByDefault: false,
+    notes: "$5/M in · $25/M out · cache hit $0.5/M",
   },
   {
     id: "anthropic/claude-opus-4.7",
