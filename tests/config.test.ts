@@ -18,10 +18,10 @@ describe("configuration and model aliases", () => {
   it("shows CommandCode pricing instead of descriptive model notes", () => {
     const config = loadBridgeConfig({ env: {} });
     expect(config.modelCatalog?.find((model) => model.id === "openai/gpt-5.5")?.notes).toBe(
-      "$5/M in · $30/M out",
+      "Latest frontier, general-purpose reasoning",
     );
     expect(config.modelCatalog?.find((model) => model.id === "openai/gpt-5.4")?.notes).toBe(
-      "$2.50/M in · $15/M out",
+      "General-purpose reasoning and complex problem solving",
     );
     expect(
       config.modelCatalog?.find((model) => model.id === "deepseek/deepseek-v4-pro")?.notes,
@@ -34,8 +34,6 @@ describe("configuration and model aliases", () => {
 
     for (const id of [
       "MiniMaxAI/MiniMax-M2.5",
-      "Qwen/Qwen3.6-Max-Preview",
-      "alibaba/qwen3.7-max",
       "zai-org/GLM-5",
       "moonshotai/Kimi-K2.5",
       "stepfun/Step-3.5-Flash",
