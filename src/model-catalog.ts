@@ -39,13 +39,22 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     notes: "$0.30/M in · $1.20/M out · cache hit $0.06/M",
   },
   {
+    id: "MiniMaxAI/MiniMax-M3",
+    label: "MiniMax M3",
+    provider: "MiniMax",
+    family: "minimax",
+    aliases: ["minimax-m3", "MiniMax-M3"],
+    enabledByDefault: false,
+    notes: "OSS pool model exposed by CommandCode 0.31.0",
+  },
+  {
     id: "MiniMaxAI/MiniMax-M2.5",
     label: "MiniMax M2.5",
     provider: "MiniMax",
     family: "minimax",
     aliases: ["minimax-m2.5", "MiniMax-M2.5"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.30.1",
+    notes: "OSS pool model exposed by CommandCode 0.31.0",
   },
   {
     id: "Qwen/Qwen3.6-Max-Preview",
@@ -54,7 +63,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "qwen",
     aliases: ["qwen3.6-max-preview", "Qwen3.6-Max-Preview"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.30.1",
+    notes: "OSS pool model exposed by CommandCode 0.31.0",
   },
   {
     id: "Qwen/Qwen3.6-Plus",
@@ -72,7 +81,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "qwen",
     aliases: ["qwen3.7-max", "Qwen3.7-Max"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.30.1",
+    notes: "OSS pool model exposed by CommandCode 0.31.0",
   },
   {
     id: "zai-org/GLM-5.1",
@@ -117,7 +126,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     family: "stepfun",
     aliases: ["step-3.5-flash", "Step-3.5-Flash"],
     enabledByDefault: false,
-    notes: "OSS pool model exposed by CommandCode 0.30.1",
+    notes: "OSS pool model exposed by CommandCode 0.31.0",
   },
   {
     id: "google/gemini-3.5-flash",

@@ -1,1 +1,1 @@
-export const BRIDGE_VERSION = "0.30.1";
+export const BRIDGE_VERSION = "0.31.0";
