@@ -6,6 +6,8 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 
+import { BRIDGE_VERSION } from "./version.js";
+
 const DEFAULT_BACKEND_ROOT = "http://127.0.0.1:19992";
 const RETRYABLE_STATUSES = new Set([401, 402, 408, 425, 429, 500, 502, 503, 504]);
 const HOP_BY_HOP_HEADERS = new Set([
@@ -454,7 +456,7 @@ export async function createRouterApp(
     return {
       status: healthyCount > 0 ? "ok" : "degraded",
       service: "commandcode-router",
-      version: "0.31.0",
+      version: BRIDGE_VERSION,
       external_port: config.port,
       backend_count: backends.length,
       healthy_backend_count: healthyCount,
