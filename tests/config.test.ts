@@ -9,9 +9,9 @@ describe("configuration and model aliases", () => {
   });
 
   it("advertises the current CommandCode CLI version by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.32.3");
-    expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.32.3-test" } }).cliVersion).toBe(
-      "0.32.3-test",
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.32.4");
+    expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.32.4-test" } }).cliVersion).toBe(
+      "0.32.4-test",
     );
   });
 
@@ -28,7 +28,7 @@ describe("configuration and model aliases", () => {
     ).toBe("$0.435/M in · $0.87/M out · cache hit $0.003625/M");
   });
 
-  it("keeps the CommandCode 0.32.3 discovered model catalog available but conservative", () => {
+  it("keeps the CommandCode 0.32.4 discovered model catalog available but conservative", () => {
     const config = loadBridgeConfig({ env: {} });
     const catalog = new Map(config.modelCatalog?.map((model) => [model.id, model]));
 
