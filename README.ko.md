@@ -67,18 +67,18 @@ curl -fsS "$BRIDGE/v1/models" | head -c 400
 
 ## 버전
 
-현재 bridge version: **v0.32.4**.
+현재 bridge version: **v0.33.1**.
 
 버전은 `/health` 응답과 웹 대시보드 오른쪽 위에 표시됩니다.
 
-### v0.32.4 CommandCode 호환성 업데이트
+### v0.33.1 CommandCode 호환성 업데이트
 
-이번 bridge release는 공식 `command-code` npm package `0.32.4`에 맞췄습니다.
+이번 bridge release는 공식 `command-code` npm package `0.33.1`에 맞췄습니다.
 
-- 기본 upstream `x-command-code-version` header는 `COMMANDCODE_CLI_VERSION`으로 덮어쓰지 않는 한 `0.32.4`를 보냅니다.
-- bridge package/runtime version도 `0.32.4`라 `/health`, dashboard, npm metadata가 대상 CommandCode CLI version과 일치합니다.
-- `command-code@0.32.4` bundle을 직접 확인한 결과 bridge 핵심 API path(`/alpha/generate`, `/alpha/whoami`, `/alpha/billing/credits`, `/alpha/billing/subscriptions`, `/alpha/usage/summary`)는 기존 bridge 경로와 호환됩니다.
-- model catalog를 `0.32.4` CLI bundle 기준으로 확인했습니다. 기존 enabled default는 보수적으로 유지하고, Qwen 3.6 Max Preview, MiniMax M3, MiniMax M2.5, Kimi K2.5, Step 3.5 Flash, Gemini 3.5 Flash, Gemini 3.1 Flash Lite, GLM-5, GPT 5.4/5.3 Codex, Claude 4.6/4.7/4.8 등 추가 발견 항목은 config에서 명시적으로 켜기 전까지 disabled-by-default입니다.
+- 기본 upstream `x-command-code-version` header는 `COMMANDCODE_CLI_VERSION`으로 덮어쓰지 않는 한 `0.33.1`를 보냅니다.
+- bridge package/runtime version도 `0.33.1`라 `/health`, dashboard, npm metadata가 대상 CommandCode CLI version과 일치합니다.
+- `command-code@0.33.1` bundle을 직접 확인한 결과 bridge 핵심 API path(`/alpha/generate`, `/alpha/whoami`, `/alpha/billing/credits`, `/alpha/billing/subscriptions`, `/alpha/usage/summary`)는 기존 bridge 경로와 호환됩니다.
+- model catalog를 `0.33.1` CLI bundle 기준으로 확인했습니다. 기존 enabled default는 보수적으로 유지하고, Qwen 3.6 Max Preview, MiniMax M3, MiniMax M2.5, Kimi K2.5, Step 3.5 Flash, Gemini 3.5 Flash, Gemini 3.1 Flash Lite, GLM-5, GPT 5.4/5.3 Codex, Claude 4.6/4.7/4.8 등 추가 발견 항목은 config에서 명시적으로 켜기 전까지 disabled-by-default입니다.
 
 ## 구조
 
@@ -322,7 +322,7 @@ http://<host-or-tailnet-ip>:9992/dashboard
 
 - **Header**
   - bridge online/offline 상태 표시.
-  - `v0.32.4` 같은 bridge version 표시.
+  - `v0.33.1` 같은 bridge version 표시.
 - **Server Bind**
   - local-only면 `127.0.0.1`.
   - LAN/Tailscale/VPN/reverse proxy 뒤에서만 `0.0.0.0`.
@@ -534,7 +534,7 @@ x-api-key: <BRIDGE_API_KEY>
 | `COMMANDCODE_DEFAULT_MODEL`                  | `deepseek/deepseek-v4-pro`   | `default`가 사용할 model.                                                                                  |
 | `COMMANDCODE_ALLOWED_MODELS`                 | Pro + Flash/catalog defaults | comma-separated allowlist.                                                                                 |
 | `COMMANDCODE_ALLOW_UNKNOWN_MODELS`           | `false`                      | 임의 model ID를 upstream으로 통과. 운영 비권장.                                                            |
-| `COMMANDCODE_CLI_VERSION`                    | `0.32.4`                     | upstream으로 보내는 version header.                                                                        |
+| `COMMANDCODE_CLI_VERSION`                    | `0.33.1`                     | upstream으로 보내는 version header.                                                                        |
 | `COMMANDCODE_TIMEOUT_MS`                     | `300000`                     | upstream request timeout.                                                                                  |
 | `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`  | `error_on_length`            | empty visible `finish_reason: length`를 fail-closed. `allow`는 legacy blank success 유지.                  |
 | `REQUEST_BODY_LIMIT_BYTES`                   | `1048576`                    | Fastify body limit.                                                                                        |
