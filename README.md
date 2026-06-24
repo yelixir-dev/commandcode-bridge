@@ -67,18 +67,18 @@ A healthy bridge returns JSON health/version data and a non-empty OpenAI-compati
 
 ## Version
 
-Current bridge version: **v0.33.1**.
+Current bridge version: **v0.40.3**.
 
 The version is also returned from `/health` and shown in the top-right of the web dashboard.
 
-### v0.33.1 CommandCode compatibility update
+### v0.40.3 CommandCode compatibility update
 
-This bridge release is aligned with the official `command-code` npm package `0.33.1`:
+This bridge release is aligned with the official `command-code` npm package `0.40.3`:
 
-- The default upstream `x-command-code-version` header now advertises `0.33.1` unless `COMMANDCODE_CLI_VERSION` overrides it.
-- The bridge package/runtime version is also `0.33.1` so `/health`, the dashboard, and the npm metadata match the CommandCode CLI version being targeted.
-- Direct inspection of the `command-code@0.33.1` bundle confirmed that the bridge-critical API paths remain compatible: `/alpha/generate`, `/alpha/whoami`, `/alpha/billing/credits`, `/alpha/billing/subscriptions`, and `/alpha/usage/summary`.
-- The model catalog was checked against the `0.33.1` CLI bundle. Existing enabled defaults stay conservative, while additional discovered entries such as Qwen 3.6 Max Preview, MiniMax M3, MiniMax M2.5, Kimi K2.5, Step 3.5 Flash, Gemini 3.5 Flash, Gemini 3.1 Flash Lite, GLM-5, GPT 5.4/5.3 Codex, and Claude 4.6/4.7/4.8 remain disabled by default unless explicitly enabled in config.
+- The default upstream `x-command-code-version` header now advertises `0.40.3` unless `COMMANDCODE_CLI_VERSION` overrides it.
+- The bridge package/runtime version is also `0.40.3` so `/health`, the dashboard, and the npm metadata match the CommandCode CLI version being targeted.
+- Direct inspection of the `command-code@0.40.3` bundle confirmed that the bridge-critical API paths remain compatible: `/alpha/generate`, `/alpha/whoami`, `/alpha/billing/credits`, `/alpha/billing/subscriptions`, and `/alpha/usage/summary`. The newer `/alpha/web-search`, `/alpha/web-fetch`, `/alpha/fingerprint/record`, and `update-status` surfaces are not exposed as OpenAI-compatible bridge APIs in this release.
+- The model catalog was checked against the `0.40.3` CLI bundle. Existing enabled defaults stay conservative, while additional discovered entries such as MiniMax M3 Free, Qwen 3.7 Plus, GLM-5.2, Kimi K2.7 Code/HighSpeed, Step 3.7 Flash, Claude Fable 5, and prior preview/frontier entries remain disabled by default unless explicitly enabled in config.
 
 ## Architecture
 
@@ -322,7 +322,7 @@ The dashboard is intentionally mobile-first. It is useful from a phone on the sa
 
 - **Header**
   - Shows bridge online/offline state.
-  - Shows bridge version, for example `v0.33.1`.
+  - Shows bridge version, for example `v0.40.3`.
 - **Server Bind**
   - Choose `127.0.0.1` for local-only use.
   - Choose `0.0.0.0` only for LAN/Tailscale/VPN/reverse-proxy use.
@@ -534,7 +534,7 @@ x-api-key: <BRIDGE_API_KEY>
 | `COMMANDCODE_DEFAULT_MODEL`                  | `deepseek/deepseek-v4-pro`   | Model used for `default`.                                                                                                    |
 | `COMMANDCODE_ALLOWED_MODELS`                 | Pro + Flash/catalog defaults | Comma-separated allowlist.                                                                                                   |
 | `COMMANDCODE_ALLOW_UNKNOWN_MODELS`           | `false`                      | Pass arbitrary model IDs upstream. Not recommended.                                                                          |
-| `COMMANDCODE_CLI_VERSION`                    | `0.33.1`                     | Version header sent upstream.                                                                                                |
+| `COMMANDCODE_CLI_VERSION`                    | `0.40.3`                     | Version header sent upstream.                                                                                                |
 | `COMMANDCODE_TIMEOUT_MS`                     | `300000`                     | Upstream request timeout.                                                                                                    |
 | `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`  | `error_on_length`            | `error_on_length` fails closed on empty visible `finish_reason: length`; `allow` preserves legacy blank success behavior.    |
 | `REQUEST_BODY_LIMIT_BYTES`                   | `1048576`                    | Fastify body limit.                                                                                                          |

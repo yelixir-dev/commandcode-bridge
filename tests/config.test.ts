@@ -9,9 +9,9 @@ describe("configuration and model aliases", () => {
   });
 
   it("advertises the current CommandCode CLI version by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.33.1");
-    expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.33.1-test" } }).cliVersion).toBe(
-      "0.33.1-test",
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.40.3");
+    expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.40.3-test" } }).cliVersion).toBe(
+      "0.40.3-test",
     );
   });
 
@@ -28,23 +28,30 @@ describe("configuration and model aliases", () => {
     ).toBe("$0.435/M in · $0.87/M out · cache hit $0.003625/M");
   });
 
-  it("keeps the CommandCode 0.33.1 discovered model catalog available but conservative", () => {
+  it("keeps the CommandCode 0.40.3 discovered model catalog available but conservative", () => {
     const config = loadBridgeConfig({ env: {} });
     const catalog = new Map(config.modelCatalog?.map((model) => [model.id, model]));
 
     for (const id of [
       "MiniMaxAI/MiniMax-M3",
+      "MiniMaxAI/MiniMax-M3-Free",
       "MiniMaxAI/MiniMax-M2.5",
       "Qwen/Qwen3.6-Max-Preview",
       "alibaba/qwen3.7-max",
+      "Qwen/Qwen3.7-Plus",
+      "zai-org/GLM-5.2",
       "zai-org/GLM-5",
+      "moonshotai/Kimi-K2.7-Code",
+      "moonshotai/Kimi-K2.7-Code-Highspeed",
       "moonshotai/Kimi-K2.5",
       "stepfun/Step-3.5-Flash",
+      "stepfun/Step-3.7-Flash",
       "google/gemini-3.5-flash",
       "google/gemini-3.1-flash-lite",
       "openai/gpt-5.4",
       "openai/gpt-5.3-codex",
       "openai/gpt-5.4-mini",
+      "anthropic/claude-fable-5",
       "anthropic/claude-opus-4.8",
       "anthropic/claude-haiku-4-5-20251001",
     ]) {
