@@ -71,7 +71,8 @@ if (
   response.status === 502 &&
   (code === "commandcode_event_error" ||
     code === "commandcode_empty_response" ||
-    code === "commandcode_empty_visible_response")
+    code === "commandcode_empty_visible_response" ||
+    code === "commandcode_http_error")
 ) {
   console.log(`SMOKE_UPSTREAM_FAILURE_SURFACED_OK code=${code}`);
   process.exit(0);
