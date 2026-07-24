@@ -433,7 +433,7 @@ export class CommandCodeClient implements CommandCodeUpstream {
         "x-project-slug": slugFromWorkingDir(body.config.workingDir),
         "x-taste-learning": "false",
         "x-co-flag": "false",
-        "x-session-id": body.threadId,
+        ...(body.threadId ? { "x-session-id": body.threadId } : {}),
       },
       body: JSON.stringify(body),
       signal,

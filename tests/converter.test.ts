@@ -76,6 +76,19 @@ describe("OpenAI to CommandCode conversion", () => {
       { role: "user", content: [{ type: "text", text: "Say hi" }] },
     ]);
     expect(body.config.workingDir).toBe("/tmp/project");
+    expect(body.memory).toBeNull();
+    expect(body.taste).toBeNull();
+    expect(body.skills).toBeNull();
+    expect(body.threadId).toBe("00000000-0000-4000-8000-000000000000");
+  });
+
+  it("omits invalid thread IDs instead of forwarding them upstream", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: { model: "deepseek/deepseek-v4-pro", messages: [{ role: "user", content: "hi" }] },
+      upstreamModel: "deepseek/deepseek-v4-pro",
+      threadId: "not-a-uuid",
+    });
+    expect(body.threadId).toBeUndefined();
   });
 
   it("treats OpenAI developer messages as system instructions for Hermes compatibility", () => {

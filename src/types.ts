@@ -87,8 +87,8 @@ export interface CommandCodeMessage {
 
 export interface CommandCodeGenerateBody {
   config: CommandCodeConfigContext;
-  memory: string;
-  taste: string;
+  memory: string | null;
+  taste: string | null;
   skills: string | null;
   permissionMode: "standard";
   params: {
@@ -102,7 +102,7 @@ export interface CommandCodeGenerateBody {
     stop?: string | string[];
     stream: true;
   };
-  threadId: string;
+  threadId?: string;
 }
 
 export interface CommandCodeUsage {

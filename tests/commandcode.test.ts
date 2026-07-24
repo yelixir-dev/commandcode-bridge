@@ -69,8 +69,8 @@ const generateBody: CommandCodeGenerateBody = {
     gitStatus: "",
     recentCommits: [],
   },
-  memory: "",
-  taste: "",
+  memory: null,
+  taste: null,
   skills: null,
   permissionMode: "standard",
   params: {
@@ -184,6 +184,11 @@ describe("CommandCode stream parsing", () => {
     });
     expect(
       parseCommandCodeEventLine(
+        'data: {"type":"tool-call","toolCallId":"call_0","toolName":"read_file","input":{"path":"input.txt"}}',
+      ),
+    ).toMatchObject({ type: "tool-call", toolCallId: "call_0", input: { path: "input.txt" } });
+    expect(
+      parseCommandCodeEventLine(
         'data: {"type":"tool-call","toolCallId":"call_1","toolName":"read_file","args":{"path":"a.txt"}}',
       ),
     ).toEqual({
@@ -202,6 +207,17 @@ describe("CommandCode stream parsing", () => {
       toolName: "read_file",
       result: "ok",
       isError: false,
+    });
+    expect(
+      parseCommandCodeEventLine(
+        'data: {"type":"tool-result","toolCallId":"call_2","toolName":"read_file","output":"failed","isError":true,"providerExecuted":true}',
+      ),
+    ).toMatchObject({
+      type: "tool-result",
+      toolCallId: "call_2",
+      output: "failed",
+      isError: true,
+      providerExecuted: true,
     });
     expect(parseCommandCodeEventLine('data: {"type":"error","error":"upstream failed"}')).toEqual({
       type: "error",

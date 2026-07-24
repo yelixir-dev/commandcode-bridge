@@ -183,6 +183,10 @@ function formatDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 export function buildCommandCodeGenerateBody(
   options: BuildCommandCodeBodyOptions,
 ): CommandCodeGenerateBody {
@@ -203,6 +207,7 @@ export function buildCommandCodeGenerateBody(
   if (options.request.top_p !== undefined) params.top_p = options.request.top_p;
   if (options.request.stop !== undefined) params.stop = options.request.stop;
 
+  const threadId = options.threadId ?? randomUUID();
   return {
     config: {
       workingDir,
@@ -215,11 +220,11 @@ export function buildCommandCodeGenerateBody(
       gitStatus: "",
       recentCommits: [],
     },
-    memory: "",
-    taste: "",
-    skills: "",
+    memory: null,
+    taste: null,
+    skills: null,
     permissionMode: "standard",
     params,
-    threadId: options.threadId ?? randomUUID(),
+    ...(isUuid(threadId) ? { threadId } : {}),
   };
 }

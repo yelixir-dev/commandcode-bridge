@@ -70,9 +70,46 @@ describe("configuration and model aliases", () => {
       "gpt-5.6-terra",
       "tencent/hy3-paid",
       "zai-org/GLM-5.2-Fast",
+      "xiaomi/mimo-v2.5-pro",
+      "xiaomi/mimo-v2.5",
+      "nvidia/nemotron-3-ultra-550b-a55b",
+      "thinkingmachines/inkling",
+      "poolside/laguna-s-2.1-free",
+      "sakana/fugu-ultra",
+      "meta/muse-spark-1.1",
+      "xai/grok-4.5",
     ]) {
       expect(catalog.has(id)).toBe(true);
       expect(catalog.get(id)?.enabled).toBe(false);
+    }
+  });
+
+  it("records exact CommandCode 1.3.1 prices for disabled candidates", () => {
+    const catalog = new Map(
+      loadBridgeConfig({ env: {} }).modelCatalog?.map((model) => [model.id, model]),
+    );
+    const prices = {
+      "claude-sonnet-5": "$2/M in · $10/M out",
+      "google/gemini-3.5-flash-lite": "$0.30/M in · $2.50/M out",
+      "google/gemini-3.6-flash": "$1.50/M in · $7.50/M out",
+      "inclusionai/ling-3.0-flash-free": "$0/M in · $0/M out",
+      "moonshotai/Kimi-K3": "$3/M in · $15/M out",
+      "gpt-5.6-luna": "$1/M in · $6/M out",
+      "gpt-5.6-sol": "$5/M in · $30/M out",
+      "gpt-5.6-terra": "$2.50/M in · $15/M out",
+      "tencent/hy3-paid": "$0.14/M in · $0.58/M out",
+      "zai-org/GLM-5.2-Fast": "$3/M in · $10.25/M out",
+      "xiaomi/mimo-v2.5-pro": "$0.435/M in · $0.87/M out",
+      "xiaomi/mimo-v2.5": "$0.14/M in · $0.28/M out",
+      "nvidia/nemotron-3-ultra-550b-a55b": "$0.60/M in · $2.40/M out",
+      "thinkingmachines/inkling": "$1/M in · $4.05/M out",
+      "poolside/laguna-s-2.1-free": "$0/M in · $0/M out",
+      "sakana/fugu-ultra": "$5/M in · $30/M out",
+      "meta/muse-spark-1.1": "$1.25/M in · $4.25/M out",
+      "xai/grok-4.5": "$2/M in · $6/M out",
+    };
+    for (const [id, notes] of Object.entries(prices)) {
+      expect(catalog.get(id)).toMatchObject({ enabled: false, notes });
     }
   });
 
