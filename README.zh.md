@@ -67,18 +67,18 @@ curl -fsS "$BRIDGE/v1/models" | head -c 400
 
 ## 版本
 
-当前 bridge version：**v0.40.3**。
+当前 bridge version：**v1.3.1**。
 
 版本也会从 `/health` 返回，并显示在 web dashboard 右上角。
 
-### v0.40.3 CommandCode 兼容性更新
+### v1.3.1 CommandCode 兼容性更新
 
-此 bridge release 已对齐官方 `command-code` npm package `0.40.3`：
+此 bridge release 已对齐官方 `command-code` npm package `1.3.1`：
 
-- 默认上游 `x-command-code-version` header 现在发送 `0.40.3`，除非用 `COMMANDCODE_CLI_VERSION` 覆盖。
-- bridge package/runtime version 也是 `0.40.3`，因此 `/health`、dashboard 和 npm metadata 与目标 CommandCode CLI version 对齐。
-- 直接检查 `command-code@0.40.3` bundle 后确认，bridge-critical API paths 仍兼容：`/alpha/generate`、`/alpha/whoami`、`/alpha/billing/credits`、`/alpha/billing/subscriptions`、`/alpha/usage/summary`。新的 `/alpha/web-search`、`/alpha/web-fetch`、`/alpha/fingerprint/record` 和 `update-status` surfaces 在本 release 中不会作为 OpenAI-compatible bridge APIs 暴露。
-- model catalog 已按 `0.40.3` CLI bundle 检查。现有 enabled defaults 保持保守；额外发现的 MiniMax M3 Free、Qwen 3.7 Plus、GLM-5.2、Kimi K2.7 Code/HighSpeed、Step 3.7 Flash、Claude Fable 5，以及既有 preview/frontier 条目默认禁用，除非在 config 中显式启用。
+- 默认上游 `x-command-code-version` header 现在发送 `1.3.1`，除非用 `COMMANDCODE_CLI_VERSION` 覆盖。
+- bridge package/runtime version 也是 `1.3.1`，因此 `/health`、dashboard 和 npm metadata 与目标 CommandCode CLI version 对齐。
+- 静态检查 `command-code@1.3.1` bundle 后确认 bridge-critical API paths 仍然存在：`/alpha/generate`、`/alpha/whoami`、`/alpha/billing/credits`、`/alpha/billing/subscriptions`、`/alpha/usage/summary`。v1 CLI 的完整重写 surface 不会作为 OpenAI-compatible bridge APIs 暴露。
+- 现有 enabled defaults 保持保守；新发现、preview 或未批准的 model entries 默认禁用，除非在 config 中显式启用。
 
 ## 架构
 
@@ -206,7 +206,7 @@ dashboard 有意采用 mobile-first 设计，适合在同一可信 tailnet 上�
 
 - **Header**
   - 显示 bridge online/offline state。
-  - 显示 bridge version，例如 `v0.40.3`。
+  - 显示 bridge version，例如 `v1.3.1`。
   - 标题旁提供 Korean/English/Chinese flag language selector。
 - **Server Bind**
   - 本机专用选择 `127.0.0.1`。
@@ -373,7 +373,7 @@ x-api-key: <BRIDGE_API_KEY>
 | `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL`  | `4`                          | Per-key concurrency cap。                                                                                        |
 | `COMMANDCODE_API_BASE`                      | `https://api.commandcode.ai` | Upstream API base。除非测试明确的 alternate upstream，否则不要更改。                                             |
 | `COMMANDCODE_DEFAULT_MODEL`                 | `deepseek/deepseek-v4-pro`   | `default` 使用的 model。                                                                                         |
-| `COMMANDCODE_CLI_VERSION`                   | `0.40.3`                     | 发送给 upstream 的 version header。                                                                              |
+| `COMMANDCODE_CLI_VERSION`                   | `1.3.1`                      | 发送给 upstream 的 version header。                                                                              |
 | `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY` | `error_on_length`            | `error_on_length` 对空 visible `finish_reason: length` fail closed；`allow` 保留 legacy blank success behavior。 |
 | `LOG_LEVEL`                                 | `info`                       | Fastify/Pino log level。                                                                                         |
 | `INCLUDE_REASONING`                         | `false`                      | 是否把 reasoning deltas 附加到 visible output。常规 clients 保持 false。                                         |

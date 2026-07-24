@@ -8,8 +8,8 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
-  it("advertises the current CommandCode CLI version by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("0.40.3");
+  it("advertises the tested CommandCode CLI version by default while allowing override", () => {
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.3.1");
     expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "0.40.3-test" } }).cliVersion).toBe(
       "0.40.3-test",
     );
@@ -26,6 +26,12 @@ describe("configuration and model aliases", () => {
     expect(
       config.modelCatalog?.find((model) => model.id === "deepseek/deepseek-v4-pro")?.notes,
     ).toBe("$0.435/M in · $0.87/M out · cache hit $0.003625/M");
+    expect(config.modelCatalog?.find((model) => model.id === "claude-sonnet-5")?.notes).toBe(
+      "$2/M in · $10/M out",
+    );
+    expect(config.modelCatalog?.find((model) => model.id === "gpt-5.6-terra")?.notes).toBe(
+      "$2.50/M in · $15/M out",
+    );
   });
 
   it("keeps the CommandCode 0.40.3 discovered model catalog available but conservative", () => {
@@ -54,6 +60,16 @@ describe("configuration and model aliases", () => {
       "anthropic/claude-fable-5",
       "anthropic/claude-opus-4.8",
       "anthropic/claude-haiku-4-5-20251001",
+      "claude-sonnet-5",
+      "google/gemini-3.5-flash-lite",
+      "google/gemini-3.6-flash",
+      "inclusionai/ling-3.0-flash-free",
+      "moonshotai/Kimi-K3",
+      "gpt-5.6-luna",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "tencent/hy3-paid",
+      "zai-org/GLM-5.2-Fast",
     ]) {
       expect(catalog.has(id)).toBe(true);
       expect(catalog.get(id)?.enabled).toBe(false);
@@ -93,7 +109,12 @@ describe("configuration and model aliases", () => {
   });
 
   it("resolves common aliases to CommandCode model ids", () => {
-    const config = loadBridgeConfig({ env: {} });
+    const config = loadBridgeConfig({
+      env: {
+        COMMANDCODE_ALLOWED_MODELS:
+          "deepseek/deepseek-v4-pro,deepseek/deepseek-v4-flash,openai/gpt-5.6-terra,anthropic/claude-sonnet-5",
+      },
+    });
     expect(resolveModel("default", config).upstreamModel).toBe("deepseek/deepseek-v4-pro");
     expect(resolveModel("commandcode/deepseek-v4-pro", config).upstreamModel).toBe(
       "deepseek/deepseek-v4-pro",
@@ -101,6 +122,8 @@ describe("configuration and model aliases", () => {
     expect(resolveModel("deepseek-v4-flash", config).upstreamModel).toBe(
       "deepseek/deepseek-v4-flash",
     );
+    expect(resolveModel("openai/gpt-5.6-terra", config).upstreamModel).toBe("gpt-5.6-terra");
+    expect(resolveModel("anthropic/claude-sonnet-5", config).upstreamModel).toBe("claude-sonnet-5");
   });
 
   it("rejects unknown models when allowUnknownModels is false", () => {

@@ -272,6 +272,7 @@ export class CommandCodeBillingClient {
     return {
       "Content-Type": "application/json",
       Authorization: `Bearer ${credential.apiKey}`,
+      "User-Agent": "cli",
       "x-cli-environment": "production",
       "x-command-code-version": this.config.cliVersion,
     };
@@ -426,6 +427,7 @@ export class CommandCodeClient implements CommandCodeUpstream {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${credential.apiKey}`,
+        "User-Agent": "cli",
         "x-cli-environment": "production",
         "x-command-code-version": this.config.cliVersion,
         "x-project-slug": slugFromWorkingDir(body.config.workingDir),

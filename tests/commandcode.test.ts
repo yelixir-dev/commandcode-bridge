@@ -170,6 +170,72 @@ describe("CommandCode stream parsing", () => {
     expect(error.message).toContain("Bad Request");
     expect(error.body).toEqual({ error: { message: "bad" } });
   });
+
+  it("parses CommandCode 1.3.1 raw and SSE event variants", () => {
+    expect(parseCommandCodeEventLine('{"type":"reasoning-start"}')).toEqual({
+      type: "reasoning-start",
+    });
+    expect(parseCommandCodeEventLine('data: {"type":"reasoning-delta","text":"think"}')).toEqual({
+      type: "reasoning-delta",
+      text: "think",
+    });
+    expect(parseCommandCodeEventLine('{"type":"reasoning-end"}')).toEqual({
+      type: "reasoning-end",
+    });
+    expect(
+      parseCommandCodeEventLine(
+        'data: {"type":"tool-call","toolCallId":"call_1","toolName":"read_file","args":{"path":"a.txt"}}',
+      ),
+    ).toEqual({
+      type: "tool-call",
+      toolCallId: "call_1",
+      toolName: "read_file",
+      args: { path: "a.txt" },
+    });
+    expect(
+      parseCommandCodeEventLine(
+        '{"type":"tool-result","toolCallId":"call_1","toolName":"read_file","result":"ok","isError":false}',
+      ),
+    ).toEqual({
+      type: "tool-result",
+      toolCallId: "call_1",
+      toolName: "read_file",
+      result: "ok",
+      isError: false,
+    });
+    expect(parseCommandCodeEventLine('data: {"type":"error","error":"upstream failed"}')).toEqual({
+      type: "error",
+      error: "upstream failed",
+    });
+  });
+
+  it("keeps CommandCode 1.3.1 finish usage and abort-only streams intact", async () => {
+    const finished = await collectEvents(
+      parseCommandCodeStream(
+        streamFromChunks([
+          '{"type":"text-delta","text":"ok"}\n',
+          'data: {"type":"finish","finishReason":"stop","totalUsage":{"inputTokens":2,"outputTokens":1,"inputTokenDetails":{"cacheReadTokens":1,"cacheWriteTokens":0}}}\n',
+        ]),
+      ),
+    );
+    expect(finished).toEqual([
+      { type: "text-delta", text: "ok" },
+      expect.objectContaining({
+        type: "finish",
+        finishReason: "stop",
+        totalUsage: {
+          inputTokens: 2,
+          outputTokens: 1,
+          inputTokenDetails: { cacheReadTokens: 1, cacheWriteTokens: 0 },
+        },
+      }),
+    ]);
+
+    const aborted = await collectEvents(
+      parseCommandCodeStream(streamFromChunks(['data: {"type":"abort"}\n'])),
+    );
+    expect(aborted).toEqual([{ type: "abort" }]);
+  });
 });
 
 describe("CommandCode client credential routing", () => {
@@ -217,6 +283,10 @@ describe("CommandCode client credential routing", () => {
       "https://api.commandcode.ai/alpha/billing/subscriptions?orgId=org_123",
       "https://api.commandcode.ai/alpha/usage/summary?orgId=org_123&since=2026-05-01T00%3A00%3A00.000Z",
     ]);
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
+      "User-Agent": "cli",
+      "x-command-code-version": "0.40.3",
+    });
     expect(snapshot).toMatchObject({
       monthlyCredits: 12,
       purchasedCredits: 3,
@@ -248,6 +318,7 @@ describe("CommandCode client credential routing", () => {
     expect(posts).toHaveLength(2);
     expect((posts[0]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer alpha-secret",
+      "User-Agent": "cli",
     });
     expect((posts[1]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer beta-secret",
@@ -280,6 +351,7 @@ describe("CommandCode client credential routing", () => {
     expect(posts).toHaveLength(2);
     expect((posts[0]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer alpha-secret",
+      "User-Agent": "cli",
     });
     expect((posts[1]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer beta-secret",
@@ -319,6 +391,7 @@ describe("CommandCode client credential routing", () => {
     expect(posts).toHaveLength(2);
     expect((posts[0]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer alpha-secret",
+      "User-Agent": "cli",
     });
     expect((posts[1]?.[1] as RequestInit).headers).toMatchObject({
       Authorization: "Bearer beta-secret",
