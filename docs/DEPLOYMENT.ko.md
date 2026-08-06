@@ -158,7 +158,7 @@ COMMANDCODE_ROUTER_COOLDOWN_MS=60000
 
 설치 중 bind 주소를 `127.0.0.1` 또는 `0.0.0.0` 중에서 고르고 port를 입력할 수 있습니다. 기본값은 안전한 `127.0.0.1:9992`입니다.
 
-사전 조건은 Linux user systemd, Node.js >= 20, npm, 그리고 `~/.commandcode/auth.json`의 CommandCode CLI 인증 또는 `COMMANDCODE_API_KEY`입니다. headless host에서 로그인 전에도 떠야 하면 한 번 `sudo loginctl enable-linger "$USER"`를 실행하십시오. `0.0.0.0`은 LAN/Tailscale/VPN/firewall 뒤에서만 사용하고 강한 `BRIDGE_API_KEY`를 유지하십시오.
+사전 조건은 Linux user systemd, 현재 CommandCode CLI 설치를 위한 Node.js >= 22, npm, 그리고 `~/.commandcode/auth.json`의 CommandCode CLI 인증 또는 `COMMANDCODE_API_KEY`입니다. headless host에서 로그인 전에도 떠야 하면 한 번 `sudo loginctl enable-linger "$USER"`를 실행하십시오. `0.0.0.0`은 LAN/Tailscale/VPN/firewall 뒤에서만 사용하고 강한 `BRIDGE_API_KEY`를 유지하십시오.
 
 비대화형 설치:
 
@@ -398,7 +398,7 @@ npm run smoke
 | `COMMANDCODE_DEFAULT_MODEL`        | `deepseek/deepseek-v4-pro`   | `model: "default"` 요청이 실제로 사용할 upstream model입니다.                                                            |
 | `COMMANDCODE_ALLOWED_MODELS`       | Pro + Flash                  | 허용할 model ID 목록입니다. 이 목록 밖 요청은 unknown model 허용 옵션을 켜지 않는 한 거부됩니다.                         |
 | `COMMANDCODE_ALLOW_UNKNOWN_MODELS` | `false`                      | 임의 model ID를 upstream으로 통과시킵니다. 운영에서는 권장하지 않습니다.                                                 |
-| `COMMANDCODE_CLI_VERSION`          | `1.3.1`                      | 테스트된 CommandCode CLI 동작과 맞추기 위해 upstream에 보내는 version header입니다.                                      |
+| `COMMANDCODE_CLI_VERSION`          | `1.14.0`                     | 테스트된 CommandCode CLI 동작과 맞추기 위해 upstream에 보내는 version header입니다.                                      |
 | `COMMANDCODE_TIMEOUT_MS`           | `300000`                     | upstream generation timeout입니다.                                                                                       |
 
 Credential JSON 파일 예시:

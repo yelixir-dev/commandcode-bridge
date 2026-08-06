@@ -1,220 +1,72 @@
-<p align="right">
-  🌐 English · <a href="README.ko.md">한국어</a> · <a href="README.zh.md">中文</a>
-</p>
-
-# CommandCode Bridge
-
 <p align="center">
-  <img src="docs/assets/readme/commandcode-bridge-overview.png" alt="CommandCode Bridge architecture overview" width="760">
+  <img src="docs/assets/banner.svg" alt="CommandCode Bridge — OpenAI-compatible gateway for trusted CommandCode deployments" width="880">
 </p>
 
 <p align="center">
-  <strong>OpenAI-compatible gateway for trusted CommandCode deployments.</strong>
+  <strong>OpenAI-compatible access to CommandCode models, credentials, and routing inside a trusted network.</strong>
 </p>
 
 <p align="center">
-  <a href=".github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-GitHub%20Actions-5865f2?style=flat-square" alt="CI workflow"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2ea44f?style=flat-square" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/Node.js-20%2B-5fa04e?style=flat-square" alt="Node.js 20+">
-  <img src="https://img.shields.io/badge/API-OpenAI--compatible-6b7280?style=flat-square" alt="OpenAI-compatible API">
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0-b57920?style=flat-square" alt="Version 1.14.0"></a>
+  <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-52-1f6f78?style=flat-square" alt="52 models"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
 </p>
 
-CommandCode Bridge is a trusted-environment HTTP bridge that exposes a small OpenAI-compatible API for a CommandCode account. It lets local, LAN, VPN, or tailnet clients call CommandCode-backed models through standard `/v1/models` and `/v1/chat/completions` endpoints.
+<!-- README-I18N:START -->
 
-> **CommandCode required.** This project is not a public standalone DeepSeek proxy and does not include or repackage CommandCode's CLI bundle. You need the official CommandCode CLI/account environment (`cmd` from the `command-code` npm package) or equivalent CommandCode API credentials. Install/authenticate CommandCode from the official site: <https://commandcode.ai/install>.
+**English** | [한국어](./README.ko.md) | [中文](./README.zh.md)
 
-> **Status.** Internal/trusted-environment bridge. The upstream CommandCode `/alpha/generate` path behaves like an alpha/internal API and may change.
+<!-- README-I18N:END -->
 
-## At a glance
+CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **52-model** catalog aligned with CommandCode/bridge **1.14.0**.
 
-| Area            | Summary                                                                                                                                   |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| API surface     | `/health`, `/dashboard`, `/v1/models`, `/v1/chat/completions`, and redacted admin diagnostics.                                            |
-| Core value      | OpenAI-compatible clients can use CommandCode-backed models without spawning `cmd` per request.                                           |
-| Routing         | Multi-key credential selection with daily-burn, balance-priority, round-robin, and drain-first policies.                                  |
-| Operations      | Mobile-first dashboard for bind settings, routing, credentials, model toggles, diagnostics, save, restart, and Korean/English/Chinese UI. |
-| Safety boundary | No upstream secrets are bundled; expose only on localhost or a trusted VPN/tailnet/private proxy.                                         |
+[What it does](#what-it-does) · [Install](#install) · [Usage](#usage) · [How it works](#how-it-works) · [Repository layout](#repository-layout) · [Current limitations](#current-limitations) · [License](#license)
 
-One-shot smoke test after install:
+## What it does
 
-```bash
-BRIDGE=http://127.0.0.1:9992; \
-curl -fsS "$BRIDGE/health" && echo && \
-curl -fsS "$BRIDGE/v1/models" | head -c 400
-```
+- **OpenAI-compatible API.** Lists and retrieves models and serves streaming or non-streaming chat without spawning `cmd` per request.
 
-A healthy bridge returns JSON health/version data and a non-empty OpenAI-compatible model list. Run a chat completion only after confirming your CommandCode account has usable credits.
+- **CommandCode stream conversion.** Normalizes visible text, usage, finish reasons, and emitted tool calls into OpenAI response shapes.
 
-## What this bridge does
+- **Multi-key routing.** Supports `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key concurrency, cooldown, model scope, and pre-output failover.
 
-- Provides OpenAI-compatible endpoints:
-  - `GET /health`
-  - `GET /dashboard`
-  - `GET /v1/models`
-  - `POST /v1/chat/completions`
-  - `GET /admin/config` and `GET /admin/commandcode/credentials` for redacted read-only dashboard state
-  - `PUT /admin/config` and `POST /admin/restart` for authenticated dashboard writes/restart
-- Converts CommandCode streaming events into OpenAI chat completion responses or SSE chunks.
-- Supports non-streaming and streaming OpenAI clients, including usage chunks for `stream_options.include_usage`.
-- Supports tool calls emitted by CommandCode and maps them back to OpenAI `tool_calls`.
-- Supports `developer`, `system`, `user`, `assistant`, and `tool` messages.
-- Hides reasoning deltas by default (`INCLUDE_REASONING=false`).
-- Fails closed on empty visible `finish_reason: length` responses by default instead of returning a blank success.
-- Loads CommandCode upstream credentials from a CLI auth file, a single API key, a multi-key env var, or a JSON credentials file.
-- Includes a multi-key credential router with routing policies designed for rotating multiple CommandCode keys safely.
-- Includes a mobile-first `/dashboard` for server bind settings, routing policy, key management, model toggles, diagnostics, JSON save, restart, and Korean/English/Chinese localization.
-- Includes optional balance alerts and an optional `commandcode-router` process for routing across multiple bridge hosts.
+- **Universal expiry priority.** Under every policy, eligible credentials with a known expiry in **1 day or less** are selected before longer-lived credentials.
 
-## Version
+- **Context metadata.** Emits `context_window`, `context_length`, and `max_context_length` whenever the catalog has a published context.
 
-Current bridge version: **v1.3.1**.
+- **Mobile dashboard.** Manages bind settings, routing, credentials, and model toggles in Korean, English, and Chinese, with models folded by provider.
 
-The version is also returned from `/health` and shown in the top-right of the web dashboard.
+- **Secret boundary.** Loads private credentials without shipping keys or the CommandCode CLI bundle; diagnostics remain redacted.
 
-### v1.3.1 CommandCode compatibility update
+## Install
 
-This bridge release is aligned with the official `command-code` npm package `1.3.1`:
+### Linux rootless installer
 
-- The default upstream `x-command-code-version` header now advertises `1.3.1` unless `COMMANDCODE_CLI_VERSION` overrides it.
-- The bridge package/runtime version is also `1.3.1` so `/health`, the dashboard, and the npm metadata match the CommandCode CLI version being targeted.
-- Static inspection of the `command-code@1.3.1` bundle confirmed that the bridge-critical API paths remain present: `/alpha/generate`, `/alpha/whoami`, `/alpha/billing/credits`, `/alpha/billing/subscriptions`, and `/alpha/usage/summary`. Its v1 CLI rewrite is intentionally not exposed as an OpenAI-compatible bridge API surface.
-- Existing enabled model defaults remain conservative; discovered, preview, and unapproved entries stay disabled unless explicitly enabled in config.
-
-## Architecture
-
-```text
-OpenAI-compatible client
-  -> CommandCode Bridge :9992
-  -> POST https://api.commandcode.ai/alpha/generate
-  -> CommandCode stream events
-  -> OpenAI chat.completion or chat.completion.chunk
-```
-
-The bridge does **not** spawn `cmd` for every request. It calls the same upstream API path used by the CommandCode CLI, then normalizes the response shape for OpenAI-compatible clients. This avoids CLI stdout parsing, reduces latency, and prevents CLI-side local tools/memory from inflating token usage.
-
-A single chat-completion request stays bound to one upstream credential from start to finish. Parallelism comes from distributing independent requests across eligible keys and, optionally, across multiple bridge hosts.
-
-## Requirements
-
-- Node.js **20+**
-- npm **10+**
-- Linux, macOS, or WSL for manual/source operation
-- Linux user systemd if you use the bundled `install.sh`
-- Official CommandCode CLI (`cmd`, npm package `command-code`) or equivalent CommandCode upstream API key
-- A CommandCode account with usable balance/credits for real generation
-
-### CommandCode prerequisite states
-
-The installer and manual setup are designed around three common states:
-
-1. **CommandCode CLI is already installed and authenticated**
-   - The bridge can import the existing `~/.commandcode/auth.json` credential as its first upstream key.
-2. **CommandCode CLI is installed but not authenticated**
-   - Run `cmd login`, then restart the bridge.
-3. **CommandCode CLI is missing**
-   - Install it first:
-     ```bash
-     npm install -g command-code
-     cmd login
-     ```
-   - The Linux installer can offer to run `npm install -g command-code` for you when the CLI is missing.
-
-## Installation options
-
-### Option A — Linux rootless installer
-
-From a source checkout or package root:
+The installer targets Linux user systemd, requires Node.js 22+ for CommandCode CLI 1.14.0, imports CLI auth when available, writes private state under `~/.config/commandcode-bridge`, installs under `~/.local/share/commandcode-bridge`, and safely defaults to `127.0.0.1:9992`. Use `0.0.0.0` only behind a trusted LAN/VPN/tailnet/firewall/reverse proxy with `BRIDGE_API_KEY`. Use `sudo loginctl enable-linger "$USER"` for pre-login startup; uninstall with `./uninstall.sh` or `./uninstall.sh --purge-config`.
 
 ```bash
 ./install.sh
-```
-
-The installer:
-
-- checks for Node.js, npm, user systemd, and CommandCode CLI;
-- offers to install `command-code` with npm if the CLI is missing;
-- imports an existing CommandCode CLI auth key when available;
-- generates a client-facing `BRIDGE_API_KEY` if you do not provide one;
-- installs the bridge under `~/.local/share/commandcode-bridge`;
-- writes private runtime env to `~/.config/commandcode-bridge/env`;
-- creates a `commandcode-bridge` user systemd service;
-- starts the service unless `--no-start` is supplied.
-
-Examples:
-
-```bash
-# Interactive, safe local-only default: 127.0.0.1:9992
-./install.sh
-
-# Non-interactive local install
 ./install.sh --yes --host 127.0.0.1 --port 9992
-
-# Tailnet/LAN exposure; keep BRIDGE_API_KEY enabled
 ./install.sh --host 0.0.0.0 --port 9992
 ```
 
-Useful service commands:
+### Manual source run
 
-```bash
-systemctl --user status commandcode-bridge --no-pager
-systemctl --user restart commandcode-bridge
-journalctl --user -u commandcode-bridge -f
-curl -fsS http://127.0.0.1:9992/health | jq
-```
-
-If the service must run before login on a Linux host:
-
-```bash
-sudo loginctl enable-linger "$USER"
-```
-
-Uninstall while preserving private config:
-
-```bash
-./uninstall.sh
-```
-
-Remove service, installed files, and private config:
-
-```bash
-./uninstall.sh --purge-config
-```
-
-### Option B — Manual source run
+The bridge runtime supports Node.js 20+, while installing or using the current CommandCode CLI requires Node.js 22+. Authenticate the official `command-code` npm package with `cmd login`, or provide equivalent credentials. Official installation: <https://commandcode.ai/install>.
 
 ```bash
 git clone <your-commandcode-bridge-repository-url> commandcode-bridge
 cd commandcode-bridge
 npm install --include=dev
 cp .env.example .env
-```
-
-Edit `.env` or export environment variables. Minimal local-only setup using the CommandCode CLI auth file:
-
-```env
-HOST=127.0.0.1
-PORT=9992
-BRIDGE_API_KEY=replace-with-a-long-random-client-key
-COMMANDCODE_ROUTING_POLICY=daily_burn_priority
-COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length
-```
-
-If you prefer an explicit upstream key:
-
-```env
-COMMANDCODE_API_KEY=your_commandcode_api_key
-```
-
-Build and run:
-
-```bash
 npm run build
 npm start
 ```
 
-### Option C — Docker / Compose
+### Docker
 
-Docker is supported for deployments that have a full source checkout. The Dockerfile runs the verification/build pipeline before producing the runtime image.
+Docker and Compose require a full source checkout; the Dockerfile verifies and builds before producing the runtime image. See [the deployment guide](docs/DEPLOYMENT.md) and [`release/docker-compose.yml`](release/docker-compose.yml).
 
 ```bash
 docker build -t commandcode-bridge .
@@ -225,32 +77,20 @@ docker run --rm -p 127.0.0.1:9992:9992 \
   commandcode-bridge
 ```
 
-Or use:
+## Usage
+
+### Verify and call the API
 
 ```bash
-cd release
-docker compose up -d --build
-```
-
-See `docs/DEPLOYMENT.md` and `release/docker-compose.yml` for production details.
-
-## First verification
-
-Health check:
-
-```bash
+export BRIDGE_API_KEY='<same value as the bridge runtime>'
 curl -fsS http://127.0.0.1:9992/health | jq
-```
-
-If `BRIDGE_API_KEY` is configured, authenticated model list:
-
-```bash
-export BRIDGE_API_KEY='<same value as your bridge env>'
 curl -fsS http://127.0.0.1:9992/v1/models \
+  -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
+curl -fsS http://127.0.0.1:9992/v1/models/deepseek%2Fdeepseek-v4-pro \
   -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
 ```
 
-Non-streaming chat completion:
+`/health` is public and secret-free. `GET /v1/models` lists available models, while `GET /v1/models/:model` returns one available model or `404 model_not_found`; slash-bearing IDs must be URL-encoded. `POST /v1/chat/completions` returns OpenAI completion JSON or SSE with `stream: true`; `stream_options.include_usage` adds a final usage chunk. Supported roles are `developer`, `system`, `user`, `assistant`, and `tool`. Tool schemas and emitted calls work; forced `tool_choice` accepts only omitted, `"auto"`, or `"none"`.
 
 ```bash
 curl -sS http://127.0.0.1:9992/v1/chat/completions \
@@ -264,434 +104,194 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
   }' | jq
 ```
 
-Streaming:
+### API surface
 
-```bash
-curl -N http://127.0.0.1:9992/v1/chat/completions \
-  -H "Authorization: Bearer $BRIDGE_API_KEY" \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "model": "deepseek/deepseek-v4-pro",
-    "stream": true,
-    "messages": [{"role": "user", "content": "Count to three."}],
-    "stream_options": {"include_usage": true}
-  }'
-```
+| Method | Path | Behavior |
 
-Project smoke script:
+| --- | --- | --- |
 
-```bash
-npm run smoke
-```
+| `GET` | `/health` | Public, secret-free health and runtime summary. |
 
-The smoke script reads `.env`, then the installed-service env file at `~/.config/commandcode-bridge/env` on Linux or `/Users/yorha/.config/commandcode-bridge/env` on Yorha's macOS bridge host, then explicit shell variables. Set `BRIDGE_ENV_FILE=/path/to/env` when validating another installed bridge. Explicit shell values such as `BRIDGE_BASE_URL` and `BRIDGE_API_KEY` always win.
+| `GET` | `/dashboard` | Public read-only shell for trusted networks. |
 
-If the account is reachable but temporarily blocked by balance/credit, use the routing-only fail-closed smoke mode:
+| `GET` | `/v1/models` | Authenticated when `BRIDGE_API_KEY` is configured; lists available models. |
 
-```bash
-SMOKE_ACCEPT_UPSTREAM_ERRORS=1 npm run smoke
-```
+| `GET` | `/v1/models/:model` | Authenticated when configured; retrieves one available model. |
 
-This mode confirms that the bridge surfaces explicit upstream/fail-closed errors instead of returning blank success. It is not a generation-readiness canary.
+| `POST` | `/v1/chat/completions` | Authenticated when configured; streaming or non-streaming chat. |
 
-## Web dashboard
+| `GET` | `/admin/config` | Public redacted dashboard state on the trusted network. |
 
-Open:
+| `GET` | `/admin/commandcode/credentials` | Public redacted diagnostics; `?refresh=true` refreshes billing. |
 
-```text
-http://127.0.0.1:9992/dashboard
-```
+| `PUT` | `/admin/config` | Same-host/loopback dashboard write; requires a credentials file. |
 
-If the bridge is bound to `0.0.0.0` behind Tailscale/VPN/LAN, open:
+| `POST` | `/admin/restart` | Same-host/loopback restart request. |
 
-```text
-http://<host-or-tailnet-ip>:9992/dashboard
-```
+### Model metadata and exact catalog
 
-The dashboard is intentionally mobile-first. It is useful from a phone on the same trusted tailnet.
+Each model object includes `id`, `object`, `created`, and provider-derived `owned_by`. Known context is repeated in `context_window`, `context_length`, and `max_context_length`. Exactly five models have no published context and therefore omit all three capacity fields. This is the exact 1.14.0 canonical catalog; “Default” is the built-in enabled state.
 
-### Dashboard languages
+| Provider | Canonical model ID | Context | Default |
 
-- The dashboard ships with Korean, English, and Chinese UI strings.
-- Korean is the hard fallback language. On first load, the dashboard chooses English or Chinese when the browser locale starts with `en` or `zh`; otherwise it uses Korean.
-- Use the flag buttons beside the compact `CommandCode Bridge` title to switch manually: 🇰🇷 Korean, 🇺🇸 English, 🇨🇳 Chinese.
-- The selected language is stored in browser `localStorage`, so subsequent dashboard visits keep the operator preference.
-- Active language flags render in color; inactive language flags are desaturated/grayscale.
+| --- | --- | ---: | :---: |
 
-### Dashboard sections
+| DeepSeek | `deepseek/deepseek-v4-pro` | 1,000,000 | Yes |
 
-- **Header**
-  - Shows bridge online/offline state.
-  - Shows bridge version, for example `v1.3.1`.
-- **Server Bind**
-  - Choose `127.0.0.1` for local-only use.
-  - Choose `0.0.0.0` only for LAN/Tailscale/VPN/reverse-proxy use.
-  - Edit the port.
-  - Save/copy the browser-local Admin API Key for authenticated writes.
-- **Routing Policy**
-  - Select how eligible upstream keys are chosen.
-  - Edit the per-key concurrency limit. Routine default is **4 in-flight requests per key**.
-- **Credentials**
-  - Add, rename, enable/disable, delete, and refresh upstream CommandCode keys.
-  - The dashboard preserves existing secrets when you rename a key or leave the secret field blank.
-  - Billing/diagnostic data is redacted and shown as operator-friendly balance/day summaries.
-- **Models**
-  - Toggle configured model catalog entries on/off.
-  - Changes require restart.
-- **Footer**
-  - `Save JSON` writes the dashboard JSON config.
-  - `Restart Bridge` restarts the LaunchAgent/system service path where supported.
+| DeepSeek | `deepseek/deepseek-v4-flash` | 1,000,000 | Yes |
 
-### Dashboard auth model
+| Moonshot | `moonshotai/Kimi-K3` | 1,000,000 | No |
 
-- `GET /dashboard`, `GET /admin/config`, and redacted `GET /admin/commandcode/credentials` can be read without `BRIDGE_API_KEY` so a phone browser can load status and saved redacted state on a trusted network.
-- These public read-only dashboard endpoints are still metadata-bearing: they can reveal service version, bind/port, configured model IDs, credential IDs/previews, counts, and redacted balance summaries. Expose them only on localhost or a trusted VPN/tailnet.
-- Writes and restarts require `BRIDGE_API_KEY`:
-  - `PUT /admin/config`
-  - `POST /admin/restart`
-  - all `/v1/*` inference calls when `BRIDGE_API_KEY` is configured
-- The dashboard never returns raw CommandCode upstream keys.
-- The dashboard is not designed as a public internet control plane. It relies on a trusted network boundary plus bearer-token-protected writes, not cookie-based sessions.
+| Moonshot | `moonshotai/Kimi-K2.7-Code` | 256,000 | No |
 
-### Save/restart flow
+| Moonshot | `moonshotai/Kimi-K2.7-Code-Highspeed` | 262,000 | No |
 
-1. Change bind host, port, routing policy, credentials, or models.
-2. Click **Save JSON**.
-3. Click **Restart Bridge**.
-4. Verify `/health` and `/v1/models`.
+| Moonshot | `moonshotai/Kimi-K2.6` | 256,000 | Yes |
 
-If you rotate the client-facing bridge key, update any clients that use it. For Hermes, keep `COMMANDCODE_BRIDGE_API_KEY` and the bridge's `BRIDGE_API_KEY` in sync, then restart the Hermes gateway/session that uses the bridge. During a key rotation, clients that still hold the old key will receive `401 Unauthorized` until they reload the new value.
+| Moonshot | `moonshotai/Kimi-K2.5` | 256,000 | No |
 
-## Upstream CommandCode authentication
+| Z.ai | `zai-org/GLM-5.2` | 1,000,000 | No |
 
-The bridge loads upstream CommandCode credentials in this order:
+| Z.ai | `zai-org/GLM-5.2-Fast` | 1,000,000 | No |
 
-1. `COMMANDCODE_CREDENTIALS_FILE`
-2. `COMMANDCODE_CREDENTIALS` or `COMMANDCODE_API_KEYS`
-3. legacy single-key `COMMANDCODE_API_KEY`
-4. `~/.commandcode/auth.json`
-5. `~/.config/commandcode/auth.json`
+| Z.ai | `zai-org/GLM-5.1` | Not published | Yes |
 
-If multiple credentials are configured, `/health` reports only the count and routing policy. Raw keys are never included.
+| Z.ai | `zai-org/GLM-5` | 200,000 | No |
 
-### Single-key env
+| MiniMax | `MiniMaxAI/MiniMax-M3` | 1,000,000 | No |
 
-```env
-COMMANDCODE_API_KEY=your_commandcode_api_key
-```
+| MiniMax | `MiniMaxAI/MiniMax-M2.7` | Not published | Yes |
 
-### Simple multi-key env
+| MiniMax | `MiniMaxAI/MiniMax-M2.5` | 200,000 | No |
 
-```env
-COMMANDCODE_API_KEYS=primary=cmd_key_one,secondary=cmd_key_two
-COMMANDCODE_ROUTING_POLICY=daily_burn_priority
-```
+| Xiaomi | `xiaomi/mimo-v2.5-pro` | 1,000,000 | No |
 
-### JSON credentials file
+| Xiaomi | `xiaomi/mimo-v2.5` | 1,000,000 | No |
 
-Recommended for dashboard-managed or multi-key setups:
+| Qwen | `Qwen/Qwen3.8-Max` | 1,000,000 | No |
 
-```env
-COMMANDCODE_CREDENTIALS_FILE=/home/you/.config/commandcode-bridge/credentials.json
-```
+| Qwen | `Qwen/Qwen3.7-Max` | 1,000,000 | No |
 
-Example `credentials.json`:
+| Qwen | `Qwen/Qwen3.7-Plus` | 1,000,000 | No |
 
-```json
-{
-  "server": {
-    "host": "127.0.0.1",
-    "port": 9992
-  },
-  "routing": {
-    "policy": "daily_burn_priority",
-    "fallbackPolicy": "round_robin",
-    "maxInFlightPerCredential": 4,
-    "maxTotalInFlight": null,
-    "maxTotalInFlightMultiplier": 3
-  },
-  "models": [
-    { "id": "deepseek/deepseek-v4-pro", "enabled": true },
-    { "id": "deepseek/deepseek-v4-flash", "enabled": true },
-    { "id": "MiniMaxAI/MiniMax-M2.7", "enabled": true },
-    { "id": "Qwen/Qwen3.6-Plus", "enabled": true },
-    { "id": "zai-org/GLM-5.1", "enabled": true },
-    { "id": "moonshotai/Kimi-K2.6", "enabled": true },
-    { "id": "openai/gpt-5.5", "enabled": false },
-    { "id": "anthropic/claude-opus-4.7", "enabled": false },
-    { "id": "anthropic/claude-sonnet-4.6", "enabled": false }
-  ],
-  "credentials": [
-    { "id": "primary", "apiKey": "cmd_key_one", "weight": 1, "enabled": true },
-    {
-      "id": "flash-only",
-      "apiKey": "cmd_key_two",
-      "weight": 1,
-      "enabled": true,
-      "allowedModels": ["deepseek/deepseek-v4-flash"]
-    }
-  ]
-}
-```
+| Qwen | `Qwen/Qwen3.7-Flash` | 1,000,000 | No |
 
-Protect it:
+| Qwen | `Qwen/Qwen3.6-Max-Preview` | Not published | No |
 
-```bash
-chmod 600 ~/.config/commandcode-bridge/credentials.json
-```
+| Qwen | `Qwen/Qwen3.6-Plus` | Not published | Yes |
 
-## Multi-key routing — the main benefit
+| StepFun | `stepfun/Step-3.7-Flash` | 256,000 | No |
 
-CommandCode Bridge can run with several upstream CommandCode keys and choose among them per request. This is the key operational feature: you can spread traffic, avoid hammering one key, and automatically skip unhealthy or expired credentials.
+| StepFun | `stepfun/Step-3.5-Flash` | 1,000,000 | No |
 
-### Routing policies
+| Tencent | `tencent/hy3-paid` | 262,000 | No |
 
-| Policy                | Purpose                                                                                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `daily_burn_priority` | Default. Prioritizes keys that need more daily usage before the current billing/credit period ends. Legacy `depletion_aware` is normalized to this policy. |
-| `balance_priority`    | Prefer keys with more usable balance.                                                                                                                      |
-| `round_robin`         | Rotate across eligible keys, respecting weight and availability.                                                                                           |
-| `drain_first`         | Use the first eligible key until it is blocked/exhausted, then move to the next.                                                                           |
+| NVIDIA | `nvidia/nemotron-3-ultra-550b-a55b` | 1,000,000 | No |
 
-### Eligibility and failover
+| Thinking Machines | `thinkingmachines/inkling` | 256,000 | No |
 
-A credential can be skipped when it is:
+| Thinking Machines | `thinkingmachines/inkling-small` | 1,000,000 | No |
 
-- manually disabled in the dashboard/JSON;
-- outside its `allowedModels` scope;
-- at the per-key in-flight limit;
-- in cooldown after 429/5xx/timeouts;
-- out of usable billing balance or expired for the current period.
+| Poolside | `poolside/laguna-s-2.1-free` | 256,000 | No |
 
-If an upstream error arrives before visible output and another eligible credential exists, the bridge can retry/fail over. If visible output has already started, the bridge surfaces the error instead of retrying and risking duplicated partial output.
+| Anthropic | `claude-sonnet-5` | 1,000,000 | No |
 
-### Concurrency
+| Anthropic | `claude-sonnet-4-6` | 1,000,000 | No |
 
-Routine default:
+| Anthropic | `claude-fable-5` | 1,000,000 | No |
 
-```env
-COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4
-```
+| Anthropic | `claude-opus-5` | 1,000,000 | No |
 
-DeepSeek V4 Flash load testing was healthy at higher parallelism, but **4 in-flight requests per key** is the recommended normal operating value. Increase only after observing diagnostics and upstream behavior.
+| Anthropic | `claude-opus-4-8` | 1,000,000 | No |
 
-### Proving multi-key rotation
+| Anthropic | `claude-opus-4-7` | 1,000,000 | No |
 
-1. Configure at least two credentials with distinct IDs.
-2. Restart the bridge.
-3. Refresh diagnostics:
+| Anthropic | `claude-haiku-4-5-20251001` | 200,000 | No |
 
-   ```bash
-   curl -sS 'http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true' \
-     -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
-   ```
+| OpenAI | `gpt-5.6-sol` | 1,050,000 | No |
 
-4. Send several concurrent low-token requests.
-5. Refresh diagnostics again and confirm different credentials show selection/in-flight movement.
-6. Confirm all responses are either successful generations or explicit upstream/fail-closed errors.
+| OpenAI | `gpt-5.6-terra` | 1,050,000 | No |
 
-## Client authentication
+| OpenAI | `gpt-5.6-luna` | 1,050,000 | No |
 
-Set `BRIDGE_API_KEY` to require clients to authenticate.
+| OpenAI | `gpt-5.5` | Not published | No |
 
-```env
-BRIDGE_API_KEY=replace-with-a-long-random-client-key
-```
+| OpenAI | `gpt-5.4` | 400,000 | No |
 
-Clients may send either:
+| OpenAI | `gpt-5.3-codex` | 400,000 | No |
+
+| OpenAI | `gpt-5.4-mini` | 400,000 | No |
+
+| Google | `google/gemini-3.6-flash` | 1,000,000 | No |
+
+| Google | `google/gemini-3.5-flash` | 1,000,000 | No |
+
+| Google | `google/gemini-3.5-flash-lite` | 1,000,000 | No |
+
+| Google | `google/gemini-3.1-flash-lite` | 1,000,000 | No |
+
+| Sakana | `sakana/fugu-ultra` | 1,000,000 | No |
+
+| Meta | `meta/muse-spark-1.1` | 1,050,000 | No |
+
+| Meta | `meta/muse-spark-1.2` | 1,050,000 | No |
+
+| Meta | `meta/muse-spark-1.2-contributor` | 1,050,000 | No |
+
+| xAI | `xai/grok-4.5` | 500,000 | No |
+
+### Dashboard and credential routing
+
+Open `http://127.0.0.1:9992/dashboard`. The mobile-first UI stores its Korean/English/Chinese locale in `localStorage` with Korean fallback. It shows online/version state; edits bind, client key, routing and per-key concurrency; manages and refreshes redacted credentials; and folds the model catalog by provider with enabled/total counts. Secret fields left blank preserve existing keys. Save writes JSON and restart applies changes. Raw upstream keys are never returned.
+
+`daily_burn_priority` is the default and weights required daily burn (`depletion_aware` is its legacy alias); `balance_priority` prefers usable balance; `round_robin` rotates smoothly by weight; `drain_first` uses the first eligible key. Every policy first narrows to eligible credentials expiring within 1 day. Manual disablement, `allowedModels`, in-flight caps, exhausted/expired balance, auth failure, and 429/5xx/timeout cooldown can exclude a key. Each request stays on one key; failover occurs only before visible output.
+
+### Configuration and operations
+
+Credential precedence is `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, `COMMANDCODE_API_KEY`, then CLI auth files. Core defaults are `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.14.0`, `COMMANDCODE_TIMEOUT_MS=300000`, and `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`. `BRIDGE_API_KEY` protects `/v1/*` when set; clients may use Bearer or `x-api-key`. Protect credential JSON with `chmod 600`. Optional balance alerts are off. Optional `commandcode-router` is for least-in-flight routing across multiple bridge hosts.
+
+## How it works
+
+1. Authenticate and validate the OpenAI-shaped request.
+
+2. Resolve model aliases against the enabled catalog.
+
+3. Filter disabled, scoped, saturated, cooled-down, expired, and exhausted credentials.
+
+4. Prioritize any eligible credential expiring within 1 day, then apply the configured policy.
+
+5. Call CommandCode `POST /alpha/generate` directly with one bound credential.
+
+6. Convert stream events into OpenAI JSON or SSE, including supported tools and optional usage.
+
+7. Verify with tests, `npm run verify`, `/health`, model discovery, and `npm run smoke`.
+
+## Repository layout
 
 ```text
-Authorization: Bearer <BRIDGE_API_KEY>
+src/                 bridge, catalog, routing, dashboard, and API implementation
+tests/               deterministic contract and behavior tests
+docs/                architecture, deployment, security, and documentation assets
+release/             Compose and production deployment material
+install.sh           Linux rootless user-systemd installer
 ```
 
-or:
+Development verification is `npm run verify`; runtime verification is `npm run smoke`. `SMOKE_ACCEPT_UPSTREAM_ERRORS=1 npm run smoke` verifies explicit fail-closed routing when credit blocks generation, but is not a generation-readiness canary.
 
-```text
-x-api-key: <BRIDGE_API_KEY>
-```
+## Current limitations
 
-`/health` intentionally remains unauthenticated and secret-free. Admin writes and `/v1/*` requests require the key when configured.
+- **Trusted network boundary.** Read-only dashboard endpoints reveal redacted operational metadata; keep them on localhost or a trusted VPN/tailnet and set `BRIDGE_API_KEY` outside localhost.
 
-## Configuration reference
+- **Alpha upstream dependency.** CommandCode `/alpha/generate` and billing paths may change; pin `COMMANDCODE_CLI_VERSION` and smoke-test upgrades.
 
-| Variable                                     | Default                      | Description                                                                                                                  |
-| -------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `HOST`                                       | `127.0.0.1`                  | Bind address. Use localhost unless behind VPN, tailnet, or reverse proxy.                                                    |
-| `PORT`                                       | `9992`                       | HTTP port.                                                                                                                   |
-| `BRIDGE_API_KEY`                             | unset                        | Client-facing API key. Strongly recommended; required for admin writes.                                                      |
-| `COMMANDCODE_API_KEY`                        | unset                        | Legacy single upstream CommandCode key.                                                                                      |
-| `COMMANDCODE_API_KEYS`                       | unset                        | Comma-separated multi-key list such as `primary=...,secondary=...`.                                                          |
-| `COMMANDCODE_CREDENTIALS`                    | unset                        | JSON credentials array/object or comma-separated multi-key list.                                                             |
-| `COMMANDCODE_CREDENTIALS_FILE`               | unset                        | JSON dashboard/credential file. Highest upstream credential precedence.                                                      |
-| `COMMANDCODE_ROUTING_POLICY`                 | `daily_burn_priority`        | `daily_burn_priority`, `balance_priority`, `round_robin`, or `drain_first`. `depletion_aware` is accepted as a legacy alias. |
-| `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL`   | `4`                          | Per-key concurrency cap.                                                                                                     |
-| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT`            | unset                        | Optional explicit total in-flight cap.                                                                                       |
-| `COMMANDCODE_MAX_TOTAL_IN_FLIGHT_MULTIPLIER` | `3`                          | Legacy/default multiplier used when an explicit total cap is not set.                                                        |
-| `COMMANDCODE_BILLING_REFRESH_MS`             | `300000`                     | Billing/usage cache TTL for routing diagnostics.                                                                             |
-| `COMMANDCODE_BILLING_TIMEOUT_MS`             | `10000`                      | Billing probe timeout.                                                                                                       |
-| `COMMANDCODE_CREDENTIAL_COOLDOWN_MS`         | `60000`                      | Cooldown after upstream failures.                                                                                            |
-| `COMMANDCODE_API_BASE`                       | `https://api.commandcode.ai` | Upstream API base. Do not change unless testing a known alternate upstream.                                                  |
-| `COMMANDCODE_DEFAULT_MODEL`                  | `deepseek/deepseek-v4-pro`   | Model used for `default`.                                                                                                    |
-| `COMMANDCODE_ALLOWED_MODELS`                 | Pro + Flash/catalog defaults | Comma-separated allowlist.                                                                                                   |
-| `COMMANDCODE_ALLOW_UNKNOWN_MODELS`           | `false`                      | Pass arbitrary model IDs upstream. Not recommended.                                                                          |
-| `COMMANDCODE_CLI_VERSION`                    | `1.3.1`                      | Version header sent upstream.                                                                                                |
-| `COMMANDCODE_TIMEOUT_MS`                     | `300000`                     | Upstream request timeout.                                                                                                    |
-| `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY`  | `error_on_length`            | `error_on_length` fails closed on empty visible `finish_reason: length`; `allow` preserves legacy blank success behavior.    |
-| `REQUEST_BODY_LIMIT_BYTES`                   | `1048576`                    | Fastify body limit.                                                                                                          |
-| `RATE_LIMIT_MAX`                             | `60`                         | Requests per rate-limit window.                                                                                              |
-| `RATE_LIMIT_WINDOW`                          | `1 minute`                   | Rate-limit window string.                                                                                                    |
-| `LOG_LEVEL`                                  | `info`                       | Fastify/Pino log level.                                                                                                      |
-| `CORS_ORIGIN`                                | unset                        | Optional CORS origin.                                                                                                        |
-| `INCLUDE_REASONING`                          | `false`                      | Append reasoning deltas to visible output. Keep false for normal clients.                                                    |
-| `COMMANDCODE_BALANCE_ALERT_ENABLED`          | `false`                      | Enables periodic balance alerts. Disabled by default.                                                                        |
-| `COMMANDCODE_BALANCE_ALERT_WEBHOOK_URL`      | unset                        | Optional JSON webhook for alerts.                                                                                            |
+- **No account-limit bypass.** Billing, credits, rate limits, and terms still apply; monitor diagnostics and eligible credentials.
 
-## OpenAI compatibility notes
+- **No invented capacity.** Five model contexts are unknown; absent capacity fields mean unknown, not unlimited.
 
-Supported request fields:
-
-- `model`
-- `messages`
-- `stream`
-- `max_tokens`
-- `temperature`
-- `top_p`
-- `stop`
-- `tools` with function schemas
-- `tool_choice` only when omitted, `"auto"`, or `"none"`
-- `response_format` (`json_object` / `json_schema` receive JSON-only prompt reinforcement)
-- `stream_options.include_usage`
-- `user`
-
-Unsupported forced tool selection returns `unsupported_tool_choice` because CommandCode `/alpha/generate` does not expose a stable forced-tool selector.
-
-## Optional commandcode-router
-
-`commandcode-router` is a separate process for multi-host deployments. It preserves one `/v1` endpoint while routing independent requests to the least-in-flight healthy bridge backend.
-
-```env
-COMMANDCODE_ROUTER_BACKENDS=local=http://127.0.0.1:19992,pc2=http://<tailnet-ip>:9992
-COMMANDCODE_ROUTER_BACKEND_MAX_INFLIGHT=1
-COMMANDCODE_ROUTER_BACKEND_TIMEOUT_MS=300000
-COMMANDCODE_ROUTER_HEALTH_TIMEOUT_MS=3000
-COMMANDCODE_ROUTER_COOLDOWN_MS=60000
-```
-
-Use this only when you operate more than one bridge host. For most users, the built-in multi-key credential router inside a single bridge process is enough.
-
-## Development
-
-```bash
-npm install --include=dev
-npm run typecheck
-npm run lint
-npm run format:check
-npm test
-npm run build
-npm run verify
-```
-
-`npm run verify` runs typecheck, lint, format check, tests, and build.
-
-## Security and non-goals
-
-- Do not expose the bridge to the public internet without TLS, authentication, and a trusted network boundary.
-- `HOST=0.0.0.0` means every interface on the machine. Use it only behind Tailscale/WireGuard/VPN/firewall/reverse proxy; it is not a security control by itself.
-- Prefer `127.0.0.1`, Tailscale, WireGuard, a VPN, or a private reverse proxy.
-- Always set `BRIDGE_API_KEY` for non-localhost deployments.
-- Treat dashboard read-only endpoints as metadata-bearing even though they are redacted.
-- Do not commit `.env`, `~/.commandcode/auth.json`, `credentials.json`, upstream API keys, bridge keys, billing details, router backend topology, or dashboard-exported secrets.
-- Treat CommandCode credentials as personal upstream credentials.
-- This repository does not include CommandCode's proprietary/UNLICENSED CLI bundle source.
-- The bridge does not bypass CommandCode account limits, billing, rate limits, or terms.
-- The bridge is not a general public proxy service.
-
-See `docs/SECURITY.md` for more details. For private security reports, use the GitHub Security Advisory form at `https://github.com/yelixir-dev/commandcode-bridge/security/advisories/new` or email `yelixir.dev@gmail.com`.
-
-## Troubleshooting
-
-### `/health` works but `/v1/models` or chat returns 401
-
-`/health` is public. `/v1/*` requires `BRIDGE_API_KEY` when configured.
-
-```bash
-export BRIDGE_API_KEY='<same value as bridge env>'
-curl -fsS http://127.0.0.1:9992/v1/models \
-  -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
-```
-
-### Hermes compression or a client suddenly gets 401 after a bridge key rotation
-
-The client-facing key changed in the bridge, but the client still has the old key. For Hermes, keep these paired:
-
-- bridge runtime env: `BRIDGE_API_KEY`
-- Hermes env/client setting: `COMMANDCODE_BRIDGE_API_KEY`
-
-Update both and restart the bridge/Hermes gateway or session that loads the env.
-
-### CommandCode CLI is installed but generation fails with missing upstream key
-
-Run:
-
-```bash
-cmd login
-```
-
-Then restart the bridge. Or provide `COMMANDCODE_API_KEY`, `COMMANDCODE_API_KEYS`, or `COMMANDCODE_CREDENTIALS_FILE` explicitly.
-
-### Account reachable but generation fails due to balance/credits
-
-Use diagnostics:
-
-```bash
-curl -sS 'http://127.0.0.1:9992/admin/commandcode/credentials?refresh=true' \
-  -H "Authorization: Bearer $BRIDGE_API_KEY" | jq
-```
-
-For bridge behavior testing only:
-
-```bash
-SMOKE_ACCEPT_UPSTREAM_ERRORS=1 npm run smoke
-```
-
-Real generation readiness requires a normal smoke without that flag.
-
-### Dashboard changes were saved but not applied
-
-Most dashboard changes write JSON and require restart. Click **Restart Bridge**, or restart your service manually.
-
-### Port 9992 is already in use
-
-```bash
-lsof -nP -iTCP:9992 -sTCP:LISTEN
-# or on Linux
-ss -ltnp '( sport = :9992 )'
-```
-
-Stop the conflicting process or change `PORT`.
-
-## Contributing
-
-Contributions are welcome when they preserve the bridge's trust boundary: no bundled upstream secrets, no public-internet-by-default exposure, and no CommandCode CLI redistribution. Before opening a change, run:
-
-```bash
-npm run verify
-```
-
-For security-sensitive changes, read `docs/SECURITY.md` first and avoid including credentials, local env files, private topology, or billing details in issues, logs, screenshots, or fixtures.
-
-## Documentation map
-
-- `README.ko.md` — Korean README.
-- `docs/DEPLOYMENT.md` — deployment and operations guide.
-- `docs/DEPLOYMENT.ko.md` — Korean deployment and operations guide.
-- `docs/ARCHITECTURE.md` — architecture and data flow.
-- `docs/KNOW_HOW.md` — CommandCode API notes and operational lessons.
-- `docs/SECURITY.md` — security model and deployment guardrails.
-- `docs/PRD.md` — product requirements.
-- `docs/IMPLEMENTATION_PLAN.md` — implementation plan.
-- `docs/PROCESS_LOG.md` — work log.
+Do not commit `.env`, CLI auth files, credential JSON, keys, billing details, private topology, or dashboard exports. This is not a public proxy or internet control plane. See [the security guide](docs/SECURITY.md).
 
 ## License
 
-MIT. CommandCode itself is separate software and may have different terms.
+CommandCode Bridge uses the [MIT License](LICENSE). CommandCode is separate software with its own terms; this repository does not include or repackage its proprietary CLI bundle.
+
+<p align="center"><em>CommandCode Bridge · a trusted boundary for OpenAI-compatible CommandCode access.</em></p>

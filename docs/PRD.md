@@ -54,7 +54,6 @@ Expose the local CommandCode account's DeepSeek V4 Pro route as a clean, OpenAI-
 
 ## Source Evidence
 
-- Local CommandCode 0.40.3 bundle calls `https://api.commandcode.ai/alpha/generate` and billing/usage endpoints under `/alpha/billing/*` and `/alpha/usage/summary`.
-- Direct Node fetch to `/alpha/whoami` and `/alpha/generate` succeeded.
+- Authenticated CommandCode 1.14.0 compatibility probes succeeded against `https://api.commandcode.ai/alpha/generate`, `/alpha/whoami`, billing endpoints under `/alpha/billing/*`, and `/alpha/usage/summary`.
 - `params.stream=false` is rejected by CommandCode; bridge must always call upstream streaming.
 - Community `pi-commandcode-provider` independently uses the same API path.

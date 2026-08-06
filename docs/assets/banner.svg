@@ -1,0 +1,35 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1200"
+  height="300"
+  viewBox="0 0 1200 300"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">CommandCode Bridge</title>
+  <desc id="desc">OpenAI-compatible CommandCode gateway with a verified 52-model catalog</desc>
+  <rect width="1200" height="300" fill="#28231f" />
+  <rect
+    x="14"
+    y="14"
+    width="1172"
+    height="272"
+    fill="none"
+    stroke="#b57920"
+    stroke-opacity="0.45"
+  />
+  <g font-family="Georgia, 'Times New Roman', serif" text-anchor="middle">
+    <line x1="360" y1="76" x2="455" y2="76" stroke="#b57920" stroke-width="2" />
+    <text x="600" y="83" fill="#b57920" font-size="20" letter-spacing="5.5">
+      OPENAI-COMPATIBLE GATEWAY
+    </text>
+    <line x1="745" y1="76" x2="840" y2="76" stroke="#b57920" stroke-width="2" />
+    <text x="600" y="165" fill="#fffdf8" font-size="62" font-style="italic">
+      CommandCode Bridge
+    </text>
+    <text x="600" y="214" fill="#a89f93" font-size="20">
+      CommandCode / bridge 1.14.0 · 52-model catalog
+    </text>
+    <line x1="548" y1="248" x2="652" y2="248" stroke="#9f4d2e" stroke-width="4" />
+  </g>
+</svg>

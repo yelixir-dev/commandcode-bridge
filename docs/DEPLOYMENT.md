@@ -159,7 +159,7 @@ For Raspberry Pi or Linux hosts that should run the bridge as the current user, 
 
 The installer asks whether to bind to `127.0.0.1` or `0.0.0.0` and which port to use. The safe default is `127.0.0.1:9992`.
 
-Prerequisites: Linux with user systemd, Node.js >= 20, npm, and either CommandCode CLI auth at `~/.commandcode/auth.json` or a `COMMANDCODE_API_KEY`. If this is a headless host that must start before login, enable linger once with `sudo loginctl enable-linger "$USER"`. Use `0.0.0.0` only behind LAN/Tailscale/VPN/firewall controls and keep a strong `BRIDGE_API_KEY`.
+Prerequisites: Linux with user systemd, Node.js >= 22 for current CommandCode CLI installation, npm, and either CommandCode CLI auth at `~/.commandcode/auth.json` or a `COMMANDCODE_API_KEY`. If this is a headless host that must start before login, enable linger once with `sudo loginctl enable-linger "$USER"`. Use `0.0.0.0` only behind LAN/Tailscale/VPN/firewall controls and keep a strong `BRIDGE_API_KEY`.
 
 Non-interactive install:
 
@@ -399,7 +399,7 @@ npm run smoke
 | `COMMANDCODE_DEFAULT_MODEL`        | `deepseek/deepseek-v4-pro`   | Upstream model used by `model: "default"`.                                                                               |
 | `COMMANDCODE_ALLOWED_MODELS`       | Pro + Flash                  | Comma-separated allowlist. Requests outside this list are rejected unless unknown models are allowed.                    |
 | `COMMANDCODE_ALLOW_UNKNOWN_MODELS` | `false`                      | Allows arbitrary model IDs to pass through. Not recommended for production.                                              |
-| `COMMANDCODE_CLI_VERSION`          | `1.3.1`                      | Version header sent upstream to match the tested CommandCode CLI behavior.                                               |
+| `COMMANDCODE_CLI_VERSION`          | `1.14.0`                     | Version header sent upstream to match the tested CommandCode CLI behavior.                                               |
 | `COMMANDCODE_TIMEOUT_MS`           | `300000`                     | Upstream generation timeout.                                                                                             |
 
 Credential file shape:

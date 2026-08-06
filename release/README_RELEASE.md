@@ -36,7 +36,7 @@ For Raspberry Pi or Linux hosts that should run the bridge as the current user:
 
 The installer asks whether to bind to `127.0.0.1` or `0.0.0.0` and which port to use. Defaults are safe: `127.0.0.1:9992`.
 
-Prerequisites: Linux with user systemd, Node.js >= 20, npm, and either CommandCode CLI auth at `~/.commandcode/auth.json` or a `COMMANDCODE_API_KEY`. On headless hosts that should start before login, enable linger once with `sudo loginctl enable-linger "$USER"`. Use `0.0.0.0` only behind LAN/Tailscale/VPN/firewall controls and keep a strong `BRIDGE_API_KEY`.
+Prerequisites: Linux with user systemd, Node.js >= 22 for current CommandCode CLI installation, npm, and either CommandCode CLI auth at `~/.commandcode/auth.json` or a `COMMANDCODE_API_KEY`. On headless hosts that should start before login, enable linger once with `sudo loginctl enable-linger "$USER"`. Use `0.0.0.0` only behind LAN/Tailscale/VPN/firewall controls and keep a strong `BRIDGE_API_KEY`.
 
 Non-interactive example:
 

@@ -54,7 +54,7 @@ Smoke-test modes:
 
 ## Billing and Multi-Key Routing
 
-CommandCode CLI 0.40.3 `/usage` uses these account endpoints with the same bearer token:
+The authenticated CommandCode 1.14.0 compatibility smoke validates these account endpoints with the same bearer token:
 
 - `GET /alpha/whoami` to discover the organization id.
 - `GET /alpha/billing/credits?orgId=...`
