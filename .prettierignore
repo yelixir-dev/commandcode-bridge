@@ -4,4 +4,6 @@ coverage/
 .vitest-tmp/
 release/
 .internal/
+.commandcode/
+.omo/
 *.tgz

@@ -6,9 +6,10 @@ import {
   CommandCodeCredentialRouter,
   type CommandCodeCredentialState,
 } from "../src/credential-router.js";
-import type { CommandCodeCredential } from "../src/types.js";
+import type { CommandCodeCredential, CommandCodeRoutingPolicy } from "../src/types.js";
 
 const now = Date.parse("2026-05-12T00:00:00.000Z");
+const DAY_MS = 86_400_000;
 
 function credential(id: string): CommandCodeCredential {
   return { id, apiKey: `${id}-secret`, weight: 1 };
@@ -77,6 +78,160 @@ describe("CommandCode credential routing", () => {
 
     expect(selected.filter((id) => id === "urgent")).toHaveLength(8);
     expect(selected.filter((id) => id === "slow")).toHaveLength(2);
+  });
+
+  it.each<CommandCodeRoutingPolicy>([
+    "drain_first",
+    "round_robin",
+    "balance_priority",
+    "daily_burn_priority",
+    "depletion_aware",
+  ])("prioritizes the universal urgent-expiry pool under %s", async (policy) => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [{ ...credential("non-urgent"), weight: 100 }, credential("urgent")],
+      policy,
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) =>
+        selected.id === "urgent"
+          ? state("urgent", 1, 1).billing!
+          : state("non-urgent", 100, 2).billing!,
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "urgent",
+    });
+  });
+
+  it.each<{
+    policy: CommandCodeRoutingPolicy;
+    expected: string;
+  }>([
+    { policy: "drain_first", expected: "first" },
+    { policy: "round_robin", expected: "weighted" },
+    { policy: "balance_priority", expected: "balanced" },
+    { policy: "daily_burn_priority", expected: "weighted" },
+    { policy: "depletion_aware", expected: "weighted" },
+  ])(
+    "preserves $policy selection inside multiple urgent credentials",
+    async ({ policy, expected }) => {
+      const router = new CommandCodeCredentialRouter({
+        credentials: [
+          credential("first"),
+          { ...credential("weighted"), weight: 10 },
+          credential("balanced"),
+        ],
+        policy,
+        billingRefreshMs: 60_000,
+        cooldownMs: 60_000,
+        validateBillingBeforeSelect: true,
+        now: () => now,
+        billingProvider: async (selected) => {
+          if (selected.id === "first") return state("first", 1, 1).billing!;
+          if (selected.id === "weighted") return state("weighted", 2, 1).billing!;
+          return state("balanced", 10, 1).billing!;
+        },
+      });
+
+      await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+        id: expected,
+      });
+    },
+  );
+
+  it("treats exactly one day as urgent and one day plus one millisecond as non-urgent", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [
+        { ...credential("one-day-plus-1ms"), weight: 100 },
+        credential("exactly-one-day"),
+      ],
+      policy: "round_robin",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) =>
+        selected.id === "exactly-one-day"
+          ? state("exactly-one-day", 1, 1).billing!
+          : {
+              ...state("one-day-plus-1ms", 100, 1).billing!,
+              currentPeriodEnd: new Date(now + DAY_MS + 1).toISOString(),
+            },
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "exactly-one-day",
+    });
+  });
+
+  it("does not treat an exactly expired credential as urgent", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("expired"), credential("non-urgent")],
+      policy: "drain_first",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) =>
+        selected.id === "expired"
+          ? {
+              ...state("expired", 100, 1).billing!,
+              currentPeriodEnd: new Date(now).toISOString(),
+            }
+          : state("non-urgent", 1, 2).billing!,
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "non-urgent",
+    });
+  });
+
+  it("does not treat unknown billing as urgent", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [{ ...credential("unknown"), weight: 100 }, credential("urgent")],
+      policy: "round_robin",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) => {
+        if (selected.id === "unknown") throw new Error("billing unavailable");
+        return state("urgent", 1, 1).billing!;
+      },
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "urgent",
+    });
+  });
+
+  it("does not let excluded or zero-balance urgent credentials block non-urgent routing", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [
+        credential("excluded-urgent"),
+        credential("empty-urgent"),
+        credential("non-urgent"),
+      ],
+      policy: "drain_first",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) => {
+        if (selected.id === "excluded-urgent") return state("excluded-urgent", 10, 1).billing!;
+        if (selected.id === "empty-urgent") return state("empty-urgent", 0, 1).billing!;
+        return state("non-urgent", 1, 2).billing!;
+      },
+    });
+
+    await expect(
+      router.select({
+        model: "deepseek/deepseek-v4-pro",
+        excludeIds: ["excluded-urgent"],
+      }),
+    ).resolves.toMatchObject({ id: "non-urgent" });
   });
 
   it("falls back to round-robin when billing probes fail", async () => {

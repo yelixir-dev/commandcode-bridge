@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 
+import { COMMANDCODE_MODEL_DEFINITIONS } from "./model-catalog.js";
 import type {
   CommandCodeCredential,
   CommandCodeModelConfig,
@@ -237,6 +238,13 @@ export function normalizeModelUpdate(
       }
       const notes = stringValue(model.notes);
       if (notes) normalized.notes = notes;
+      const definition = COMMANDCODE_MODEL_DEFINITIONS.find(
+        (entry) => entry.id === id || entry.aliases?.includes(id),
+      );
+      const contextWindow = definition ? definition.contextWindow : model.contextWindow;
+      if (contextWindow !== undefined && Number.isInteger(contextWindow) && contextWindow > 0) {
+        normalized.contextWindow = contextWindow;
+      }
       return normalized;
     })
     .filter((model): model is CommandCodeModelConfig => Boolean(model));

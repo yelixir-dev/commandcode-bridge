@@ -298,14 +298,14 @@ validate_env_value COMMANDCODE_API_KEY "$COMMANDCODE_API_KEY"
 [ "${EUID:-$(id -u)}" -ne 0 ] || fail "do not run this rootless installer with sudo/root"
 
 require_command node
+NODE_MAJOR="$(node -p "Number(process.versions.node.split('.')[0])")"
+if [ "$NODE_MAJOR" -lt 22 ]; then
+  fail "Node.js >= 22 is required to install or use Command Code CLI 1.14.0; found $(node --version)"
+fi
+
 require_command npm
 require_command systemctl
 ensure_commandcode_auth
-
-NODE_MAJOR="$(node -p "Number(process.versions.node.split('.')[0])")"
-if [ "$NODE_MAJOR" -lt 20 ]; then
-  fail "Node.js >= 20 is required; found $(node --version)"
-fi
 
 if [ ! -f "package.json" ] || ! grep -q '"name": "commandcode-bridge"' package.json; then
   fail "run this script from the commandcode-bridge source checkout or package root"
@@ -382,7 +382,7 @@ fi
   write_env_line COMMANDCODE_DEFAULT_MODEL deepseek/deepseek-v4-pro
   write_env_line COMMANDCODE_ALLOWED_MODELS "$DEFAULT_ALLOWED_MODELS"
   write_env_line COMMANDCODE_ALLOW_UNKNOWN_MODELS false
-  write_env_line COMMANDCODE_CLI_VERSION 1.3.1
+  write_env_line COMMANDCODE_CLI_VERSION 1.14.0
   write_env_line COMMANDCODE_TIMEOUT_MS 300000
   write_env_line COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY error_on_length
   write_env_line COMMANDCODE_BALANCE_ALERT_ENABLED false

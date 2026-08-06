@@ -230,6 +230,70 @@ describe("Fastify OpenAI-compatible server", () => {
     await app.close();
   });
 
+  it("publishes context metadata for known models and omits it for unknown capacities", async () => {
+    const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
+    const response = await app.inject({ method: "GET", url: "/v1/models" });
+    const rows = response.json().data as Array<Record<string, unknown> & { id: string }>;
+    const byId = new Map(rows.map((model) => [model.id, model]));
+    const expectedKnownIds = [
+      "deepseek/deepseek-v4-pro",
+      "deepseek-v4-pro",
+      "commandcode/deepseek-v4-pro",
+      "default",
+      "commandcode/default",
+    ];
+
+    expect(response.statusCode).toBe(200);
+    for (const id of expectedKnownIds) {
+      expect(byId.get(id)).toMatchObject({
+        context_window: 1_000_000,
+        context_length: 1_000_000,
+        max_context_length: 1_000_000,
+      });
+    }
+    const unknownCapacity = byId.get("zai-org/GLM-5.1");
+    expect(unknownCapacity).not.toHaveProperty("context_window");
+    expect(unknownCapacity).not.toHaveProperty("context_length");
+    expect(unknownCapacity).not.toHaveProperty("max_context_length");
+    for (const row of rows) expect(row).not.toHaveProperty("max_tokens");
+    await app.close();
+  });
+
+  it("retrieves the same model objects for canonical, alias, and slash ids", async () => {
+    const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
+    const listResponse = await app.inject({ method: "GET", url: "/v1/models" });
+    const rows = listResponse.json().data as Array<Record<string, unknown> & { id: string }>;
+    const byId = new Map(rows.map((model) => [model.id, model]));
+
+    for (const id of [
+      "deepseek/deepseek-v4-pro",
+      "deepseek-v4-pro",
+      "commandcode/deepseek-v4-pro",
+      "default",
+      "commandcode/default",
+    ]) {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/models/${encodeURIComponent(id)}`,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(byId.get(id));
+    }
+
+    await app.close();
+  });
+
+  it("returns an OpenAI model_not_found error when retrieving an unknown model", async () => {
+    const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
+    const response = await app.inject({ method: "GET", url: "/v1/models/not-a-model" });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      error: { type: "invalid_request_error", code: "model_not_found" },
+    });
+    await app.close();
+  });
+
   it("requires bridge API key for /v1/models when configured", async () => {
     const app = await createTestApp({
       upstream: new FakeCommandCodeClient(),

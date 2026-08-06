@@ -114,6 +114,13 @@ function daysUntil(value: string | null | undefined, now: number): number | unde
   return Math.max((end - now) / DAY_MS, 0);
 }
 
+function hasUrgentExpiry(state: CommandCodeCredentialState, now: number): boolean {
+  const end = Date.parse(state.billing?.currentPeriodEnd ?? "");
+  if (!Number.isFinite(end)) return false;
+  const remaining = end - now;
+  return remaining > 0 && remaining <= DAY_MS;
+}
+
 function scoringDaysUntil(value: string | null | undefined, now: number): number | undefined {
   const remaining = daysUntil(value, now);
   return remaining === undefined ? undefined : Math.max(remaining, MIN_DAYS_LEFT);
@@ -391,6 +398,9 @@ export class CommandCodeCredentialRouter {
         `No available CommandCode credentials for model ${options.model}`,
       );
     }
+
+    const urgentCandidates = candidates.filter((state) => hasUrgentExpiry(state, now));
+    if (urgentCandidates.length > 0) candidates = urgentCandidates;
 
     const selected = this.selectForPolicy(this.policy, candidates, now);
     selected.inFlight += 1;

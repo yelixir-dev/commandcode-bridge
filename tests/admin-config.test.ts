@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { loadBridgeConfig } from "../src/config.js";
-import { resolveConfigFilePath, writeDashboardConfigFile } from "../src/dashboard-config.js";
+import {
+  normalizeModelUpdate,
+  resolveConfigFilePath,
+  writeDashboardConfigFile,
+} from "../src/dashboard-config.js";
 import { createApp } from "../src/server.js";
 import type {
   CommandCodeEvent,
@@ -84,6 +88,21 @@ describe("JSON dashboard configuration", () => {
     expect(config.commandCodeRoutingPolicy).toBe("round_robin");
   });
 
+  it("preserves context windows when normalizing dashboard model updates", () => {
+    const normalized = normalizeModelUpdate([
+      { id: "deepseek/deepseek-v4-pro", enabled: true, contextWindow: 1_000_000 },
+      { id: "zai-org/GLM-5.1", enabled: false },
+    ] as Array<{ id: string; enabled: boolean; contextWindow?: number }>) as Array<{
+      id: string;
+      contextWindow?: number;
+    }>;
+
+    expect(normalized).toEqual([
+      { id: "deepseek/deepseek-v4-pro", enabled: true, contextWindow: 1_000_000 },
+      { id: "zai-org/GLM-5.1", enabled: false },
+    ]);
+  });
+
   it("loads routing defaults and enabled model toggles from credentials JSON", () => {
     const file = tempConfigFile({
       server: { host: "0.0.0.0", port: 9992 },
@@ -116,9 +135,7 @@ describe("JSON dashboard configuration", () => {
       "deepseek/deepseek-v4-flash",
       "deepseek/deepseek-v4-pro",
     ]);
-    expect(config.modelCatalog!.find((model) => model.id === "openai/gpt-5.5")?.enabled).toBe(
-      false,
-    );
+    expect(config.modelCatalog!.find((model) => model.id === "gpt-5.5")?.enabled).toBe(false);
   });
 
   it("exposes redacted dashboard config and accepts credential/model edits", async () => {

@@ -9,11 +9,11 @@ describe("dashboard UI", () => {
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
       credentials: [],
       models: [],
-      bridge: { online: true, endpoint: "0.0.0.0:9992", version: "1.3.1" },
+      bridge: { online: true, endpoint: "0.0.0.0:9992", version: "1.14.0" },
     });
 
     expect(html).toContain('id="bridgeVersion"');
-    expect(html).toContain("v1.3.1");
+    expect(html).toContain("v1.14.0");
     expect(html).not.toContain('id="endpoint"');
   });
 
@@ -159,6 +159,37 @@ describe("dashboard UI", () => {
     expect(html).toContain("Pending Client API key saved");
   });
 
+  it("keeps the JSON save action legible against the dark footer", () => {
+    const html = dashboardHtml();
+
+    expect
+      .soft(html)
+      .toContain(
+        ".footerbar #save{background:var(--paper);color:var(--ink);border-color:var(--paper)}",
+      );
+    expect
+      .soft(html)
+      .toContain(
+        ".footerbar #save:hover{background:var(--gold);color:var(--ink);border-color:var(--gold)}",
+      );
+  });
+
+  it("keeps client API key setup visible for loopback binding", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+    });
+    const syncBridgeKey = html.slice(
+      html.indexOf("function syncBridgeKey"),
+      html.indexOf("function setDirty"),
+    );
+
+    expect.soft(html).toContain('id="bridgeKeyWrap"');
+    expect.soft(syncBridgeKey).not.toContain("wrap.style.display");
+  });
+
   it("builds save payloads from current relative-page DOM inputs instead of stale cfg state", () => {
     const html = dashboardHtml({
       server: { host: "0.0.0.0", port: 9992 },
@@ -233,6 +264,72 @@ describe("dashboard UI", () => {
     expect(html).toContain("🇨🇳");
     expect(html).toContain("filter:grayscale(1)");
     expect(html).toContain(".brand h1{font-size:16px");
+  });
+
+  it("groups models by provider in closed native disclosure elements", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [
+        { id: "qwen/off", provider: "Qwen", enabled: false },
+        { id: "deepseek/on", provider: "DeepSeek", enabled: true },
+        { id: "qwen/on", provider: "Qwen", enabled: true },
+        { id: "openai/on", provider: "OpenAI", enabled: true },
+      ],
+    });
+    const modelRender = html.slice(
+      html.indexOf("$('models').innerHTML="),
+      html.indexOf("function randomBridgeKey"),
+    );
+
+    expect.soft(modelRender).toMatch(/(?:Map|groupBy|reduce)[\s\S]*provider/);
+    expect.soft(modelRender).toContain("<details");
+    expect.soft(modelRender).toContain("<summary");
+    expect.soft(modelRender).not.toMatch(/<details[^>]*\sopen(?:\s|=|>)/);
+    expect.soft(modelRender).toContain("data-provider");
+    expect.soft(modelRender).toContain("data-enabled");
+    expect.soft(modelRender).toContain("data-total");
+    expect.soft(modelRender).toMatch(/summary[\s\S]*provider[\s\S]*enabled[\s\S]*\/[\s\S]*total/);
+    expect.soft(modelRender).toMatch(/provider[\s\S]*\.sort\(/);
+    expect.soft(html).toContain(".provider-fold:not([open]) .provider-models{display:none}");
+  });
+
+  it("updates a provider enabled count without rebuilding its open details element", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [
+        { id: "qwen/off", provider: "Qwen", enabled: false },
+        { id: "qwen/on", provider: "Qwen", enabled: true },
+      ],
+    });
+    const modelRender = html.slice(
+      html.indexOf("$('models').innerHTML="),
+      html.indexOf("function randomBridgeKey"),
+    );
+    const checkboxHandler = modelRender.slice(
+      modelRender.indexOf("querySelectorAll('[data-mid]')"),
+    );
+
+    expect.soft(checkboxHandler).toContain("closest('details')");
+    expect.soft(checkboxHandler).toContain("data-enabled");
+    expect.soft(checkboxHandler).toContain("textContent");
+    expect.soft(checkboxHandler).not.toContain("render()");
+    expect.soft(checkboxHandler).not.toContain("innerHTML");
+  });
+
+  it("exposes the emil palette and Georgia typography as dashboard design tokens", () => {
+    const html = dashboardHtml();
+    const rootRules = html.slice(html.indexOf(":root"), html.indexOf("*{box-sizing"));
+
+    for (const color of ["#28231f", "#f1ede5", "#fffdf8", "#9f4d2e", "#1f6f78", "#b57920"]) {
+      expect.soft(rootRules.toLowerCase()).toContain(color);
+    }
+    const georgiaToken = rootRules.match(/(--[\w-]+):\s*Georgia(?:,|;)/);
+    expect.soft(georgiaToken).not.toBeNull();
+    if (georgiaToken) expect.soft(html).toContain(`font-family:var(${georgiaToken[1]})`);
   });
 
   it("contains Korean, English, and Chinese dashboard translations with locale fallback", () => {

@@ -27,6 +27,18 @@ describe("installer scripts", () => {
     expect(script).toContain('case "$HOST" in');
   });
 
+  it("requires Node.js 22 before installing or using CommandCode 1.14.0", () => {
+    const script = readScript("install.sh");
+    const nodeVersionCheck = script.indexOf('NODE_MAJOR="$(node -p');
+    const commandCodeSetup = script.indexOf("\nensure_commandcode_auth\n");
+
+    expect(nodeVersionCheck).toBeGreaterThan(-1);
+    expect(commandCodeSetup).toBeGreaterThan(-1);
+    expect(nodeVersionCheck).toBeLessThan(commandCodeSetup);
+    expect(script).toContain('if [ "$NODE_MAJOR" -lt 22 ]; then');
+    expect(script).toContain("Node.js >= 22 is required");
+  });
+
   it("installs a user systemd service backed by a private env file", () => {
     const script = readScript("install.sh");
 

@@ -13,7 +13,7 @@ import {
   loadBridgeConfig,
   ModelNotAllowedError,
   publicModelList,
-  publicModelOwnedBy,
+  publicModelObject,
   resolveModel,
 } from "./config.js";
 import {
@@ -585,13 +585,24 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
 
   app.get("/v1/models", async () => ({
     object: "list",
-    data: publicModelList(config).map((model) => ({
-      id: model,
-      object: "model",
-      created: 1_778_454_400,
-      owned_by: publicModelOwnedBy(model, config),
-    })),
+    data: publicModelList(config).map((model) => publicModelObject(model, config)),
   }));
+
+  app.get("/v1/models/:model", async (request, reply) => {
+    const { model } = request.params as { model: string };
+    if (!publicModelList(config).includes(model)) {
+      return reply
+        .code(404)
+        .send(
+          openAIError(
+            `The model "${model}" does not exist or is not available`,
+            "invalid_request_error",
+            "model_not_found",
+          ),
+        );
+    }
+    return publicModelObject(model, config);
+  });
 
   app.post("/v1/chat/completions", async (request, reply) => {
     try {

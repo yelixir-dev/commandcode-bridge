@@ -155,6 +155,7 @@ export interface CommandCodeModelConfig {
   provider?: string;
   family?: string;
   aliases?: string[];
+  contextWindow?: number;
   enabled: boolean;
   notes?: string;
 }

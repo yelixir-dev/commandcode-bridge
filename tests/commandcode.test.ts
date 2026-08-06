@@ -23,7 +23,7 @@ const baseConfig: BridgeConfig = {
   host: "127.0.0.1",
   port: 9992,
   apiBase: "https://api.commandcode.ai",
-  cliVersion: "0.40.3",
+  cliVersion: "1.14.0",
   defaultModel: "deepseek/deepseek-v4-pro",
   allowedModels: ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],
   allowUnknownModels: false,
@@ -171,7 +171,7 @@ describe("CommandCode stream parsing", () => {
     expect(error.body).toEqual({ error: { message: "bad" } });
   });
 
-  it("parses CommandCode 1.3.1 raw and SSE event variants", () => {
+  it("parses CommandCode 1.14.0 raw and SSE event variants", () => {
     expect(parseCommandCodeEventLine('{"type":"reasoning-start"}')).toEqual({
       type: "reasoning-start",
     });
@@ -225,7 +225,7 @@ describe("CommandCode stream parsing", () => {
     });
   });
 
-  it("keeps CommandCode 1.3.1 finish usage and abort-only streams intact", async () => {
+  it("keeps CommandCode 1.14.0 finish usage and abort-only streams intact", async () => {
     const finished = await collectEvents(
       parseCommandCodeStream(
         streamFromChunks([
@@ -301,7 +301,7 @@ describe("CommandCode client credential routing", () => {
     ]);
     expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
       "User-Agent": "cli",
-      "x-command-code-version": "0.40.3",
+      "x-command-code-version": "1.14.0",
     });
     expect(snapshot).toMatchObject({
       monthlyCredits: 12,

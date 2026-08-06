@@ -174,7 +174,7 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     host: serverFromFile.host,
     port: serverFromFile.port,
     apiBase: (env.COMMANDCODE_API_BASE?.trim() || "https://api.commandcode.ai").replace(/\/+$/, ""),
-    cliVersion: env.COMMANDCODE_CLI_VERSION?.trim() || "1.3.1",
+    cliVersion: env.COMMANDCODE_CLI_VERSION?.trim() || "1.14.0",
     defaultModel,
     allowedModels,
     allowUnknownModels: parseBoolean(env.COMMANDCODE_ALLOW_UNKNOWN_MODELS, false),
@@ -270,4 +270,36 @@ export function publicModelOwnedBy(model: string, config: BridgeConfig): string 
   const upstreamModel = normalizeModelName(model);
   const catalogEntry = config.modelCatalog?.find((entry) => entry.id === upstreamModel);
   return ownedBySlug(catalogEntry?.provider ?? upstreamModel.split("/")[0]);
+}
+
+export interface PublicModelObject {
+  id: string;
+  object: "model";
+  created: number;
+  owned_by: string;
+  context_window?: number;
+  context_length?: number;
+  max_context_length?: number;
+}
+
+export function publicModelObject(model: string, config: BridgeConfig): PublicModelObject {
+  const upstreamModel =
+    model === "default" || model === "commandcode/default"
+      ? config.defaultModel
+      : normalizeModelName(model);
+  const contextWindow = config.modelCatalog?.find(
+    (entry) => entry.id === upstreamModel,
+  )?.contextWindow;
+  const object: PublicModelObject = {
+    id: model,
+    object: "model",
+    created: 1_778_454_400,
+    owned_by: publicModelOwnedBy(model, config),
+  };
+  if (contextWindow !== undefined) {
+    object.context_window = contextWindow;
+    object.context_length = contextWindow;
+    object.max_context_length = contextWindow;
+  }
+  return object;
 }
