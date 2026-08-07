@@ -29,6 +29,7 @@ import {
   buildProviderChatRequestBody,
   CommandCodeProviderClient,
   CommandCodeProviderSseTransform,
+  probeProviderAccess,
 } from "./provider.js";
 import {
   DEFAULT_ROUTING_CONFIG,
@@ -186,13 +187,20 @@ async function handleProviderChat(options: {
   resolvedModel: ResolvedModel;
   signal: AbortSignal;
   config: BridgeConfig;
-}): Promise<FastifyReply> {
+}): Promise<boolean | null> {
   const { reply, request, providerClient, resolvedModel, signal, config } = options;
   const body = buildProviderChatRequestBody(request, resolvedModel.upstreamModel);
   let response: Response;
   try {
     response = await providerClient.chat(body, signal);
   } catch (error) {
+    if (
+      error instanceof CommandCodeHttpError &&
+      error.status === 403 &&
+      config.upstreamMode === "auto"
+    ) {
+      return null;
+    }
     if (error instanceof CommandCodeHttpError) {
       const payload =
         error.body ??
@@ -204,7 +212,8 @@ async function handleProviderChat(options: {
             upstream_status: error.status,
           },
         } as const);
-      return reply.code(error.status).type("application/json; charset=utf-8").send(payload);
+      reply.code(error.status).type("application/json; charset=utf-8").send(payload);
+      return true;
     }
     throw error;
   }
@@ -215,12 +224,13 @@ async function handleProviderChat(options: {
       includeReasoning: config.includeReasoning,
     });
     const stream = Readable.fromWeb(response.body as WebReadableStream<Uint8Array>).pipe(transform);
-    return reply
+    reply
       .type("text/event-stream; charset=utf-8")
       .header("cache-control", "no-cache, no-transform")
       .header("connection", "keep-alive")
       .header("x-accel-buffering", "no")
       .send(stream);
+    return true;
   }
 
   if (!response.ok) {
@@ -231,7 +241,8 @@ async function handleProviderChat(options: {
     } catch {
       // keep the raw upstream body when it is not JSON
     }
-    return reply.code(response.status).type("application/json; charset=utf-8").send(payload);
+    reply.code(response.status).type("application/json; charset=utf-8").send(payload);
+    return true;
   }
 
   const completion = (await response.json()) as Record<string, unknown>;
@@ -249,7 +260,7 @@ async function handleProviderChat(options: {
     content.length === 0 &&
     toolCalls.length === 0
   ) {
-    return reply.code(502).send({
+    reply.code(502).send({
       error: {
         message:
           "CommandCode upstream consumed the response budget without visible text or tool calls",
@@ -258,8 +269,10 @@ async function handleProviderChat(options: {
         upstream_status: 502,
       },
     });
+    return true;
   }
-  return reply.send(completion);
+  reply.send(completion);
+  return true;
 }
 
 function isAdminRequest(request: FastifyRequest): boolean {
@@ -388,6 +401,7 @@ function dashboardConfigResponse(
   config: BridgeConfig,
   dirty: boolean,
   diagnostics: CommandCodeCredentialDiagnostic[] = [],
+  providerAccessById: ReadonlyMap<string, boolean> = new Map(),
 ) {
   const diagnosticsById = new Map(diagnostics.map((diagnostic) => [diagnostic.id, diagnostic]));
   const routing = {
@@ -418,6 +432,7 @@ function dashboardConfigResponse(
     credentials: redactedCredentials(config.commandCodeCredentials).map((credential) => ({
       ...credential,
       metrics: diagnosticsById.get(credential.id),
+      providerApiAccess: providerAccessById.get(credential.id),
     })),
     bridge: {
       online: true,
@@ -487,8 +502,36 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     bodyLimit: baseConfig.requestBodyLimitBytes,
   });
   let config = baseConfig;
-  if (!eventPipelineAll && config.upstreamMode === "provider") {
-    config = await refreshProviderModelCatalog(config, app.log);
+  let providerAccessById = new Map<string, boolean>();
+  let providerAccessAvailable = false;
+  if (!eventPipelineAll) {
+    if (config.upstreamMode === "provider") {
+      providerAccessById = new Map(
+        config.commandCodeCredentials.map((credential) => [credential.id, true]),
+      );
+      providerAccessAvailable = true;
+      config = await refreshProviderModelCatalog(config, app.log);
+    } else if (config.upstreamMode === "alpha") {
+      providerAccessById = new Map(
+        config.commandCodeCredentials.map((credential) => [credential.id, false]),
+      );
+    } else if (config.upstreamMode === "auto") {
+      const probes = await Promise.all(
+        config.commandCodeCredentials.map(
+          async (credential) =>
+            [credential.id, await probeProviderAccess(config, { credential })] as const,
+        ),
+      );
+      providerAccessById = new Map(probes);
+      providerAccessAvailable = [...providerAccessById.values()].some(Boolean);
+      if (providerAccessAvailable) {
+        config = await refreshProviderModelCatalog(config, app.log);
+      } else {
+        app.log.info(
+          "CommandCode Provider API probe failed or this plan lacks API access (Go/GOAT/Pro keep the /alpha tunnel); using /alpha/generate",
+        );
+      }
+    }
   }
   const upstream = injectedUpstream ?? new CommandCodeClient(config);
   const providerClient = new CommandCodeProviderClient(config);
@@ -588,7 +631,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     service: "commandcode-bridge",
     version: BRIDGE_VERSION,
     upstream:
-      config.upstreamMode === "provider"
+      config.upstreamMode === "provider" ||
+      (config.upstreamMode === "auto" && providerAccessAvailable)
         ? "commandcode-provider-api"
         : "commandcode-alpha-generate",
     endpoint: `${config.host}:${config.port}`,
@@ -602,6 +646,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       commandcode_routing_policy: config.commandCodeRoutingPolicy,
       commandcode_max_in_flight_per_credential: config.commandCodeMaxInFlightPerCredential ?? 4,
       commandcode_max_total_in_flight: config.commandCodeMaxTotalInFlight,
+      upstream_mode: config.upstreamMode,
+      provider_api_access: providerAccessAvailable,
     },
   }));
 
@@ -619,7 +665,11 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     return reply
       .type("text/html; charset=utf-8")
       .header("cache-control", "no-store")
-      .send(dashboardHtml(dashboardConfigResponse(config, configDirty, diagnostics)));
+      .send(
+        dashboardHtml(
+          dashboardConfigResponse(config, configDirty, diagnostics, providerAccessById),
+        ),
+      );
   });
 
   let configDirty = false;
@@ -628,7 +678,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     const diagnostics = await readCredentialDiagnostics(false).catch(() => []);
     return reply
       .header("cache-control", "no-store")
-      .send(dashboardConfigResponse(config, configDirty, diagnostics));
+      .send(dashboardConfigResponse(config, configDirty, diagnostics, providerAccessById));
   });
 
   app.put("/admin/config", async (request, reply) => {
@@ -669,7 +719,12 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     const savedConfig = loadBridgeConfig({
       env: { ...process.env, COMMANDCODE_CREDENTIALS_FILE: config.configFilePath },
     });
-    return dashboardConfigResponse({ ...savedConfig, bridgeApiKey: config.bridgeApiKey }, true);
+    return dashboardConfigResponse(
+      { ...savedConfig, bridgeApiKey: config.bridgeApiKey },
+      true,
+      [],
+      providerAccessById,
+    );
   });
 
   app.post("/admin/restart", async () => {
@@ -742,8 +797,9 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       const resolvedModel = resolveModel(openAIRequest.model, config);
       const useProviderChat =
         !eventPipelineAll &&
-        config.upstreamMode === "provider" &&
-        !isClaudeModelId(resolvedModel.upstreamModel);
+        !isClaudeModelId(resolvedModel.upstreamModel) &&
+        (config.upstreamMode === "provider" ||
+          (config.upstreamMode === "auto" && providerAccessAvailable));
       if (!useProviderChat && !isSupportedToolChoice(openAIRequest.tool_choice)) {
         return reply
           .code(400)
@@ -764,7 +820,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       });
 
       if (useProviderChat) {
-        return await handleProviderChat({
+        const handled = await handleProviderChat({
           reply,
           request: openAIRequest,
           providerClient,
@@ -772,6 +828,11 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
           signal: abortController.signal,
           config,
         });
+        if (handled) return reply;
+        providerAccessById = new Map(
+          config.commandCodeCredentials.map((credential) => [credential.id, false]),
+        );
+        providerAccessAvailable = false;
       }
 
       const commandCodeBody = buildCommandCodeGenerateBody({

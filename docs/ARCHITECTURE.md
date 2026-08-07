@@ -68,7 +68,9 @@ DeepSeek V4 Pro / Flash etc.
 
 ## Upstream Compatibility
 
-Provider mode (default) calls the official `POST /provider/v1/chat/completions` with a native OpenAI body and streams the provider's OpenAI SSE through with the public model id; `stream: false` requests are answered with a single JSON completion. Claude model ids are served through `POST /alpha/generate` because the Provider API exposes Claude only via the Anthropic `/messages` format. Legacy `alpha` mode keeps the old tunnel: `/alpha/generate` requires `params.stream: true`, so the bridge always calls upstream streaming there, even for OpenAI non-streaming clients.
+`COMMANDCODE_UPSTREAM_MODE` selects the upstream per plan. The default `auto` probes `POST /provider/v1/chat/completions` at startup with one minimal `deepseek/deepseek-v4-flash` request (`max_tokens: 1`): a 2xx response proves the key is accepted and the plan has API access (Provider plan at $15/mo or higher — Max, Team Pro, and Enterprise tiers included), while `403 upgrade_required` means the account is on a Go/GOAT/Pro subscription plan without API access. A valid body is required because body validation runs before the plan check — an empty body returns 400 even without API access. `provider` forces the official API; `alpha` forces the legacy tunnel for every model. In `auto` mode a mid-run `403 upgrade_required` on a chat request falls back to the `/alpha/generate` tunnel for that request and marks the Provider API unavailable.
+
+Provider mode calls the official `POST /provider/v1/chat/completions` with a native OpenAI body and streams the provider's OpenAI SSE through with the public model id; `stream: false` requests are answered with a single JSON completion. Claude model ids are served through `POST /alpha/generate` in every mode because the Provider API exposes Claude only via the Anthropic `/messages` format. Legacy `alpha` mode keeps the old tunnel: `/alpha/generate` requires `params.stream: true`, so the bridge always calls upstream streaming there, even for OpenAI non-streaming clients.
 
 The Provider API emits token usage in the final chunk with no opt-in required; `x-cmd-zdr: 1` is sent when `COMMANDCODE_ZDR` is enabled. Billing and usage snapshots (`/alpha/whoami`, `/alpha/billing/*`, `/alpha/usage/summary`) are shared by both modes and remain the routing and balance-alert data source.
 
@@ -77,6 +79,7 @@ The Provider API emits token usage in the final chunk with no opt-in required; `
 - Invalid OpenAI request → HTTP 400 OpenAI-style error.
 - Disallowed model → HTTP 400 OpenAI-style error.
 - Missing upstream API key → HTTP 500 configuration error.
+- Transient upstream failures (429, 5xx, timeouts, empty bodies) are retried with exponential backoff up to `COMMANDCODE_RETRY_MAX_ATTEMPTS` (default 5, base `COMMANDCODE_RETRY_BACKOFF_MS` doubled per attempt, capped at 2s). A credential that fails with 401/402/403 is excluded for the rest of the request so other keys are preferred; retries stop once any visible output has been emitted.
 - Provider API HTTP failure → upstream status and OpenAI-style error body forwarded (for example `403 upgrade_required` or `429 rate_limit_error`); credential cooldown/disable rules are applied.
 - `/alpha` HTTP failure → HTTP 502 with upstream status and sanitized body.
 - `/alpha` stream `error` event → fail over first if no visible output has been emitted and another credential is available; otherwise map to HTTP 502 or SSE error frame plus `[DONE]`.

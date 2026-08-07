@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0.a-b57920?style=flat-square" alt="Version 1.14.0.a"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0.c-b57920?style=flat-square" alt="Version 1.14.0.c"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-52-1f6f78?style=flat-square" alt="52 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -20,13 +20,13 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge 是面向 CommandCode 账号的可信环境 HTTP 网关。它提供标准 OpenAI-compatible 模型与聊天端点，在符合条件的上游凭据之间路由请求，并发布与 CommandCode **1.14.0** 对齐的准确 **52-model** catalog。Bridge 版本始终跟随当前 CommandCode CLI 版本并在其后附加字母后缀（例如 **1.14.0.a**）；后缀表示仅限 Bridge 的发布。
+CommandCode Bridge 是面向 CommandCode 账号的可信环境 HTTP 网关。它提供标准 OpenAI-compatible 模型与聊天端点，在符合条件的上游凭据之间路由请求，并发布与 CommandCode **1.14.0** 对齐的准确 **52-model** catalog。Bridge 版本始终跟随当前 CommandCode CLI 版本并在其后附加字母后缀（例如 **1.14.0.c**）；后缀表示仅限 Bridge 的发布。
 
 [功能](#功能) · [安装](#安装) · [用法](#用法) · [工作原理](#工作原理) · [仓库布局](#仓库布局) · [当前限制](#当前限制) · [许可证](#许可证)
 
 ## 功能
 
-- **默认使用官方 Provider API。** 非 Claude chat 调用 CommandCode 官方 `POST /provider/v1/chat/completions`，使用 native OpenAI body——无 CLI header、无每次请求的 `cmd` subprocess、无 event 转换。由于 Provider API 只以 Anthropic format 提供 Claude，Claude 模型继续走 `/alpha/generate` 隧道。
+- **按套餐选择 upstream（默认 `auto`）。** 启动时 bridge 会探测官方 Provider API。**Provider 套餐（$15/月）或更高**的账号直接调用 `POST /provider/v1/chat/completions`，使用 native OpenAI body——无 CLI header、无每次请求的 `cmd` subprocess、无 event 转换。Go（$1）、GOAT（$10）、Pro（$20）订阅套餐会收到 `403 upgrade_required`，因此 bridge 保留 `/alpha/generate` 隧道，并在运行中套餐变化时自动回退。由于 Provider API 只以 Anthropic format 提供 Claude，Claude 模型始终走隧道。
 
 - **OpenAI-compatible API。** 为所有 OpenAI client 提供模型列表/查询与 streaming/non-streaming chat，model alias、allowlist 和 per-key routing 对调用方透明。
 
@@ -34,7 +34,7 @@ CommandCode Bridge 是面向 CommandCode 账号的可信环境 HTTP 网关。它
 
 - **通用到期优先级。** 在所有 policy 下，已知 **1 天或更短**到期的 eligible credential 会先于长期凭据选择。
 
-- **实时模型 catalog。** provider mode 启动时从公开 `GET /provider/v1/models` 刷新 catalog，新模型与 context window 无需发布静态 catalog 即可出现。
+- **实时模型 catalog。** 在 Provider API 可用时，启动时从公开 `GET /provider/v1/models` 刷新 catalog，新模型与 context window 无需发布静态 catalog 即可出现。
 
 - **Context metadata。** catalog 有公开 context 时返回 `context_window`、`context_length`、`max_context_length`（静态 catalog 留空的 5 个 context 由 live 值填充）。
 
@@ -58,7 +58,7 @@ installer 面向 Linux user systemd；由于 CommandCode CLI 1.14.0，需要 Nod
 
 ### 手动 source 运行
 
-bridge runtime 支持 Node.js 20+。默认 provider mode 只需要 Studio 签发的 API key——无需安装 CLI，也无需 `cmd login`。通过 `COMMAND_CODE_API_KEY`、`COMMANDCODE_API_KEY` 或 `CMD_API_KEY`（或已运行 CLI 时的 `~/.commandcode/auth.json`）提供 key。legacy `alpha` mode 与 `/alpha` billing 复用同一个 key。官方安装：<https://commandcode.ai/install>。
+bridge runtime 支持 Node.js 20+。默认 `auto` mode 会在启动时探测套餐：Provider 套餐账号直接使用官方 API，低档套餐则保留 `/alpha` 隧道——无论哪种都不需要安装 CLI 或 `cmd login`，只需 Studio 签发的 API key。通过 `COMMAND_CODE_API_KEY`、`COMMANDCODE_API_KEY` 或 `CMD_API_KEY`（或已运行 CLI 时的 `~/.commandcode/auth.json`）提供 key。legacy `alpha` mode 与 `/alpha` billing 复用同一个 key。官方安装：<https://commandcode.ai/install>。
 
 ```bash
 git clone <your-commandcode-bridge-repository-url> commandcode-bridge
@@ -125,7 +125,7 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Model metadata 与准确 catalog
 
-每个 model object 包含 `id`、`object`、`created` 和 provider-derived `owned_by`。已知 context 同时写入 `context_window`、`context_length`、`max_context_length`。provider mode 启动时会从 live `GET /provider/v1/models` 刷新 catalog，填充静态 catalog 留空的 5 个 context（当前均为 `200,000`），并纳入新添加的模型。下表是随附的 1.14.0 baseline；“默认启用”表示 built-in enabled state。
+每个 model object 包含 `id`、`object`、`created` 和 provider-derived `owned_by`。已知 context 同时写入 `context_window`、`context_length`、`max_context_length`。在 Provider API 可用时，启动时从 live `GET /provider/v1/models` 刷新 catalog，填充静态 catalog 留空的 5 个 context（当前均为 `200,000`），并纳入新添加的模型。下表是随附的 1.14.0 baseline；“默认启用”表示 built-in enabled state。
 
 | Provider          | Canonical model ID                    |        Context | 默认启用 |
 | ----------------- | ------------------------------------- | -------------: | :------: |
@@ -194,13 +194,13 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 浏览器已保存 key 的现有用户可继续使用。新浏览器在保存或重启前，需要在 **当前管理员 API Key** 中输入一次现有 key。无 key runtime 仅在真实 loopback 连接且 Host 也是 loopback 时允许 bootstrap。
 
-Credential 优先级为 `COMMANDCODE_CREDENTIALS_FILE`、`COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`、`COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`、CLI auth file。核心默认值：`HOST=127.0.0.1`、`PORT=9992`、`COMMANDCODE_UPSTREAM_MODE=provider`、`COMMANDCODE_ROUTING_POLICY=daily_burn_priority`、`COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`、`COMMANDCODE_CLI_VERSION=1.14.0`、`COMMANDCODE_TIMEOUT_MS=300000`、`COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`。设置后 `BRIDGE_API_KEY` 保护 `/v1/*`；client 可使用 Bearer 或 `x-api-key`。设 `COMMANDCODE_ZDR=true` 会在 Provider API 请求中发送 `x-cmd-zdr: 1`（zero data retention），设 `COMMANDCODE_UPSTREAM_MODE=alpha` 则强制所有模型走 legacy `/alpha/generate`。用 `chmod 600` 保护 credential JSON。Balance alert 默认关闭。可选 `commandcode-router` 用于多个 bridge host 的 least-in-flight routing。
+Credential 优先级为 `COMMANDCODE_CREDENTIALS_FILE`、`COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`、`COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`、CLI auth file。核心默认值：`HOST=127.0.0.1`、`PORT=9992`、`COMMANDCODE_UPSTREAM_MODE=auto`、`COMMANDCODE_ROUTING_POLICY=daily_burn_priority`、`COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`、`COMMANDCODE_CLI_VERSION=1.14.0`、`COMMANDCODE_TIMEOUT_MS=600000`、`COMMANDCODE_RETRY_MAX_ATTEMPTS=5`、`COMMANDCODE_RETRY_BACKOFF_MS=250`、`COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`。对瞬时上游故障（429、5xx、超时）按指数退避重试，最多 `COMMANDCODE_RETRY_MAX_ATTEMPTS` 次；以 401/402/403 失败的凭据会在本次请求中被跳过并优先使用其他 key，一旦产生可见输出即停止重试。设置后 `BRIDGE_API_KEY` 保护 `/v1/*`；client 可使用 Bearer 或 `x-api-key`。`COMMANDCODE_UPSTREAM_MODE=auto` 在启动时探测 Provider API，套餐允许时（Provider $15/月或更高）使用官方 API；`provider` 强制官方 API；`alpha` 强制所有模型走 legacy `/alpha/generate`。设 `COMMANDCODE_ZDR=true` 会在 Provider API 请求中发送 `x-cmd-zdr: 1`（zero data retention）。用 `chmod 600` 保护 credential JSON。Balance alert 默认关闭。可选 `commandcode-router` 用于多个 bridge host 的 least-in-flight routing。
 
 ## 工作原理
 
 1. 认证并验证 OpenAI-shaped request。
 
-2. 在 catalog（provider mode 下 live 刷新）中解析 model alias。
+2. 在 catalog（Provider API 可用时 live 刷新）中解析 model alias。
 
 3. 过滤 disabled、scoped、saturated、cooldown、expired、exhausted credential。
 
@@ -228,7 +228,7 @@ install.sh           Linux rootless user-systemd installer
 
 - **可信 network 边界。** Read-only dashboard endpoint 会显示 redacted 运维 metadata；只放在 localhost 或 trusted VPN/tailnet，离开 localhost 时设置 `BRIDGE_API_KEY`。
 
-- **Claude 走 alpha 隧道。** Provider API 只以 Anthropic `/messages` format 提供 Claude，因此 provider mode 下 Claude 请求仍走 `/alpha/generate`；要强制所有模型走该路径，设置 `COMMANDCODE_UPSTREAM_MODE=alpha`。
+- **Claude 走 alpha 隧道。** Provider API 只以 Anthropic `/messages` format 提供 Claude，因此 Claude 请求始终走 `/alpha/generate`；要强制所有模型走该路径，设置 `COMMANDCODE_UPSTREAM_MODE=alpha`。
 
 - **Billing 留在 alpha surface。** `/alpha/billing` 不是文档化的 Provider API route；固定 `COMMANDCODE_CLI_VERSION` 并对升级运行 smoke test，确保 routing 与 balance alert 继续工作。
 

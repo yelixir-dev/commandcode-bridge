@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0.a-b57920?style=flat-square" alt="Version 1.14.0.a"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0.c-b57920?style=flat-square" alt="Version 1.14.0.c"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-52-1f6f78?style=flat-square" alt="52 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -20,13 +20,13 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **52-model** catalog aligned with CommandCode **1.14.0**. The bridge version always tracks the current CommandCode CLI version with a letter suffix (for example **1.14.0.a**); the suffix marks bridge-only releases.
+CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **52-model** catalog aligned with CommandCode **1.14.0**. The bridge version always tracks the current CommandCode CLI version with a letter suffix (for example **1.14.0.c**); the suffix marks bridge-only releases.
 
 [What it does](#what-it-does) · [Install](#install) · [Usage](#usage) · [How it works](#how-it-works) · [Repository layout](#repository-layout) · [Current limitations](#current-limitations) · [License](#license)
 
 ## What it does
 
-- **Official Provider API by default.** Non-Claude chat calls CommandCode's public `POST /provider/v1/chat/completions` with native OpenAI bodies — no CLI headers, no per-request `cmd` subprocess, no event conversion. Claude models keep the `/alpha/generate` tunnel because the Provider API serves them only through the Anthropic format.
+- **Plan-aware upstream selection (`auto` by default).** At startup the bridge probes the official Provider API. Accounts on the **Provider plan ($15/mo) or higher** get native `POST /provider/v1/chat/completions` calls with OpenAI bodies — no CLI headers, no per-request `cmd` subprocess, no event conversion. Go ($1), GOAT ($10), and Pro ($20) subscription plans get `403 upgrade_required`, so the bridge keeps the `/alpha/generate` tunnel for them and falls back to it automatically if a plan changes mid-run. Claude models always use the tunnel because the Provider API serves them only through the Anthropic format.
 
 - **OpenAI-compatible API.** Lists and retrieves models and serves streaming or non-streaming chat to any OpenAI client, with model aliases, allowlist, and per-key routing transparent to the caller.
 
@@ -34,7 +34,7 @@ CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode accou
 
 - **Universal expiry priority.** Under every policy, eligible credentials with a known expiry in **1 day or less** are selected before longer-lived credentials.
 
-- **Live model catalog.** At startup in provider mode the bridge refreshes the catalog from the public `GET /provider/v1/models`, so newly published models and context windows appear without a static-catalog release.
+- **Live model catalog.** At startup, when the Provider API is available, the bridge refreshes the catalog from the public `GET /provider/v1/models`, so newly published models and context windows appear without a static-catalog release.
 
 - **Context metadata.** Emits `context_window`, `context_length`, and `max_context_length` whenever the catalog has a published context (live values fill the five contexts the static catalog leaves unknown).
 
@@ -58,7 +58,7 @@ The installer targets Linux user systemd, requires Node.js 22+ for CommandCode C
 
 ### Manual source run
 
-The bridge runtime supports Node.js 20+. In the default provider mode you only need a Studio-issued API key — no CLI install, no `cmd login`. Provide the key through `COMMAND_CODE_API_KEY`, `COMMANDCODE_API_KEY`, or `CMD_API_KEY` (or `~/.commandcode/auth.json` if you already run the CLI). The legacy `alpha` mode and `/alpha` billing reuse the same key. Official installation: <https://commandcode.ai/install>.
+The bridge runtime supports Node.js 20+. The default `auto` mode probes your plan at startup: Provider-plan accounts use the official API directly, while lower tiers keep the `/alpha` tunnel — either way you only need a Studio-issued API key, no CLI install, no `cmd login`. Provide the key through `COMMAND_CODE_API_KEY`, `COMMANDCODE_API_KEY`, or `CMD_API_KEY` (or `~/.commandcode/auth.json` if you already run the CLI). The legacy `alpha` mode and `/alpha` billing reuse the same key. Official installation: <https://commandcode.ai/install>.
 
 ```bash
 git clone <your-commandcode-bridge-repository-url> commandcode-bridge
@@ -125,7 +125,7 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Model metadata and exact catalog
 
-Each model object includes `id`, `object`, `created`, and provider-derived `owned_by`. Known context is repeated in `context_window`, `context_length`, and `max_context_length`. In provider mode the catalog is refreshed from the live `GET /provider/v1/models` at startup, which fills the five contexts the static catalog leaves unpublished (all currently `200,000`) and picks up newly added models; the static table below is the shipped 1.14.0 baseline. “Default” is the built-in enabled state.
+Each model object includes `id`, `object`, `created`, and provider-derived `owned_by`. Known context is repeated in `context_window`, `context_length`, and `max_context_length`. When the Provider API is available the catalog is refreshed from the live `GET /provider/v1/models` at startup, which fills the five contexts the static catalog leaves unpublished (all currently `200,000`) and picks up newly added models; the static table below is the shipped 1.14.0 baseline. “Default” is the built-in enabled state.
 
 | Provider          | Canonical model ID                    |        Context | Default |
 | ----------------- | ------------------------------------- | -------------: | :-----: |
@@ -194,13 +194,13 @@ Upgrades from a persisted 1.3.1 dashboard catalog preserve each current model's 
 
 Existing browsers with a saved key continue without interruption. On a fresh browser, enter the current key in **Current Admin API Key** before saving or restarting. A runtime with no key can bootstrap only from a real loopback connection whose Host is also loopback.
 
-Credential precedence is `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, then `COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`, then CLI auth files. Core defaults are `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_UPSTREAM_MODE=provider`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.14.0`, `COMMANDCODE_TIMEOUT_MS=300000`, and `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`. `BRIDGE_API_KEY` protects `/v1/*` when set; clients may use Bearer or `x-api-key`. Set `COMMANDCODE_ZDR=true` to send `x-cmd-zdr: 1` (zero data retention) on Provider API requests, and `COMMANDCODE_UPSTREAM_MODE=alpha` to force the legacy `/alpha/generate` path for every model. Protect credential JSON with `chmod 600`. Optional balance alerts are off. Optional `commandcode-router` is for least-in-flight routing across multiple bridge hosts.
+Credential precedence is `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, then `COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`, then CLI auth files. Core defaults are `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_UPSTREAM_MODE=auto`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.14.0`, `COMMANDCODE_TIMEOUT_MS=600000`, `COMMANDCODE_RETRY_MAX_ATTEMPTS=5`, `COMMANDCODE_RETRY_BACKOFF_MS=250`, and `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`. Transient upstream failures (429, 5xx, timeouts) are retried with exponential backoff up to `COMMANDCODE_RETRY_MAX_ATTEMPTS`; a credential that fails with 401/402/403 is skipped for the rest of the request while other keys are preferred, and retries stop once any visible output has been emitted. `BRIDGE_API_KEY` protects `/v1/*` when set; clients may use Bearer or `x-api-key`. `COMMANDCODE_UPSTREAM_MODE=auto` probes the Provider API at startup and uses it whenever the plan allows (the Provider plan at $15/mo or higher); `provider` forces the official API and `alpha` forces the legacy `/alpha/generate` path for every model. Set `COMMANDCODE_ZDR=true` to send `x-cmd-zdr: 1` (zero data retention) on Provider API requests. Protect credential JSON with `chmod 600`. Optional balance alerts are off. Optional `commandcode-router` is for least-in-flight routing across multiple bridge hosts.
 
 ## How it works
 
 1. Authenticate and validate the OpenAI-shaped request.
 
-2. Resolve model aliases against the catalog (live-refreshed in provider mode).
+2. Resolve model aliases against the catalog (live-refreshed when the Provider API is available).
 
 3. Filter disabled, scoped, saturated, cooled-down, expired, and exhausted credentials.
 
@@ -228,7 +228,7 @@ Development verification is `npm run verify`; runtime verification is `npm run s
 
 - **Trusted network boundary.** Read-only dashboard endpoints reveal redacted operational metadata; keep them on localhost or a trusted VPN/tailnet and set `BRIDGE_API_KEY` outside localhost.
 
-- **Claude traffic uses the alpha tunnel.** The Provider API serves Claude models only through the Anthropic `/messages` format, so in provider mode Claude requests still go to `/alpha/generate`; set `COMMANDCODE_UPSTREAM_MODE=alpha` to force that path for every model.
+- **Claude traffic uses the alpha tunnel.** The Provider API serves Claude models only through the Anthropic `/messages` format, so Claude requests always go to `/alpha/generate`; set `COMMANDCODE_UPSTREAM_MODE=alpha` to force that path for every model.
 
 - **Billing stays on the alpha surface.** `/alpha/billing` is not a documented Provider API route; pin `COMMANDCODE_CLI_VERSION` and smoke-test upgrades so routing and balance alerts keep working.
 

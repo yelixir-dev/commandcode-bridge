@@ -6,11 +6,14 @@ import {
   CommandCodeHttpError,
   createCommandCodeCredentialRouter,
   createTimeoutSignal,
+  isFatalCredFailure,
   responseBody,
+  retryBackoff,
 } from "./commandcode.js";
 import {
   NoAvailableCommandCodeCredentialError,
   type CommandCodeCredentialRouter,
+  type SelectCredentialOptions,
 } from "./credential-router.js";
 import type { BridgeConfig, CommandCodeCredential, OpenAIChatCompletionRequest } from "./types.js";
 
@@ -44,9 +47,44 @@ function shouldRetryStatus(statusCode: number | undefined): boolean {
     statusCode === undefined ||
     statusCode === 401 ||
     statusCode === 402 ||
+    statusCode === 403 ||
     statusCode === 429 ||
     statusCode >= 500
   );
+}
+
+export async function probeProviderAccess(
+  config: BridgeConfig,
+  options: {
+    fetchImpl?: typeof fetch;
+    timeoutMs?: number;
+    credential?: CommandCodeCredential;
+  } = {},
+): Promise<boolean> {
+  const credential = options.credential ?? config.commandCodeCredentials[0];
+  if (!credential) return false;
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const timeoutMs = options.timeoutMs ?? config.commandCodeBillingTimeoutMs;
+  try {
+    const response = await fetchImpl(`${config.apiBase}/provider/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${credential.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek/deepseek-v4-flash",
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    // A valid minimal request is required: body validation runs before the
+    // plan check, so an empty body returns 400 even without API access.
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export class CommandCodeProviderClient {
@@ -63,19 +101,34 @@ export class CommandCodeProviderClient {
 
     const timeoutSignal = createTimeoutSignal(this.config.timeoutMs);
     const effectiveSignal = signal ? combineAbortSignals([signal, timeoutSignal]) : timeoutSignal;
-    const maxAttempts = Math.max(1, this.router.credentialCount);
-    const attemptedIds = new Set<string>();
+    const maxAttempts = Math.max(1, this.config.commandCodeRetryMaxAttempts ?? 5);
+    const fatalIds = new Set<string>();
+    const retryableFailed = new Set<string>();
     let lastError: unknown;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       let credential: CommandCodeCredential;
       try {
-        credential = await this.router.select({ model: body.model, excludeIds: attemptedIds });
+        const selectOptions: SelectCredentialOptions = {
+          model: body.model,
+          ignoreCooldown: attempt > 0,
+        };
+        if (fatalIds.size + retryableFailed.size > 0) {
+          selectOptions.excludeIds = new Set([...fatalIds, ...retryableFailed]);
+        }
+        credential = await this.router.select(selectOptions);
       } catch (error) {
-        if (lastError instanceof Error) throw lastError;
-        throw error;
+        if (retryableFailed.size > 0) {
+          retryableFailed.clear();
+          credential = await this.router.select({
+            model: body.model,
+            ignoreCooldown: true,
+          });
+        } else {
+          if (lastError instanceof Error) throw lastError;
+          throw error;
+        }
       }
-      attemptedIds.add(credential.id);
 
       let finalized = false;
       const finalizeSuccess = () => {
@@ -105,6 +158,9 @@ export class CommandCodeProviderClient {
             shouldRetryStatus(response.status) &&
             !effectiveSignal.aborted
           ) {
+            if (isFatalCredFailure(response.status)) fatalIds.add(credential.id);
+            else retryableFailed.add(credential.id);
+            await retryBackoff(attempt, this.config.commandCodeRetryBackoffMs ?? 250);
             continue;
           }
           throw error;
@@ -121,6 +177,10 @@ export class CommandCodeProviderClient {
           shouldRetryStatus(statusCode) &&
           !effectiveSignal.aborted
         ) {
+          if (statusCode !== undefined && isFatalCredFailure(statusCode))
+            fatalIds.add(credential.id);
+          else if (statusCode !== undefined) retryableFailed.add(credential.id);
+          await retryBackoff(attempt, this.config.commandCodeRetryBackoffMs ?? 250);
           continue;
         }
         throw error;

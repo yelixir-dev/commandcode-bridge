@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { dashboardHtml } from "../src/dashboard.js";
 
 describe("dashboard UI", () => {
-  it("shows the summed current balance next to the credentials heading", () => {
+  it("shows the summed current balance inline next to the credentials heading", () => {
     const html = dashboardHtml({
       server: { host: "127.0.0.1", port: 9992 },
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -13,7 +13,27 @@ describe("dashboard UI", () => {
 
     expect(html).toContain('id="credTotalBalance"');
     expect(html).toContain("Number(bm.currentBalance??b?.currentBalance??bm.monthlyCredits)");
-    expect(html).toContain("'$'+total.toFixed(2)");
+    expect(html).toContain("tr('totalBalanceLabel')+'$'+total.toFixed(2)");
+    expect(html).toContain("totalBalanceLabel:'현재 총 잔액 : '");
+    expect(html).toContain("totalBalanceLabel:'Total balance: '");
+    expect(html).toContain("totalBalanceLabel:'当前总余额：'");
+  });
+
+  it("annotates ready credentials with the active upstream path", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [
+        { id: "alpha", enabled: true, apiKeyConfigured: true, providerApiAccess: true },
+      ],
+      models: [],
+    });
+
+    expect(html).toContain("c.providerApiAccess===true?tr('officialApi'):tr('apiProxy')");
+    expect(html).toContain("officialApi:'공식 API'");
+    expect(html).toContain("apiProxy:'API 프록시'");
+    expect(html).toContain("officialApi:'official API'");
+    expect(html).toContain("apiProxy:'API proxy'");
   });
 
   it("shows the bridge version in the header instead of the endpoint", () => {
@@ -26,7 +46,7 @@ describe("dashboard UI", () => {
     });
 
     expect(html).toContain('id="bridgeVersion"');
-    expect(html).toContain("v1.14.0.a");
+    expect(html).toContain("v1.14.0.c");
     expect(html).not.toContain('id="endpoint"');
   });
 
@@ -365,6 +385,29 @@ describe("dashboard UI", () => {
     const georgiaToken = rootRules.match(/(--[\w-]+):\s*Georgia(?:,|;)/);
     expect.soft(georgiaToken).not.toBeNull();
     if (georgiaToken) expect.soft(html).toContain(`font-family:var(${georgiaToken[1]})`);
+  });
+
+  it("renders rolling window quota and exceeded markers", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+    });
+
+    expect(html).toContain("tr('quota')");
+    expect(html).toContain("quotaExceeded?' ('+tr('quotaExceeded')+')':''");
+    expect(html).toContain("wf.used.toFixed(2)+'/'+wf.cap+' · '+ww.used.toFixed(2)+'/'+ww.cap");
+    expect(html).toContain("quota:'쿼타 5h/1w'");
+    expect(html).toContain("quotaExceeded:'쿼타 초과'");
+    expect(html).toContain("quotaExceeded:'quota exceeded'");
+    expect(html).toContain(".kv b.bad{color:var(--bad)}");
+  });
+
+  it("places the save/restart bar above the server bind card", () => {
+    const html = dashboardHtml();
+    expect(html.indexOf('class="footerbar"')).toBeGreaterThan(-1);
+    expect(html.indexOf('class="footerbar"')).toBeLessThan(html.indexOf('<section class="grid">'));
   });
 
   it("contains Korean, English, and Chinese dashboard translations with locale fallback", () => {

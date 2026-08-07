@@ -12,6 +12,7 @@ import {
   buildProviderChatRequestBody,
   CommandCodeProviderClient,
   CommandCodeProviderSseTransform,
+  probeProviderAccess,
   type CommandCodeProviderSseTransformOptions,
 } from "../src/provider.js";
 import { createApp } from "../src/server.js";
@@ -35,6 +36,8 @@ function providerConfig(overrides: Partial<BridgeConfig> = {}): BridgeConfig {
     commandCodeBillingRefreshMs: 60_000,
     commandCodeBillingTimeoutMs: 10_000,
     commandCodeCredentialCooldownMs: 60_000,
+    commandCodeRetryMaxAttempts: 5,
+    commandCodeRetryBackoffMs: 1,
     requestBodyLimitBytes: 1_048_576,
     rateLimitMax: 60,
     rateLimitWindow: "1 minute",
@@ -388,6 +391,58 @@ describe("provider chat client", () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 
+  it("retries a transient provider failure up to the configured budget", async () => {
+    let postCount = 0;
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      postCount += 1;
+      return Response.json(
+        { error: { message: "rate limited", type: "rate_limit_error" } },
+        { status: 429 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new CommandCodeProviderClient(providerConfig());
+    await expect(
+      client.chat(
+        buildProviderChatRequestBody(
+          { model: "default", messages: [{ role: "user", content: "hi" }] },
+          "deepseek/deepseek-v4-pro",
+        ),
+      ),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(postCount).toBe(5);
+  });
+
+  it("recovers after transient provider failures", async () => {
+    let postCount = 0;
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      postCount += 1;
+      if (postCount < 3) {
+        return Response.json(
+          { error: { message: "server error", type: "server_error" } },
+          { status: 500 },
+        );
+      }
+      return Response.json({ id: "chatcmpl_ok", choices: [] }, { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new CommandCodeProviderClient(providerConfig());
+    const response = await client.chat(
+      buildProviderChatRequestBody(
+        { model: "default", messages: [{ role: "user", content: "hi" }] },
+        "deepseek/deepseek-v4-pro",
+      ),
+    );
+    expect(response.ok).toBe(true);
+    expect(postCount).toBe(3);
+  });
+
   it("throws a configuration error when no credentials are configured", async () => {
     const client = new CommandCodeProviderClient(providerConfig({ commandCodeCredentials: [] }));
     await expect(
@@ -398,6 +453,276 @@ describe("provider chat client", () => {
         ),
       ),
     ).rejects.toBeInstanceOf(CommandCodeAuthError);
+  });
+});
+
+describe("provider access probe", () => {
+  it("confirms access when the endpoint accepts a minimal probe request", async () => {
+    let requestBody = "";
+    const available = await probeProviderAccess(providerConfig(), {
+      fetchImpl: async (_input, init) => {
+        requestBody = String(init?.body ?? "");
+        return Response.json({ choices: [] }, { status: 200 });
+      },
+    });
+    expect(available).toBe(true);
+    const body = JSON.parse(requestBody) as { model?: string; max_tokens?: number };
+    expect(body.model).toBe("deepseek/deepseek-v4-flash");
+    expect(body.max_tokens).toBe(1);
+  });
+
+  it("denies access on upgrade_required, bad keys, unknown routes, and network failures", async () => {
+    for (const status of [401, 403, 404, 429, 500]) {
+      const available = await probeProviderAccess(providerConfig(), {
+        fetchImpl: async () => new Response("{}", { status }),
+      });
+      expect(available, `status ${status}`).toBe(false);
+    }
+    const offline = await probeProviderAccess(providerConfig(), {
+      fetchImpl: async () => {
+        throw new Error("offline");
+      },
+    });
+    expect(offline).toBe(false);
+  });
+
+  it("returns false without credentials", async () => {
+    await expect(probeProviderAccess(providerConfig({ commandCodeCredentials: [] }))).resolves.toBe(
+      false,
+    );
+  });
+});
+
+describe("server auto mode", () => {
+  async function createAutoApp(fetchImpl: typeof fetch) {
+    const fetchStub = vi.fn<typeof fetch>(fetchImpl);
+    vi.stubGlobal("fetch", fetchStub);
+    const app = await createApp({
+      configEnv: {},
+      configAuthPaths: [],
+      configOverrides: {
+        logLevel: "silent",
+        upstreamMode: "auto",
+        commandCodeCredentials: [{ id: "alpha", apiKey: "provider-secret", weight: 1 }],
+      },
+    });
+    return { app, fetchStub };
+  }
+
+  it("probes each credential and exposes per-key provider access", async () => {
+    const fetchStub = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      const billing = billingResponse(url);
+      if (billing) return billing;
+      if (url.includes("/provider/v1/models")) return Response.json({ data: [] });
+      if (url.includes("/provider/v1/chat/completions")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { max_tokens?: number };
+        if (body.max_tokens === 1) {
+          const auth = String(
+            (init?.headers as Record<string, string> | undefined)?.Authorization ?? "",
+          );
+          return Response.json(
+            { choices: [] },
+            { status: auth.includes("capable-secret") ? 200 : 403 },
+          );
+        }
+        return Response.json(
+          {
+            id: "c",
+            model: "deepseek/deepseek-v4-pro",
+            choices: [
+              { index: 0, message: { role: "assistant", content: "OK" }, finish_reason: "stop" },
+            ],
+          },
+          { status: 200 },
+        );
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchStub);
+    const app = await createApp({
+      configEnv: {},
+      configAuthPaths: [],
+      configOverrides: {
+        logLevel: "silent",
+        upstreamMode: "auto",
+        commandCodeCredentials: [
+          { id: "capable", apiKey: "capable-secret", weight: 1 },
+          { id: "proxy", apiKey: "proxy-secret", weight: 1 },
+        ],
+      },
+    });
+
+    const configResponse = await app.inject({ method: "GET", url: "/admin/config" });
+    const credentials = configResponse.json().credentials as Array<{
+      id: string;
+      providerApiAccess: boolean;
+    }>;
+    expect(credentials.find((credential) => credential.id === "capable")?.providerApiAccess).toBe(
+      true,
+    );
+    expect(credentials.find((credential) => credential.id === "proxy")?.providerApiAccess).toBe(
+      false,
+    );
+
+    const chat = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: { model: "default", messages: [{ role: "user", content: "hi" }] },
+    });
+    expect(chat.statusCode).toBe(200);
+    expect(chat.json().choices[0].message.content).toBe("OK");
+    await app.close();
+  });
+
+  it("keeps low-tier plans on the alpha tunnel when the probe returns 403", async () => {
+    const { app, fetchStub } = await createAutoApp(async (input) => {
+      const url = String(input);
+      const billing = billingResponse(url);
+      if (billing) return billing;
+      if (url.includes("/provider/v1/chat/completions")) {
+        return new Response("{}", { status: 403 });
+      }
+      if (url.includes("/alpha/generate")) {
+        return new Response(
+          'data: {"type":"text-delta","text":"ALPHA_OK"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+          { status: 200 },
+        );
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: { model: "default", messages: [{ role: "user", content: "hi" }] },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().choices[0].message.content).toBe("ALPHA_OK");
+    const providerPosts = postCalls(fetchStub).filter((call) =>
+      String(call[0]).includes("/provider/v1/chat/completions"),
+    );
+    expect(providerPosts).toHaveLength(1);
+    const probeBody = JSON.parse((providerPosts[0]?.[1] as RequestInit).body as string) as {
+      model: string;
+      max_tokens: number;
+    };
+    expect(probeBody.model).toBe("deepseek/deepseek-v4-flash");
+    expect(probeBody.max_tokens).toBe(1);
+    expect(postCalls(fetchStub).some((call) => String(call[0]).includes("/alpha/generate"))).toBe(
+      true,
+    );
+    await app.close();
+  });
+
+  it("uses the provider API when the probe confirms plan access", async () => {
+    const { app, fetchStub } = await createAutoApp(async (input, init) => {
+      const url = String(input);
+      const billing = billingResponse(url);
+      if (billing) return billing;
+      if (url.includes("/provider/v1/models")) {
+        return Response.json({
+          data: [{ id: "deepseek/deepseek-v4-pro", context_length: 1_000_000 }],
+        });
+      }
+      if (url.includes("/provider/v1/chat/completions")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { max_tokens?: number };
+        if (body.max_tokens === 1) {
+          return Response.json({ choices: [] }, { status: 200 });
+        }
+        return Response.json(
+          {
+            id: "chatcmpl_a",
+            object: "chat.completion",
+            model: "deepseek/deepseek-v4-pro",
+            choices: [
+              {
+                index: 0,
+                message: { role: "assistant", content: "PROVIDER_AUTO_OK" },
+                finish_reason: "stop",
+              },
+            ],
+          },
+          { status: 200 },
+        );
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: { model: "default", messages: [{ role: "user", content: "hi" }] },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().choices[0].message.content).toBe("PROVIDER_AUTO_OK");
+    expect(postCalls(fetchStub).some((call) => String(call[0]).includes("/alpha/generate"))).toBe(
+      false,
+    );
+    await app.close();
+  });
+
+  it("falls back to alpha when a provider request returns 403 mid-run", async () => {
+    const { app, fetchStub } = await createAutoApp(async (input, init) => {
+      const url = String(input);
+      const billing = billingResponse(url);
+      if (billing) return billing;
+      if (url.includes("/provider/v1/models")) return Response.json({ data: [] });
+      if (url.includes("/provider/v1/chat/completions")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { max_tokens?: number };
+        if (body.max_tokens === 1) return Response.json({ choices: [] }, { status: 200 });
+        return Response.json({ error: { code: "upgrade_required" } }, { status: 403 });
+      }
+      if (url.includes("/alpha/generate")) {
+        return new Response(
+          'data: {"type":"text-delta","text":"FALLBACK_OK"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+          { status: 200 },
+        );
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    const first = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: { model: "default", messages: [{ role: "user", content: "hi" }] },
+    });
+    const second = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: { model: "default", messages: [{ role: "user", content: "hi" }] },
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(first.json().choices[0].message.content).toBe("FALLBACK_OK");
+    expect(second.json().choices[0].message.content).toBe("FALLBACK_OK");
+    const chatPosts = postCalls(fetchStub).filter((call) => {
+      const body = JSON.parse(String((call[1] as RequestInit).body)) as {
+        model?: unknown;
+        max_tokens?: number;
+      };
+      return Boolean(body.model) && body.max_tokens !== 1;
+    });
+    const providerChats = chatPosts.filter((call) =>
+      String(call[0]).includes("/provider/v1/chat/completions"),
+    );
+    expect(providerChats).toHaveLength(1);
+    await app.close();
+  });
+
+  it("reports the effective upstream and probe result in health", async () => {
+    const { app } = await createAutoApp(async (input) => {
+      const url = String(input);
+      const billing = billingResponse(url);
+      if (billing) return billing;
+      if (url.includes("/provider/v1/chat/completions")) return new Response("{}", { status: 403 });
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    const response = await app.inject({ method: "GET", url: "/health" });
+    expect(response.json()).toMatchObject({
+      upstream: "commandcode-alpha-generate",
+      auth: { upstream_mode: "auto", provider_api_access: false },
+    });
+    await app.close();
   });
 });
 

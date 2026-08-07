@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0.a-b57920?style=flat-square" alt="Version 1.14.0.a"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0.c-b57920?style=flat-square" alt="Version 1.14.0.c"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-52-1f6f78?style=flat-square" alt="52 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -20,13 +20,13 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이트웨이입니다. 표준 OpenAI-compatible 모델·채팅 endpoint를 제공하고 eligible upstream credential 사이에서 요청을 라우팅하며, CommandCode **1.14.0**에 맞춘 정확한 **52-model** catalog를 게시합니다. Bridge 버전은 항상 현재 CommandCode CLI 버전을 따라가며 그 뒤에 문자 접미사를 붙입니다(예: **1.14.0.a**). 접미사는 bridge 전용 release를 뜻합니다.
+CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이트웨이입니다. 표준 OpenAI-compatible 모델·채팅 endpoint를 제공하고 eligible upstream credential 사이에서 요청을 라우팅하며, CommandCode **1.14.0**에 맞춘 정확한 **52-model** catalog를 게시합니다. Bridge 버전은 항상 현재 CommandCode CLI 버전을 따라가며 그 뒤에 문자 접미사를 붙입니다(예: **1.14.0.c**). 접미사는 bridge 전용 release를 뜻합니다.
 
 [기능](#기능) · [설치](#설치) · [사용법](#사용법) · [동작 방식](#동작-방식) · [저장소 구성](#저장소-구성) · [현재 제한](#현재-제한) · [라이선스](#라이선스)
 
 ## 기능
 
-- **기본값이 공식 Provider API.** 비-Claude chat은 CommandCode 공식 `POST /provider/v1/chat/completions`를 native OpenAI body로 호출합니다. CLI header가 없고 요청당 `cmd` subprocess도 없으며 event 변환도 없습니다. Claude model은 Provider API가 Anthropic format으로만 서빙하므로 `/alpha/generate` 터널을 유지합니다.
+- **요금제 기반 upstream 선택(`auto` 기본값).** 시작 시 bridge가 공식 Provider API를 프로브합니다. **Provider 요금제($15/월) 이상** 계정은 `POST /provider/v1/chat/completions`를 native OpenAI body로 직접 호출합니다 — CLI header가 없고 요청당 `cmd` subprocess도 없으며 event 변환도 없습니다. Go($1)·GOAT($10)·Pro($20) 구독 요금제는 `403 upgrade_required`가 나오므로 bridge는 `/alpha/generate` 터널을 유지하고, 실행 중 요금제가 바뀌면 자동으로 터널로 폴백합니다. Claude model은 Provider API가 Anthropic format으로만 서빙하므로 항상 터널을 사용합니다.
 
 - **OpenAI-compatible API.** model list·단건 조회와 streaming/non-streaming chat을 모든 OpenAI client에 제공하며 model alias, allowlist, key별 routing은 호출자에게 투명합니다.
 
@@ -34,7 +34,7 @@ CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이�
 
 - **보편적 만료 우선순위.** 모든 policy에서 알려진 만료까지 **1일 이하**인 eligible credential을 더 오래 남은 credential보다 먼저 선택합니다.
 
-- **실시간 model catalog.** provider mode 시작 시 공개 `GET /provider/v1/models`로 catalog를 갱신하므로 새 model과 context window가 static catalog release 없이 나타납니다.
+- **실시간 model catalog.** Provider API를 쓸 수 있을 때 시작 시 공개 `GET /provider/v1/models`로 catalog를 갱신하므로 새 model과 context window가 static catalog release 없이 나타납니다.
 
 - **Context metadata.** catalog에 공개 context가 있으면 `context_window`, `context_length`, `max_context_length`를 제공합니다(정적 catalog가 비워 두는 5개 context는 live 값으로 채워집니다).
 
@@ -58,7 +58,7 @@ installer는 Linux user systemd용이며 CommandCode CLI 1.14.0 때문에 Node.j
 
 ### 수동 source 실행
 
-bridge runtime은 Node.js 20+를 지원합니다. 기본 provider mode에서는 Studio에서 발급한 API key만 있으면 됩니다 — CLI 설치도 `cmd login`도 필요 없습니다. key는 `COMMAND_CODE_API_KEY`, `COMMANDCODE_API_KEY`, `CMD_API_KEY`(또는 이미 CLI를 쓴다면 `~/.commandcode/auth.json`)로 제공하십시오. legacy `alpha` mode와 `/alpha` billing은 같은 key를 재사용합니다. 공식 설치: <https://commandcode.ai/install>.
+bridge runtime은 Node.js 20+를 지원합니다. 기본 `auto` mode는 시작 시 요금제를 프로브합니다: Provider 요금제 계정은 공식 API를 직접 쓰고, 하위 요금제는 `/alpha` 터널을 유지합니다 — 어느 쪽이든 Studio에서 발급한 API key만 있으면 됩니다. CLI 설치도 `cmd login`도 필요 없습니다. key는 `COMMAND_CODE_API_KEY`, `COMMANDCODE_API_KEY`, `CMD_API_KEY`(또는 이미 CLI를 쓴다면 `~/.commandcode/auth.json`)로 제공하십시오. legacy `alpha` mode와 `/alpha` billing은 같은 key를 재사용합니다. 공식 설치: <https://commandcode.ai/install>.
 
 ```bash
 git clone <your-commandcode-bridge-repository-url> commandcode-bridge
@@ -125,7 +125,7 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Model metadata와 정확한 catalog
 
-각 model object는 `id`, `object`, `created`, provider 기반 `owned_by`를 포함합니다. 알려진 context는 `context_window`, `context_length`, `max_context_length`에 동일하게 나옵니다. provider mode에서는 시작 시 live `GET /provider/v1/models`로 catalog를 갱신해 정적 catalog가 비워 둔 5개 context를 채우고(현재 모두 `200,000`) 새로 추가된 model도 반영합니다. 아래 표는 배포되는 1.14.0 baseline이며 “기본 활성화”는 built-in enabled state입니다.
+각 model object는 `id`, `object`, `created`, provider 기반 `owned_by`를 포함합니다. 알려진 context는 `context_window`, `context_length`, `max_context_length`에 동일하게 나옵니다. Provider API를 쓸 수 있을 때는 시작 시 live `GET /provider/v1/models`로 catalog를 갱신해 정적 catalog가 비워 둔 5개 context를 채우고(현재 모두 `200,000`) 새로 추가된 model도 반영합니다. 아래 표는 배포되는 1.14.0 baseline이며 “기본 활성화”는 built-in enabled state입니다.
 
 | Provider          | Canonical model ID                    |        Context | 기본 활성화 |
 | ----------------- | ------------------------------------- | -------------: | :---------: |
@@ -194,13 +194,13 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 브라우저에 key가 저장된 기존 사용자는 그대로 동작합니다. 새 브라우저에서는 저장·재시작 전에 **현재 Admin API Key**에 기존 key를 한 번 입력합니다. key 없는 runtime은 실제 loopback 연결이며 Host도 loopback인 경우에만 bootstrap할 수 있습니다.
 
-Credential 우선순위는 `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, `COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`, CLI auth file 순입니다. 핵심 기본값은 `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_UPSTREAM_MODE=provider`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.14.0`, `COMMANDCODE_TIMEOUT_MS=300000`, `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`입니다. `BRIDGE_API_KEY`는 설정 시 `/v1/*`를 보호하며 client는 Bearer 또는 `x-api-key`를 쓸 수 있습니다. `COMMANDCODE_ZDR=true`면 Provider API 요청에 `x-cmd-zdr: 1`(zero data retention)을 보내고, `COMMANDCODE_UPSTREAM_MODE=alpha`면 모든 model을 legacy `/alpha/generate`로 강제합니다. Credential JSON은 `chmod 600`으로 보호하십시오. Balance alert는 기본 off입니다. 선택적 `commandcode-router`는 여러 bridge host의 least-in-flight routing용입니다.
+Credential 우선순위는 `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, `COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`, CLI auth file 순입니다. 핵심 기본값은 `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_UPSTREAM_MODE=auto`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.14.0`, `COMMANDCODE_TIMEOUT_MS=600000`, `COMMANDCODE_RETRY_MAX_ATTEMPTS=5`, `COMMANDCODE_RETRY_BACKOFF_MS=250`, `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`입니다. 일시적 upstream 실패(429, 5xx, timeout)는 `COMMANDCODE_RETRY_MAX_ATTEMPTS`까지 지수 백오프로 재시도합니다. 401/402/403으로 실패한 키는 해당 요청에서 제외되고 다른 키를 우선하며, visible output이 나온 뒤에는 재시도하지 않습니다. `BRIDGE_API_KEY`는 설정 시 `/v1/*`를 보호하며 client는 Bearer 또는 `x-api-key`를 쓸 수 있습니다. `COMMANDCODE_UPSTREAM_MODE=auto`는 시작 시 Provider API를 프로브해 요금제가 허용하면(Provider $15/월 이상) 공식 API를 쓰고, `provider`는 공식 API를 강제하며, `alpha`는 모든 model을 legacy `/alpha/generate`로 강제합니다. `COMMANDCODE_ZDR=true`면 Provider API 요청에 `x-cmd-zdr: 1`(zero data retention)을 보냅니다. Credential JSON은 `chmod 600`으로 보호하십시오. Balance alert는 기본 off입니다. 선택적 `commandcode-router`는 여러 bridge host의 least-in-flight routing용입니다.
 
 ## 동작 방식
 
 1. OpenAI-shaped request를 인증하고 검증합니다.
 
-2. Catalog(provider mode에서는 live 갱신)에서 model alias를 resolve합니다.
+2. Catalog(Provider API 사용 가능 시 live 갱신)에서 model alias를 resolve합니다.
 
 3. Disabled, scoped, saturated, cooldown, expired, exhausted credential을 거릅니다.
 
@@ -228,7 +228,7 @@ install.sh           Linux rootless user-systemd installer
 
 - **신뢰 network 경계.** Read-only dashboard endpoint도 redacted 운영 metadata를 보이므로 localhost 또는 trusted VPN/tailnet에 두고 localhost 밖에서는 `BRIDGE_API_KEY`를 설정하십시오.
 
-- **Claude는 alpha 터널 사용.** Provider API는 Claude를 Anthropic `/messages` format으로만 서빙하므로 provider mode에서도 Claude 요청은 `/alpha/generate`로 갑니다. 모든 model을 그 경로로 강제하려면 `COMMANDCODE_UPSTREAM_MODE=alpha`를 설정하십시오.
+- **Claude는 alpha 터널 사용.** Provider API는 Claude를 Anthropic `/messages` format으로만 서빙하므로 Claude 요청은 항상 `/alpha/generate`로 갑니다. 모든 model을 그 경로로 강제하려면 `COMMANDCODE_UPSTREAM_MODE=alpha`를 설정하십시오.
 
 - **Billing은 alpha surface 유지.** `/alpha/billing`은 문서화된 Provider API route가 아니므로 `COMMANDCODE_CLI_VERSION`을 고정하고 routing·balance alert이 계속 동작하도록 upgrade를 smoke-test하십시오.
 

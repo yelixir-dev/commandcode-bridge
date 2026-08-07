@@ -206,17 +206,40 @@ describe("configuration and model aliases", () => {
     ]);
   });
 
-  it("defaults to provider upstream mode with zero data retention off", () => {
+  it("defaults to auto upstream mode with zero data retention off", () => {
     const config = loadBridgeConfig({ env: {} });
-    expect(config.upstreamMode).toBe("provider");
+    expect(config.upstreamMode).toBe("auto");
     expect(config.zdr).toBe(false);
     expect(loadBridgeConfig({ env: { COMMANDCODE_UPSTREAM_MODE: "alpha" } }).upstreamMode).toBe(
       "alpha",
     );
+    expect(loadBridgeConfig({ env: { COMMANDCODE_UPSTREAM_MODE: "provider" } }).upstreamMode).toBe(
+      "provider",
+    );
     expect(loadBridgeConfig({ env: { COMMANDCODE_UPSTREAM_MODE: "PROVIDER" } }).upstreamMode).toBe(
       "provider",
     );
+    expect(loadBridgeConfig({ env: { COMMANDCODE_UPSTREAM_MODE: "auto" } }).upstreamMode).toBe(
+      "auto",
+    );
     expect(loadBridgeConfig({ env: { COMMANDCODE_ZDR: "true" } }).zdr).toBe(true);
+  });
+
+  it("defaults to a five-attempt retry budget with a ten-minute timeout", () => {
+    const config = loadBridgeConfig({ env: {} });
+    expect(config.timeoutMs).toBe(600_000);
+    expect(config.commandCodeRetryMaxAttempts).toBe(5);
+    expect(config.commandCodeRetryBackoffMs).toBe(250);
+    const overridden = loadBridgeConfig({
+      env: {
+        COMMANDCODE_TIMEOUT_MS: "120000",
+        COMMANDCODE_RETRY_MAX_ATTEMPTS: "3",
+        COMMANDCODE_RETRY_BACKOFF_MS: "500",
+      },
+    });
+    expect(overridden.timeoutMs).toBe(120_000);
+    expect(overridden.commandCodeRetryMaxAttempts).toBe(3);
+    expect(overridden.commandCodeRetryBackoffMs).toBe(500);
   });
 
   it("keeps balance alerts off by default while failing closed on empty length responses", () => {

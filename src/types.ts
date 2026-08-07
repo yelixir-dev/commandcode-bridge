@@ -183,6 +183,20 @@ export interface CommandCodeBalanceAlertConfig {
   webhookBearer: string | undefined;
 }
 
+export interface CommandCodeUsageWindow {
+  used: number;
+  cap: number;
+  exceeded: boolean;
+  resetAt: number;
+}
+
+export interface CommandCodeWindowLimits {
+  limited: boolean;
+  exceeded: string | null;
+  fiveHour?: CommandCodeUsageWindow;
+  weekly?: CommandCodeUsageWindow;
+}
+
 export interface CommandCodeBillingSnapshot {
   fetchedAt: number;
   monthlyCredits: number;
@@ -192,6 +206,7 @@ export interface CommandCodeBillingSnapshot {
   planId?: string | null;
   totalCost?: number;
   totalCount?: number;
+  windowLimits?: CommandCodeWindowLimits;
 }
 
 export interface OpenAIUsage {
@@ -217,7 +232,7 @@ export interface OpenAIChatCompletion {
   usage: OpenAIUsage;
 }
 
-export type CommandCodeUpstreamMode = "provider" | "alpha";
+export type CommandCodeUpstreamMode = "auto" | "provider" | "alpha";
 
 export interface BridgeConfig {
   host: string;
@@ -242,6 +257,8 @@ export interface BridgeConfig {
   commandCodeBillingRefreshMs: number;
   commandCodeBillingTimeoutMs: number;
   commandCodeCredentialCooldownMs: number;
+  commandCodeRetryMaxAttempts: number;
+  commandCodeRetryBackoffMs: number;
   requestBodyLimitBytes: number;
   rateLimitMax: number;
   rateLimitWindow: string;

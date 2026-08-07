@@ -2,6 +2,7 @@ import {
   CommandCodeCredentialRouter,
   type CommandCodeCredentialDiagnostic,
   NoAvailableCommandCodeCredentialError,
+  type SelectCredentialOptions,
 } from "./credential-router.js";
 import type {
   BridgeConfig,
@@ -10,6 +11,8 @@ import type {
   CommandCodeEvent,
   CommandCodeGenerateBody,
   CommandCodeUpstream,
+  CommandCodeUsageWindow,
+  CommandCodeWindowLimits,
 } from "./types.js";
 
 export class CommandCodeHttpError extends Error {
@@ -197,6 +200,41 @@ function isClientVisibleEvent(event: CommandCodeEvent): boolean {
   return ["text-delta", "reasoning-delta", "tool-call", "finish"].includes(event.type);
 }
 
+export function isFatalCredFailure(statusCode: number | undefined): boolean {
+  return statusCode === 401 || statusCode === 402 || statusCode === 403;
+}
+
+export function retryBackoff(attempt: number, baseMs: number): Promise<void> {
+  const delay = Math.min(Math.max(1, baseMs) * 2 ** attempt, 2_000);
+  return new Promise((resolve) => setTimeout(resolve, delay));
+}
+
+function usageWindowValue(value: unknown): CommandCodeUsageWindow | undefined {
+  if (!isRecord(value)) return undefined;
+  const used =
+    typeof value.used === "number" && Number.isFinite(value.used) ? value.used : undefined;
+  const cap = typeof value.cap === "number" && Number.isFinite(value.cap) ? value.cap : undefined;
+  const resetAt =
+    typeof value.resetAt === "number" && Number.isFinite(value.resetAt) ? value.resetAt : undefined;
+  if (used === undefined || cap === undefined || resetAt === undefined) return undefined;
+  return { used, cap, exceeded: value.exceeded === true, resetAt };
+}
+
+function windowLimitsValue(value: unknown): CommandCodeWindowLimits | undefined {
+  if (!isRecord(value)) return undefined;
+  const fiveHour = usageWindowValue(value.fiveHour);
+  const weekly = usageWindowValue(value.weekly);
+  const exceeded = typeof value.exceeded === "string" ? value.exceeded : null;
+  const limits: CommandCodeWindowLimits = {
+    limited: value.limited === true,
+    exceeded,
+  };
+  if (fiveHour) limits.fiveHour = fiveHour;
+  if (weekly) limits.weekly = weekly;
+  if (!fiveHour && !weekly && !limits.limited) return undefined;
+  return limits;
+}
+
 export class CommandCodeBillingClient {
   private readonly config: BridgeConfig;
 
@@ -240,6 +278,8 @@ export class CommandCodeBillingClient {
       currentPeriodEnd: stringValue(subscriptionData?.currentPeriodEnd) ?? null,
       planId: stringValue(subscriptionData?.planId) ?? stringValue(creditData?.planId) ?? null,
     };
+    const windowLimits = isRecord(credits) ? windowLimitsValue(credits.windowLimits) : undefined;
+    if (windowLimits) snapshot.windowLimits = windowLimits;
     if (isRecord(summary)) {
       const totalCost = numberValue(summary.totalCost);
       const totalCount = numberValue(summary.totalCount);
@@ -325,21 +365,33 @@ export class CommandCodeClient implements CommandCodeUpstream {
     const timeoutSignal = createTimeoutSignal(this.config.timeoutMs);
     const effectiveSignal = signal ? combineAbortSignals([signal, timeoutSignal]) : timeoutSignal;
     let lastError: unknown;
-    const maxAttempts = Math.max(1, this.router.credentialCount);
-    const attemptedIds = new Set<string>();
+    const maxAttempts = Math.max(1, this.config.commandCodeRetryMaxAttempts ?? 5);
+    const fatalIds = new Set<string>();
+    const retryableFailed = new Set<string>();
 
     attemptLoop: for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       let credential: CommandCodeCredential;
       try {
-        credential = await this.router.select({
+        const selectOptions: SelectCredentialOptions = {
           model: body.params.model,
-          excludeIds: attemptedIds,
-        });
+          ignoreCooldown: attempt > 0,
+        };
+        if (fatalIds.size + retryableFailed.size > 0) {
+          selectOptions.excludeIds = new Set([...fatalIds, ...retryableFailed]);
+        }
+        credential = await this.router.select(selectOptions);
       } catch (error) {
-        if (lastError instanceof Error) throw lastError;
-        throw error;
+        if (retryableFailed.size > 0) {
+          retryableFailed.clear();
+          credential = await this.router.select({
+            model: body.params.model,
+            ignoreCooldown: true,
+          });
+        } else {
+          if (lastError instanceof Error) throw lastError;
+          throw error;
+        }
       }
-      attemptedIds.add(credential.id);
       let finalized = false;
       const finalizeSuccess = () => {
         if (finalized) return;
@@ -368,6 +420,9 @@ export class CommandCodeClient implements CommandCodeUpstream {
             shouldRetry(response.status) &&
             !effectiveSignal.aborted
           ) {
+            if (isFatalCredFailure(response.status)) fatalIds.add(credential.id);
+            else retryableFailed.add(credential.id);
+            await retryBackoff(attempt, this.config.commandCodeRetryBackoffMs ?? 250);
             continue;
           }
           throw error;
@@ -380,7 +435,11 @@ export class CommandCodeClient implements CommandCodeUpstream {
           );
           finalizeFailure(response.status);
           lastError = error;
-          if (attempt < maxAttempts - 1 && !effectiveSignal.aborted) continue;
+          if (attempt < maxAttempts - 1 && !effectiveSignal.aborted) {
+            retryableFailed.add(credential.id);
+            await retryBackoff(attempt, this.config.commandCodeRetryBackoffMs ?? 250);
+            continue;
+          }
           throw error;
         }
 
@@ -400,6 +459,10 @@ export class CommandCodeClient implements CommandCodeUpstream {
               shouldRetry(statusCode) &&
               !effectiveSignal.aborted
             ) {
+              if (statusCode !== undefined && isFatalCredFailure(statusCode))
+                fatalIds.add(credential.id);
+              else retryableFailed.add(credential.id);
+              await retryBackoff(attempt, this.config.commandCodeRetryBackoffMs ?? 250);
               continue attemptLoop;
             }
             yield event;
@@ -414,8 +477,13 @@ export class CommandCodeClient implements CommandCodeUpstream {
         const statusCode = errorStatusCodeFromUnknown(error);
         finalizeFailure(statusCode);
         lastError = error;
-        if (attempt < maxAttempts - 1 && shouldRetry(statusCode) && !effectiveSignal.aborted)
+        if (attempt < maxAttempts - 1 && shouldRetry(statusCode) && !effectiveSignal.aborted) {
+          if (statusCode !== undefined && isFatalCredFailure(statusCode))
+            fatalIds.add(credential.id);
+          else retryableFailed.add(credential.id);
+          await retryBackoff(attempt, this.config.commandCodeRetryBackoffMs ?? 250);
           continue;
+        }
         throw error;
       }
     }

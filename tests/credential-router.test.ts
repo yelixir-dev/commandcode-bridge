@@ -482,6 +482,64 @@ describe("CommandCode credential routing", () => {
     ).toBeGreaterThan(now);
   });
 
+  it("skips keys with an exhausted rolling window regardless of policy priority", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [{ ...credential("quota-hit"), weight: 100 }, credential("open")],
+      policy: "drain_first",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) =>
+        selected.id === "quota-hit"
+          ? {
+              ...state("quota-hit", 10, 2).billing!,
+              windowLimits: {
+                limited: true,
+                exceeded: "weekly",
+                fiveHour: { used: 2.5, cap: 3, exceeded: false, resetAt: now + 1 },
+                weekly: { used: 6, cap: 6, exceeded: true, resetAt: now + 1 },
+              },
+            }
+          : state("open", 10, 10).billing!,
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "open",
+    });
+  });
+
+  it("does not skip an exceeded-window key when purchased credits are available", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [{ ...credential("topup"), weight: 100 }, credential("other")],
+      policy: "round_robin",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) =>
+        selected.id === "topup"
+          ? {
+              fetchedAt: now,
+              monthlyCredits: 1,
+              purchasedCredits: 5,
+              freeCredits: 0,
+              currentPeriodEnd: new Date(now + 86_400_000).toISOString(),
+              windowLimits: {
+                limited: true,
+                exceeded: "weekly",
+                fiveHour: { used: 2.5, cap: 3, exceeded: false, resetAt: now + 1 },
+                weekly: { used: 6, cap: 6, exceeded: true, resetAt: now + 1 },
+              },
+            }
+          : state("other", 1, 3).billing!,
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "topup",
+    });
+  });
+
   it("rejects duplicate credential IDs because health accounting is keyed by ID", () => {
     expect(
       () =>

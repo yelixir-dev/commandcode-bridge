@@ -2,6 +2,7 @@ import type {
   CommandCodeBillingSnapshot,
   CommandCodeCredential,
   CommandCodeRoutingPolicy,
+  CommandCodeWindowLimits,
 } from "./types.js";
 
 const DAY_MS = 86_400_000;
@@ -59,6 +60,7 @@ export interface CommandCodeCredentialDiagnostic {
         planId: string | null | undefined;
         totalCost: number | undefined;
         totalCount: number | undefined;
+        windowLimits?: CommandCodeWindowLimits;
         metrics: CommandCodeCreditMetrics;
       }
     | undefined;
@@ -84,6 +86,8 @@ export interface CommandCodeCredentialRouterOptions {
 export interface SelectCredentialOptions {
   model: string;
   excludeIds?: Iterable<string>;
+  /** Re-include cooldown-disabled credentials so an in-request retry can re-try them. */
+  ignoreCooldown?: boolean;
 }
 
 export interface RecordFailureOptions {
@@ -151,6 +155,16 @@ function remainingCredits(state: CommandCodeCredentialState, now: number): numbe
 function hasKnownCreditCapacity(state: CommandCodeCredentialState, now: number): boolean {
   const remaining = remainingCredits(state, now);
   return remaining === undefined || remaining > 0;
+}
+
+function hasExceededWindow(state: CommandCodeCredentialState): boolean {
+  const limits = state.billing?.windowLimits;
+  if (!limits || !limits.limited) return false;
+  const exceeded = limits.fiveHour?.exceeded === true || limits.weekly?.exceeded === true;
+  if (!exceeded) return false;
+  // Over a window limit, Command Code spends on-demand credits first, so a
+  // key with purchased credits can still serve requests.
+  return (state.billing?.purchasedCredits ?? 0) <= 0;
 }
 
 export function calculateCreditMetrics(
@@ -353,6 +367,7 @@ export class CommandCodeCredentialRouter {
                 planId: billing.planId,
                 totalCost: billing.totalCost,
                 totalCount: billing.totalCount,
+                ...(billing.windowLimits ? { windowLimits: billing.windowLimits } : {}),
                 metrics,
               }
             : undefined,
@@ -375,7 +390,7 @@ export class CommandCodeCredentialRouter {
         `CommandCode bridge is at max total in-flight capacity (${this.maxTotalInFlight})`,
       );
     }
-    let candidates = this.basicCandidates(options.model, now, excludedIds);
+    let candidates = this.basicCandidates(options.model, now, excludedIds, options.ignoreCooldown);
     if (candidates.length === 0) {
       throw new NoAvailableCommandCodeCredentialError(
         `No available CommandCode credentials for model ${options.model}`,
@@ -384,15 +399,15 @@ export class CommandCodeCredentialRouter {
 
     if (this.policy === "daily_burn_priority") {
       await Promise.all(candidates.map((state) => this.refreshBillingIfStale(state, now)));
-      candidates = this.activeCandidates(options.model, now, excludedIds);
+      candidates = this.activeCandidates(options.model, now, excludedIds, options.ignoreCooldown);
     } else if (this.policy === "balance_priority") {
       await Promise.all(candidates.map((state) => this.refreshBillingIfStale(state, now)));
-      candidates = this.activeCandidates(options.model, now, excludedIds);
+      candidates = this.activeCandidates(options.model, now, excludedIds, options.ignoreCooldown);
       if (candidates.some((state) => state.billing === undefined)) {
         candidates = this.selectableCandidatesForPolicy(this.fallbackPolicy, candidates, now);
       }
     } else {
-      candidates = this.activeCandidates(options.model, now, excludedIds);
+      candidates = this.activeCandidates(options.model, now, excludedIds, options.ignoreCooldown);
     }
 
     if (candidates.length === 0) {
@@ -486,13 +501,16 @@ export class CommandCodeCredentialRouter {
     model: string,
     now: number,
     excludedIds: Set<string>,
+    ignoreCooldown = false,
   ): CommandCodeCredentialState[] {
     return this.states.filter(
       (state) =>
         !excludedIds.has(state.credential.id) &&
         state.credential.enabled !== false &&
-        state.disabledUntil <= now &&
+        (state.disabledUntil <= now ||
+          (ignoreCooldown === true && state.disabledReason === "cooldown")) &&
         state.inFlight < this.maxInFlightForState(state) &&
+        !hasExceededWindow(state) &&
         isModelAllowed(state.credential, model),
     );
   }
@@ -501,8 +519,9 @@ export class CommandCodeCredentialRouter {
     model: string,
     now: number,
     excludedIds: Set<string>,
+    ignoreCooldown = false,
   ): CommandCodeCredentialState[] {
-    return this.basicCandidates(model, now, excludedIds).filter((state) =>
+    return this.basicCandidates(model, now, excludedIds, ignoreCooldown).filter((state) =>
       hasKnownCreditCapacity(state, now),
     );
   }

@@ -65,7 +65,10 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 }
 
 function parseUpstreamMode(value: string | undefined): CommandCodeUpstreamMode {
-  return value?.trim().toLowerCase() === "alpha" ? "alpha" : "provider";
+  const mode = value?.trim().toLowerCase();
+  if (mode === "alpha") return "alpha";
+  if (mode === "provider") return "provider";
+  return "auto";
 }
 
 function parseRoutingPolicy(value: string | undefined): CommandCodeRoutingPolicy {
@@ -211,6 +214,8 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     commandCodeBillingRefreshMs,
     commandCodeBillingTimeoutMs: parseNumber(env.COMMANDCODE_BILLING_TIMEOUT_MS, 10_000),
     commandCodeCredentialCooldownMs,
+    commandCodeRetryMaxAttempts: parseNumber(env.COMMANDCODE_RETRY_MAX_ATTEMPTS, 5),
+    commandCodeRetryBackoffMs: parseNumber(env.COMMANDCODE_RETRY_BACKOFF_MS, 250),
     requestBodyLimitBytes: parseNumber(env.REQUEST_BODY_LIMIT_BYTES, 1_048_576),
     rateLimitMax: parseNumber(env.RATE_LIMIT_MAX, 60),
     rateLimitWindow: env.RATE_LIMIT_WINDOW?.trim() || "1 minute",
@@ -239,7 +244,7 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
       webhookUrl: env.COMMANDCODE_BALANCE_ALERT_WEBHOOK_URL?.trim() || undefined,
       webhookBearer: env.COMMANDCODE_BALANCE_ALERT_WEBHOOK_BEARER?.trim() || undefined,
     },
-    timeoutMs: parseNumber(env.COMMANDCODE_TIMEOUT_MS, 300_000),
+    timeoutMs: parseNumber(env.COMMANDCODE_TIMEOUT_MS, 600_000),
   };
 }
 

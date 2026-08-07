@@ -39,6 +39,8 @@ const baseConfig: BridgeConfig = {
   commandCodeBillingRefreshMs: 60_000,
   commandCodeBillingTimeoutMs: 10_000,
   commandCodeCredentialCooldownMs: 60_000,
+  commandCodeRetryMaxAttempts: 5,
+  commandCodeRetryBackoffMs: 1,
   requestBodyLimitBytes: 1_048_576,
   rateLimitMax: 60,
   rateLimitWindow: "1 minute",
@@ -267,6 +269,12 @@ describe("CommandCode client credential routing", () => {
         new Response(
           JSON.stringify({
             credits: { monthlyCredits: 12, purchasedCredits: 3, freeCredits: 1, planId: "pro" },
+            windowLimits: {
+              limited: true,
+              exceeded: "weekly",
+              fiveHour: { used: 2.25, cap: 3, exceeded: false, resetAt: 1_786_091_731_770 },
+              weekly: { used: 6.24, cap: 6, exceeded: true, resetAt: 1_786_603_898_869 },
+            },
           }),
           { status: 200 },
         ),
@@ -313,6 +321,12 @@ describe("CommandCode client credential routing", () => {
       planId: "pro-plan",
       totalCost: 4.5,
       totalCount: 9,
+      windowLimits: {
+        limited: true,
+        exceeded: "weekly",
+        fiveHour: { used: 2.25, cap: 3, exceeded: false, resetAt: 1_786_091_731_770 },
+        weekly: { used: 6.24, cap: 6, exceeded: true, resetAt: 1_786_603_898_869 },
+      },
     });
   });
 
