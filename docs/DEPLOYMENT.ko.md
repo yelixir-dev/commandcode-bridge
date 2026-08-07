@@ -388,18 +388,20 @@ npm run smoke
 
 ### CommandCode upstream 옵션
 
-| 변수                               | 기본값                       | 설명                                                                                                                     |
-| ---------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `COMMANDCODE_API_KEY`              | 미설정                       | single upstream CommandCode API key입니다. 비워두면 일반 CommandCode auth file을 읽을 수 있습니다.                       |
-| `COMMANDCODE_API_KEYS`             | 미설정                       | multi-key용 comma-separated `id=key` 목록입니다. 예: `primary=...,secondary=...`. single-key보다 우선합니다.             |
-| `COMMANDCODE_CREDENTIALS`          | 미설정                       | JSON credential 배열/객체 또는 comma-separated multi-key 목록입니다. 구조화된 배포 시스템에서 유용합니다.                |
-| `COMMANDCODE_CREDENTIALS_FILE`     | 미설정                       | JSON credentials 파일 경로입니다. upstream credential source 중 최우선입니다. 복잡한 multi-key에는 이 방식을 권장합니다. |
-| `COMMANDCODE_API_BASE`             | `https://api.commandcode.ai` | upstream CommandCode API base URL입니다. 테스트나 upstream 변경 대응 외에는 바꾸지 마십시오.                             |
-| `COMMANDCODE_DEFAULT_MODEL`        | `deepseek/deepseek-v4-pro`   | `model: "default"` 요청이 실제로 사용할 upstream model입니다.                                                            |
-| `COMMANDCODE_ALLOWED_MODELS`       | Pro + Flash                  | 허용할 model ID 목록입니다. 이 목록 밖 요청은 unknown model 허용 옵션을 켜지 않는 한 거부됩니다.                         |
-| `COMMANDCODE_ALLOW_UNKNOWN_MODELS` | `false`                      | 임의 model ID를 upstream으로 통과시킵니다. 운영에서는 권장하지 않습니다.                                                 |
-| `COMMANDCODE_CLI_VERSION`          | `1.14.0`                     | 테스트된 CommandCode CLI 동작과 맞추기 위해 upstream에 보내는 version header입니다.                                      |
-| `COMMANDCODE_TIMEOUT_MS`           | `300000`                     | upstream generation timeout입니다.                                                                                       |
+| 변수                               | 기본값                       | 설명                                                                                                                                                             |
+| ---------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `COMMANDCODE_API_KEY`              | 미설정                       | single upstream CommandCode API key입니다. `COMMAND_CODE_API_KEY`, `CMD_API_KEY`도 인식합니다. 비워두면 일반 CommandCode auth file을 읽을 수 있습니다.           |
+| `COMMANDCODE_API_KEYS`             | 미설정                       | multi-key용 comma-separated `id=key` 목록입니다. 예: `primary=...,secondary=...`. single-key보다 우선합니다.                                                     |
+| `COMMANDCODE_CREDENTIALS`          | 미설정                       | JSON credential 배열/객체 또는 comma-separated multi-key 목록입니다. 구조화된 배포 시스템에서 유용합니다.                                                        |
+| `COMMANDCODE_CREDENTIALS_FILE`     | 미설정                       | JSON credentials 파일 경로입니다. upstream credential source 중 최우선입니다. 복잡한 multi-key에는 이 방식을 권장합니다.                                         |
+| `COMMANDCODE_UPSTREAM_MODE`        | `provider`                   | `provider`는 비-Claude 모델을 공식 Provider API(`/provider/v1/chat/completions`)로 호출합니다. `alpha`는 모든 모델을 legacy `/alpha/generate` 터널로 강제합니다. |
+| `COMMANDCODE_ZDR`                  | `false`                      | Provider API 요청에 `x-cmd-zdr: 1`(zero data retention)을 보냅니다.                                                                                              |
+| `COMMANDCODE_API_BASE`             | `https://api.commandcode.ai` | upstream CommandCode API base URL입니다. 테스트나 upstream 변경 대응 외에는 바꾸지 마십시오.                                                                     |
+| `COMMANDCODE_DEFAULT_MODEL`        | `deepseek/deepseek-v4-pro`   | `model: "default"` 요청이 실제로 사용할 upstream model입니다.                                                                                                    |
+| `COMMANDCODE_ALLOWED_MODELS`       | Pro + Flash                  | 허용할 model ID 목록입니다. 이 목록 밖 요청은 unknown model 허용 옵션을 켜지 않는 한 거부됩니다.                                                                 |
+| `COMMANDCODE_ALLOW_UNKNOWN_MODELS` | `false`                      | 임의 model ID를 upstream으로 통과시킵니다. 운영에서는 권장하지 않습니다.                                                                                         |
+| `COMMANDCODE_CLI_VERSION`          | `1.14.0`                     | 테스트된 CommandCode CLI 동작과 맞추기 위해 upstream에 보내는 version header입니다.                                                                              |
+| `COMMANDCODE_TIMEOUT_MS`           | `300000`                     | upstream generation timeout입니다.                                                                                                                               |
 
 Credential JSON 파일 예시:
 

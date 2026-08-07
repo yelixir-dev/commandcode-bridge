@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0-b57920?style=flat-square" alt="Version 1.14.0"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0.a-b57920?style=flat-square" alt="Version 1.14.0.a"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-52-1f6f78?style=flat-square" alt="52 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -20,21 +20,25 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **52-model** catalog aligned with CommandCode/bridge **1.14.0**.
+CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **52-model** catalog aligned with CommandCode **1.14.0**. The bridge version always tracks the current CommandCode CLI version with a letter suffix (for example **1.14.0.a**); the suffix marks bridge-only releases.
 
 [What it does](#what-it-does) · [Install](#install) · [Usage](#usage) · [How it works](#how-it-works) · [Repository layout](#repository-layout) · [Current limitations](#current-limitations) · [License](#license)
 
 ## What it does
 
-- **OpenAI-compatible API.** Lists and retrieves models and serves streaming or non-streaming chat without spawning `cmd` per request.
+- **Official Provider API by default.** Non-Claude chat calls CommandCode's public `POST /provider/v1/chat/completions` with native OpenAI bodies — no CLI headers, no per-request `cmd` subprocess, no event conversion. Claude models keep the `/alpha/generate` tunnel because the Provider API serves them only through the Anthropic format.
 
-- **CommandCode stream conversion.** Normalizes visible text, usage, finish reasons, and emitted tool calls into OpenAI response shapes.
+- **OpenAI-compatible API.** Lists and retrieves models and serves streaming or non-streaming chat to any OpenAI client, with model aliases, allowlist, and per-key routing transparent to the caller.
 
 - **Multi-key routing.** Supports `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key concurrency, cooldown, model scope, and pre-output failover.
 
 - **Universal expiry priority.** Under every policy, eligible credentials with a known expiry in **1 day or less** are selected before longer-lived credentials.
 
-- **Context metadata.** Emits `context_window`, `context_length`, and `max_context_length` whenever the catalog has a published context.
+- **Live model catalog.** At startup in provider mode the bridge refreshes the catalog from the public `GET /provider/v1/models`, so newly published models and context windows appear without a static-catalog release.
+
+- **Context metadata.** Emits `context_window`, `context_length`, and `max_context_length` whenever the catalog has a published context (live values fill the five contexts the static catalog leaves unknown).
+
+- **Balance alerts without the CLI.** Billing and usage snapshots still come from the `/alpha/billing` surface with the same Studio key, so routing and alerts keep working with zero CLI involvement.
 
 - **Mobile dashboard.** Manages bind settings, routing, credentials, and model toggles in Korean, English, and Chinese, with models folded by provider.
 
@@ -54,7 +58,7 @@ The installer targets Linux user systemd, requires Node.js 22+ for CommandCode C
 
 ### Manual source run
 
-The bridge runtime supports Node.js 20+, while installing or using the current CommandCode CLI requires Node.js 22+. Authenticate the official `command-code` npm package with `cmd login`, or provide equivalent credentials. Official installation: <https://commandcode.ai/install>.
+The bridge runtime supports Node.js 20+. In the default provider mode you only need a Studio-issued API key — no CLI install, no `cmd login`. Provide the key through `COMMAND_CODE_API_KEY`, `COMMANDCODE_API_KEY`, or `CMD_API_KEY` (or `~/.commandcode/auth.json` if you already run the CLI). The legacy `alpha` mode and `/alpha` billing reuse the same key. Official installation: <https://commandcode.ai/install>.
 
 ```bash
 git clone <your-commandcode-bridge-repository-url> commandcode-bridge
@@ -121,62 +125,62 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Model metadata and exact catalog
 
-Each model object includes `id`, `object`, `created`, and provider-derived `owned_by`. Known context is repeated in `context_window`, `context_length`, and `max_context_length`. Exactly five models have no published context and therefore omit all three capacity fields. This is the exact 1.14.0 canonical catalog; “Default” is the built-in enabled state.
+Each model object includes `id`, `object`, `created`, and provider-derived `owned_by`. Known context is repeated in `context_window`, `context_length`, and `max_context_length`. In provider mode the catalog is refreshed from the live `GET /provider/v1/models` at startup, which fills the five contexts the static catalog leaves unpublished (all currently `200,000`) and picks up newly added models; the static table below is the shipped 1.14.0 baseline. “Default” is the built-in enabled state.
 
-| Provider          | Canonical model ID                    |       Context | Default |
-| ----------------- | ------------------------------------- | ------------: | :-----: |
-| DeepSeek          | `deepseek/deepseek-v4-pro`            |     1,000,000 |   Yes   |
-| DeepSeek          | `deepseek/deepseek-v4-flash`          |     1,000,000 |   Yes   |
-| Moonshot          | `moonshotai/Kimi-K3`                  |     1,000,000 |   No    |
-| Moonshot          | `moonshotai/Kimi-K2.7-Code`           |       256,000 |   No    |
-| Moonshot          | `moonshotai/Kimi-K2.7-Code-Highspeed` |       262,000 |   No    |
-| Moonshot          | `moonshotai/Kimi-K2.6`                |       256,000 |   Yes   |
-| Moonshot          | `moonshotai/Kimi-K2.5`                |       256,000 |   No    |
-| Z.ai              | `zai-org/GLM-5.2`                     |     1,000,000 |   No    |
-| Z.ai              | `zai-org/GLM-5.2-Fast`                |     1,000,000 |   No    |
-| Z.ai              | `zai-org/GLM-5.1`                     | Not published |   Yes   |
-| Z.ai              | `zai-org/GLM-5`                       |       200,000 |   No    |
-| MiniMax           | `MiniMaxAI/MiniMax-M3`                |     1,000,000 |   No    |
-| MiniMax           | `MiniMaxAI/MiniMax-M2.7`              | Not published |   Yes   |
-| MiniMax           | `MiniMaxAI/MiniMax-M2.5`              |       200,000 |   No    |
-| Xiaomi            | `xiaomi/mimo-v2.5-pro`                |     1,000,000 |   No    |
-| Xiaomi            | `xiaomi/mimo-v2.5`                    |     1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.8-Max`                    |     1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.7-Max`                    |     1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.7-Plus`                   |     1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.7-Flash`                  |     1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.6-Max-Preview`            | Not published |   No    |
-| Qwen              | `Qwen/Qwen3.6-Plus`                   | Not published |   Yes   |
-| StepFun           | `stepfun/Step-3.7-Flash`              |       256,000 |   No    |
-| StepFun           | `stepfun/Step-3.5-Flash`              |     1,000,000 |   No    |
-| Tencent           | `tencent/hy3-paid`                    |       262,000 |   No    |
-| NVIDIA            | `nvidia/nemotron-3-ultra-550b-a55b`   |     1,000,000 |   No    |
-| Thinking Machines | `thinkingmachines/inkling`            |       256,000 |   No    |
-| Thinking Machines | `thinkingmachines/inkling-small`      |     1,000,000 |   No    |
-| Poolside          | `poolside/laguna-s-2.1-free`          |       256,000 |   No    |
-| Anthropic         | `claude-sonnet-5`                     |     1,000,000 |   No    |
-| Anthropic         | `claude-sonnet-4-6`                   |     1,000,000 |   No    |
-| Anthropic         | `claude-fable-5`                      |     1,000,000 |   No    |
-| Anthropic         | `claude-opus-5`                       |     1,000,000 |   No    |
-| Anthropic         | `claude-opus-4-8`                     |     1,000,000 |   No    |
-| Anthropic         | `claude-opus-4-7`                     |     1,000,000 |   No    |
-| Anthropic         | `claude-haiku-4-5-20251001`           |       200,000 |   No    |
-| OpenAI            | `gpt-5.6-sol`                         |     1,050,000 |   No    |
-| OpenAI            | `gpt-5.6-terra`                       |     1,050,000 |   No    |
-| OpenAI            | `gpt-5.6-luna`                        |     1,050,000 |   No    |
-| OpenAI            | `gpt-5.5`                             | Not published |   No    |
-| OpenAI            | `gpt-5.4`                             |       400,000 |   No    |
-| OpenAI            | `gpt-5.3-codex`                       |       400,000 |   No    |
-| OpenAI            | `gpt-5.4-mini`                        |       400,000 |   No    |
-| Google            | `google/gemini-3.6-flash`             |     1,000,000 |   No    |
-| Google            | `google/gemini-3.5-flash`             |     1,000,000 |   No    |
-| Google            | `google/gemini-3.5-flash-lite`        |     1,000,000 |   No    |
-| Google            | `google/gemini-3.1-flash-lite`        |     1,000,000 |   No    |
-| Sakana            | `sakana/fugu-ultra`                   |     1,000,000 |   No    |
-| Meta              | `meta/muse-spark-1.1`                 |     1,050,000 |   No    |
-| Meta              | `meta/muse-spark-1.2`                 |     1,050,000 |   No    |
-| Meta              | `meta/muse-spark-1.2-contributor`     |     1,050,000 |   No    |
-| xAI               | `xai/grok-4.5`                        |       500,000 |   No    |
+| Provider          | Canonical model ID                    |        Context | Default |
+| ----------------- | ------------------------------------- | -------------: | :-----: |
+| DeepSeek          | `deepseek/deepseek-v4-pro`            |      1,000,000 |   Yes   |
+| DeepSeek          | `deepseek/deepseek-v4-flash`          |      1,000,000 |   Yes   |
+| Moonshot          | `moonshotai/Kimi-K3`                  |      1,000,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code`           |        256,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code-Highspeed` |        262,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K2.6`                |        256,000 |   Yes   |
+| Moonshot          | `moonshotai/Kimi-K2.5`                |        256,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.2`                     |      1,000,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.2-Fast`                |      1,000,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.1`                     | 200,000 (live) |   Yes   |
+| Z.ai              | `zai-org/GLM-5`                       |        200,000 |   No    |
+| MiniMax           | `MiniMaxAI/MiniMax-M3`                |      1,000,000 |   No    |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.7`              | 200,000 (live) |   Yes   |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.5`              |        200,000 |   No    |
+| Xiaomi            | `xiaomi/mimo-v2.5-pro`                |      1,000,000 |   No    |
+| Xiaomi            | `xiaomi/mimo-v2.5`                    |      1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.8-Max`                    |      1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.7-Max`                    |      1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.7-Plus`                   |      1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.7-Flash`                  |      1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.6-Max-Preview`            | 200,000 (live) |   No    |
+| Qwen              | `Qwen/Qwen3.6-Plus`                   | 200,000 (live) |   Yes   |
+| StepFun           | `stepfun/Step-3.7-Flash`              |        256,000 |   No    |
+| StepFun           | `stepfun/Step-3.5-Flash`              |      1,000,000 |   No    |
+| Tencent           | `tencent/hy3-paid`                    |        262,000 |   No    |
+| NVIDIA            | `nvidia/nemotron-3-ultra-550b-a55b`   |      1,000,000 |   No    |
+| Thinking Machines | `thinkingmachines/inkling`            |        256,000 |   No    |
+| Thinking Machines | `thinkingmachines/inkling-small`      |      1,000,000 |   No    |
+| Poolside          | `poolside/laguna-s-2.1-free`          |        256,000 |   No    |
+| Anthropic         | `claude-sonnet-5`                     |      1,000,000 |   No    |
+| Anthropic         | `claude-sonnet-4-6`                   |      1,000,000 |   No    |
+| Anthropic         | `claude-fable-5`                      |      1,000,000 |   No    |
+| Anthropic         | `claude-opus-5`                       |      1,000,000 |   No    |
+| Anthropic         | `claude-opus-4-8`                     |      1,000,000 |   No    |
+| Anthropic         | `claude-opus-4-7`                     |      1,000,000 |   No    |
+| Anthropic         | `claude-haiku-4-5-20251001`           |        200,000 |   No    |
+| OpenAI            | `gpt-5.6-sol`                         |      1,050,000 |   No    |
+| OpenAI            | `gpt-5.6-terra`                       |      1,050,000 |   No    |
+| OpenAI            | `gpt-5.6-luna`                        |      1,050,000 |   No    |
+| OpenAI            | `gpt-5.5`                             | 200,000 (live) |   No    |
+| OpenAI            | `gpt-5.4`                             |        400,000 |   No    |
+| OpenAI            | `gpt-5.3-codex`                       |        400,000 |   No    |
+| OpenAI            | `gpt-5.4-mini`                        |        400,000 |   No    |
+| Google            | `google/gemini-3.6-flash`             |      1,000,000 |   No    |
+| Google            | `google/gemini-3.5-flash`             |      1,000,000 |   No    |
+| Google            | `google/gemini-3.5-flash-lite`        |      1,000,000 |   No    |
+| Google            | `google/gemini-3.1-flash-lite`        |      1,000,000 |   No    |
+| Sakana            | `sakana/fugu-ultra`                   |      1,000,000 |   No    |
+| Meta              | `meta/muse-spark-1.1`                 |      1,050,000 |   No    |
+| Meta              | `meta/muse-spark-1.2`                 |      1,050,000 |   No    |
+| Meta              | `meta/muse-spark-1.2-contributor`     |      1,050,000 |   No    |
+| xAI               | `xai/grok-4.5`                        |        500,000 |   No    |
 
 ### Dashboard and credential routing
 
@@ -190,21 +194,21 @@ Upgrades from a persisted 1.3.1 dashboard catalog preserve each current model's 
 
 Existing browsers with a saved key continue without interruption. On a fresh browser, enter the current key in **Current Admin API Key** before saving or restarting. A runtime with no key can bootstrap only from a real loopback connection whose Host is also loopback.
 
-Credential precedence is `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, `COMMANDCODE_API_KEY`, then CLI auth files. Core defaults are `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.14.0`, `COMMANDCODE_TIMEOUT_MS=300000`, and `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`. `BRIDGE_API_KEY` protects `/v1/*` when set; clients may use Bearer or `x-api-key`. Protect credential JSON with `chmod 600`. Optional balance alerts are off. Optional `commandcode-router` is for least-in-flight routing across multiple bridge hosts.
+Credential precedence is `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, then `COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`, then CLI auth files. Core defaults are `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_UPSTREAM_MODE=provider`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.14.0`, `COMMANDCODE_TIMEOUT_MS=300000`, and `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`. `BRIDGE_API_KEY` protects `/v1/*` when set; clients may use Bearer or `x-api-key`. Set `COMMANDCODE_ZDR=true` to send `x-cmd-zdr: 1` (zero data retention) on Provider API requests, and `COMMANDCODE_UPSTREAM_MODE=alpha` to force the legacy `/alpha/generate` path for every model. Protect credential JSON with `chmod 600`. Optional balance alerts are off. Optional `commandcode-router` is for least-in-flight routing across multiple bridge hosts.
 
 ## How it works
 
 1. Authenticate and validate the OpenAI-shaped request.
 
-2. Resolve model aliases against the enabled catalog.
+2. Resolve model aliases against the catalog (live-refreshed in provider mode).
 
 3. Filter disabled, scoped, saturated, cooled-down, expired, and exhausted credentials.
 
 4. Prioritize any eligible credential expiring within 1 day, then apply the configured policy.
 
-5. Call CommandCode `POST /alpha/generate` directly with one bound credential.
+5. Call the official `POST /provider/v1/chat/completions` with a native OpenAI body (Claude models and `alpha` mode keep using `POST /alpha/generate`).
 
-6. Convert stream events into OpenAI JSON or SSE, including supported tools and optional usage.
+6. Stream the provider's OpenAI SSE through with the public model id (alpha mode converts CommandCode stream events instead), including optional usage.
 
 7. Verify with tests, `npm run verify`, `/health`, model discovery, and `npm run smoke`.
 
@@ -224,11 +228,13 @@ Development verification is `npm run verify`; runtime verification is `npm run s
 
 - **Trusted network boundary.** Read-only dashboard endpoints reveal redacted operational metadata; keep them on localhost or a trusted VPN/tailnet and set `BRIDGE_API_KEY` outside localhost.
 
-- **Alpha upstream dependency.** CommandCode `/alpha/generate` and billing paths may change; pin `COMMANDCODE_CLI_VERSION` and smoke-test upgrades.
+- **Claude traffic uses the alpha tunnel.** The Provider API serves Claude models only through the Anthropic `/messages` format, so in provider mode Claude requests still go to `/alpha/generate`; set `COMMANDCODE_UPSTREAM_MODE=alpha` to force that path for every model.
+
+- **Billing stays on the alpha surface.** `/alpha/billing` is not a documented Provider API route; pin `COMMANDCODE_CLI_VERSION` and smoke-test upgrades so routing and balance alerts keep working.
 
 - **No account-limit bypass.** Billing, credits, rate limits, and terms still apply; monitor diagnostics and eligible credentials.
 
-- **No invented capacity.** Five model contexts are unknown; absent capacity fields mean unknown, not unlimited.
+- **Dynamic catalog is best-effort.** The startup refresh falls back to the static catalog when the live models endpoint is unreachable; context metadata is only as current as the last successful refresh.
 
 Do not commit `.env`, CLI auth files, credential JSON, keys, billing details, private topology, or dashboard exports. This is not a public proxy or internet control plane. See [the security guide](docs/SECURITY.md).
 

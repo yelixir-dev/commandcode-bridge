@@ -1,5 +1,117 @@
 import type { CommandCodeModelConfig } from "./types.js";
 
+const PROVIDER_MODELS_TIMEOUT_MS = 10_000;
+
+export function isClaudeModelId(id: string): boolean {
+  return /^claude(?:[-_.]|$)/i.test(id.trim());
+}
+
+export interface ProviderCatalogModel {
+  id?: unknown;
+  name?: unknown;
+  context_length?: unknown;
+  owned_by?: unknown;
+}
+
+type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function contextWindowValue(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export function providerModelsFromCatalog(payload: unknown): CommandCodeModelConfig[] {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("data" in payload) ||
+    !Array.isArray(payload.data)
+  ) {
+    throw new Error("Command Code provider model catalog did not contain a data array");
+  }
+
+  const models: CommandCodeModelConfig[] = [];
+  const seenIds = new Set<string>();
+  for (const item of payload.data) {
+    if (typeof item !== "object" || item === null) continue;
+    const {
+      id: rawId,
+      name: rawName,
+      context_length: rawContext,
+      owned_by: rawOwner,
+    } = item as ProviderCatalogModel;
+    const id = stringValue(rawId);
+    if (!id || seenIds.has(id)) continue;
+    seenIds.add(id);
+    const model: CommandCodeModelConfig = {
+      id,
+      enabled: false,
+    };
+    const label = stringValue(rawName);
+    if (label) model.label = label;
+    const owner = stringValue(rawOwner);
+    if (owner) model.provider = owner;
+    const contextWindow = contextWindowValue(rawContext);
+    if (contextWindow !== undefined) model.contextWindow = contextWindow;
+    models.push(model);
+  }
+
+  if (models.length === 0) {
+    throw new Error("Command Code provider model catalog contained no usable models");
+  }
+  return models;
+}
+
+export async function fetchProviderModelCatalog(
+  apiBase: string,
+  options: { timeoutMs?: number; fetchImpl?: FetchLike } = {},
+): Promise<CommandCodeModelConfig[]> {
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const timeoutMs = options.timeoutMs ?? PROVIDER_MODELS_TIMEOUT_MS;
+  const response = await fetchImpl(`${apiBase}/provider/v1/models`, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Command Code provider model discovery failed: HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`,
+    );
+  }
+  const payload: unknown = await response.json();
+  return providerModelsFromCatalog(payload);
+}
+
+export function mergeProviderModelCatalog(
+  baseCatalog: CommandCodeModelConfig[],
+  liveCatalog: CommandCodeModelConfig[],
+  enabledIds: string[] = [],
+): CommandCodeModelConfig[] {
+  const liveById = new Map(liveCatalog.map((model) => [model.id, model]));
+  const baseIds = new Set(baseCatalog.map((model) => model.id));
+  const enabled = new Set(enabledIds);
+
+  const merged = baseCatalog.map((base) => {
+    const live = liveById.get(base.id);
+    if (!live) return { ...base };
+    const model: CommandCodeModelConfig = { ...base };
+    if (live.contextWindow !== undefined) model.contextWindow = live.contextWindow;
+    if (live.label) model.label = live.label;
+    if (live.provider) model.provider = live.provider;
+    return model;
+  });
+
+  for (const live of liveCatalog) {
+    if (baseIds.has(live.id)) continue;
+    merged.push({ ...live, enabled: enabled.has(live.id) || live.enabled === true });
+  }
+
+  return merged;
+}
+
 export interface CommandCodeModelDefinition {
   id: string;
   label: string;

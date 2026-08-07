@@ -17,17 +17,20 @@ CommandCode Bridge
   ├─ model alias/allowlist resolver
   ├─ CommandCode credential router
   ├─ CommandCode billing/usage snapshot cache
-  ├─ OpenAI → CommandCode converter
+  ├─ Provider API client (native OpenAI, default)
+  ├─ CommandCode /alpha client (Claude + legacy mode)
+  ├─ OpenAI → CommandCode converter (alpha path only)
   ├─ CommandCode upstream HTTP client
-  ├─ CommandCode stream parser
-  └─ CommandCode → OpenAI response converter
+  ├─ CommandCode stream parser (alpha path only)
+  └─ CommandCode → OpenAI response converter (alpha path only)
         │
         ▼
 CommandCode API
-  └─ POST /alpha/generate
+  ├─ POST /provider/v1/chat/completions  (Provider API, non-Claude)
+  └─ POST /alpha/generate                (Claude + alpha mode)
         │
         ▼
-DeepSeek V4 Pro
+DeepSeek V4 Pro / Flash etc.
 ```
 
 ## Request Flow
@@ -65,15 +68,18 @@ DeepSeek V4 Pro
 
 ## Upstream Compatibility
 
-CommandCode's `/alpha/generate` requires `params.stream: true`. The bridge therefore always calls upstream streaming, even for OpenAI non-streaming clients.
+Provider mode (default) calls the official `POST /provider/v1/chat/completions` with a native OpenAI body and streams the provider's OpenAI SSE through with the public model id; `stream: false` requests are answered with a single JSON completion. Claude model ids are served through `POST /alpha/generate` because the Provider API exposes Claude only via the Anthropic `/messages` format. Legacy `alpha` mode keeps the old tunnel: `/alpha/generate` requires `params.stream: true`, so the bridge always calls upstream streaming there, even for OpenAI non-streaming clients.
+
+The Provider API emits token usage in the final chunk with no opt-in required; `x-cmd-zdr: 1` is sent when `COMMANDCODE_ZDR` is enabled. Billing and usage snapshots (`/alpha/whoami`, `/alpha/billing/*`, `/alpha/usage/summary`) are shared by both modes and remain the routing and balance-alert data source.
 
 ## Error Strategy
 
 - Invalid OpenAI request → HTTP 400 OpenAI-style error.
 - Disallowed model → HTTP 400 OpenAI-style error.
 - Missing upstream API key → HTTP 500 configuration error.
-- CommandCode HTTP failure → HTTP 502 with upstream status and sanitized body; selected credential cooldown/disable rules are applied.
-- CommandCode stream `error` event → fail over first if no visible output has been emitted and another credential is available; otherwise map to HTTP 502 or SSE error frame plus `[DONE]`.
+- Provider API HTTP failure → upstream status and OpenAI-style error body forwarded (for example `403 upgrade_required` or `429 rate_limit_error`); credential cooldown/disable rules are applied.
+- `/alpha` HTTP failure → HTTP 502 with upstream status and sanitized body.
+- `/alpha` stream `error` event → fail over first if no visible output has been emitted and another credential is available; otherwise map to HTTP 502 or SSE error frame plus `[DONE]`.
 - No available upstream credential → HTTP 503 OpenAI-style upstream error.
 - Unknown server failure → HTTP 500 generic error.
 

@@ -1,6 +1,6 @@
 # CommandCode Bridge PRD
 
-> Product Requirement Document for an OpenAI-compatible HTTP proxy over CommandCode's `/alpha/generate` endpoint.
+> Product Requirement Document for an OpenAI-compatible HTTP proxy over CommandCode's official Provider API (`/provider/v1`), with the legacy `/alpha/generate` tunnel retained for Claude models and billing.
 
 ## Mission
 

@@ -206,6 +206,19 @@ describe("configuration and model aliases", () => {
     ]);
   });
 
+  it("defaults to provider upstream mode with zero data retention off", () => {
+    const config = loadBridgeConfig({ env: {} });
+    expect(config.upstreamMode).toBe("provider");
+    expect(config.zdr).toBe(false);
+    expect(loadBridgeConfig({ env: { COMMANDCODE_UPSTREAM_MODE: "alpha" } }).upstreamMode).toBe(
+      "alpha",
+    );
+    expect(loadBridgeConfig({ env: { COMMANDCODE_UPSTREAM_MODE: "PROVIDER" } }).upstreamMode).toBe(
+      "provider",
+    );
+    expect(loadBridgeConfig({ env: { COMMANDCODE_ZDR: "true" } }).zdr).toBe(true);
+  });
+
   it("keeps balance alerts off by default while failing closed on empty length responses", () => {
     const config = loadBridgeConfig({ env: {} });
     expect(config.balanceAlerts.enabled).toBe(false);

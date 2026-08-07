@@ -31,6 +31,21 @@ describe("CommandCode auth loading", () => {
     expect(key).toBe("user_env");
   });
 
+  it("recognizes official and alternate API key env names", () => {
+    expect(
+      loadCommandCodeApiKeyFromEnvOrFile({
+        env: { COMMAND_CODE_API_KEY: "user_official" },
+        authPaths: [],
+      }),
+    ).toBe("user_official");
+    expect(
+      loadCommandCodeApiKeyFromEnvOrFile({
+        env: { CMD_API_KEY: "user_cmd" },
+        authPaths: [],
+      }),
+    ).toBe("user_cmd");
+  });
+
   it("preserves dashboard-managed credential enabled toggles", () => {
     expect(
       extractCommandCodeCredentials({

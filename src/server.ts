@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Readable } from "node:stream";
+import type { ReadableStream as WebReadableStream } from "node:stream/web";
 
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
@@ -12,10 +13,23 @@ import { CommandCodeAuthError, CommandCodeClient, CommandCodeHttpError } from ".
 import {
   loadBridgeConfig,
   ModelNotAllowedError,
+  normalizeModelName,
   publicModelList,
   publicModelObject,
   resolveModel,
+  type ResolvedModel,
 } from "./config.js";
+import {
+  defaultModelCatalog,
+  fetchProviderModelCatalog,
+  isClaudeModelId,
+  mergeProviderModelCatalog,
+} from "./model-catalog.js";
+import {
+  buildProviderChatRequestBody,
+  CommandCodeProviderClient,
+  CommandCodeProviderSseTransform,
+} from "./provider.js";
 import {
   DEFAULT_ROUTING_CONFIG,
   redactedCredentials,
@@ -134,6 +148,118 @@ function clientApiKey(request: FastifyRequest): string | undefined {
 
 function openAIError(message: string, type: string, code: string | null = null) {
   return { error: { message, type, code } };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function refreshProviderModelCatalog(
+  baseConfig: BridgeConfig,
+  logger: { warn(object: unknown, message?: string): void },
+): Promise<BridgeConfig> {
+  try {
+    const liveCatalog = await fetchProviderModelCatalog(baseConfig.apiBase);
+    const merged = mergeProviderModelCatalog(
+      baseConfig.modelCatalog ?? defaultModelCatalog(),
+      liveCatalog,
+      baseConfig.allowedModels,
+    );
+    const enabledIds = merged
+      .filter((model) => model.enabled)
+      .map((model) => normalizeModelName(model.id));
+    const allowedModels = Array.from(new Set([...enabledIds, baseConfig.defaultModel]));
+    return { ...baseConfig, modelCatalog: merged, allowedModels };
+  } catch (error) {
+    logger.warn(
+      { err: error },
+      "CommandCode provider model discovery failed; keeping static catalog",
+    );
+    return baseConfig;
+  }
+}
+
+async function handleProviderChat(options: {
+  reply: FastifyReply;
+  request: OpenAIChatCompletionRequest;
+  providerClient: CommandCodeProviderClient;
+  resolvedModel: ResolvedModel;
+  signal: AbortSignal;
+  config: BridgeConfig;
+}): Promise<FastifyReply> {
+  const { reply, request, providerClient, resolvedModel, signal, config } = options;
+  const body = buildProviderChatRequestBody(request, resolvedModel.upstreamModel);
+  let response: Response;
+  try {
+    response = await providerClient.chat(body, signal);
+  } catch (error) {
+    if (error instanceof CommandCodeHttpError) {
+      const payload =
+        error.body ??
+        ({
+          error: {
+            message: error.message,
+            type: "upstream_error",
+            code: "commandcode_http_error",
+            upstream_status: error.status,
+          },
+        } as const);
+      return reply.code(error.status).type("application/json; charset=utf-8").send(payload);
+    }
+    throw error;
+  }
+
+  if (request.stream) {
+    const transform = new CommandCodeProviderSseTransform({
+      publicModel: resolvedModel.publicModel,
+      includeReasoning: config.includeReasoning,
+    });
+    const stream = Readable.fromWeb(response.body as WebReadableStream<Uint8Array>).pipe(transform);
+    return reply
+      .type("text/event-stream; charset=utf-8")
+      .header("cache-control", "no-cache, no-transform")
+      .header("connection", "keep-alive")
+      .header("x-accel-buffering", "no")
+      .send(stream);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    let payload: unknown = text;
+    try {
+      payload = JSON.parse(text) as unknown;
+    } catch {
+      // keep the raw upstream body when it is not JSON
+    }
+    return reply.code(response.status).type("application/json; charset=utf-8").send(payload);
+  }
+
+  const completion = (await response.json()) as Record<string, unknown>;
+  if (typeof completion.model === "string") completion.model = resolvedModel.publicModel;
+  const firstChoice =
+    Array.isArray(completion.choices) && isRecord(completion.choices[0])
+      ? completion.choices[0]
+      : undefined;
+  const message = firstChoice && isRecord(firstChoice.message) ? firstChoice.message : undefined;
+  const content = typeof message?.content === "string" ? message.content : "";
+  const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+  if (
+    config.emptyVisibleResponsePolicy === "error_on_length" &&
+    firstChoice?.finish_reason === "length" &&
+    content.length === 0 &&
+    toolCalls.length === 0
+  ) {
+    return reply.code(502).send({
+      error: {
+        message:
+          "CommandCode upstream consumed the response budget without visible text or tool calls",
+        type: "upstream_error",
+        code: "commandcode_empty_visible_response",
+        upstream_status: 502,
+      },
+    });
+  }
+  return reply.send(completion);
 }
 
 function isAdminRequest(request: FastifyRequest): boolean {
@@ -296,6 +422,7 @@ function dashboardConfigResponse(
     bridge: {
       online: true,
       version: BRIDGE_VERSION,
+      upstream_mode: config.upstreamMode,
       endpoint: `${config.host}:${config.port}`,
       port: config.port,
       models: publicModelList(config),
@@ -335,13 +462,15 @@ async function writeStreamingResponse(
 }
 
 export async function createApp(options: CreateAppOptions = {}): Promise<FastifyInstance> {
-  const config = mergeConfig(options);
+  const baseConfig = mergeConfig(options);
+  const injectedUpstream = options.upstream;
+  const eventPipelineAll = injectedUpstream !== undefined;
   const app = Fastify({
     logger:
-      config.logLevel === "silent"
+      baseConfig.logLevel === "silent"
         ? false
         : {
-            level: config.logLevel,
+            level: baseConfig.logLevel,
             redact: {
               paths: [
                 "req.headers.authorization",
@@ -355,9 +484,14 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
               censor: "[REDACTED]",
             },
           },
-    bodyLimit: config.requestBodyLimitBytes,
+    bodyLimit: baseConfig.requestBodyLimitBytes,
   });
-  const upstream = options.upstream ?? new CommandCodeClient(config);
+  let config = baseConfig;
+  if (!eventPipelineAll && config.upstreamMode === "provider") {
+    config = await refreshProviderModelCatalog(config, app.log);
+  }
+  const upstream = injectedUpstream ?? new CommandCodeClient(config);
+  const providerClient = new CommandCodeProviderClient(config);
   const diagnosticsProvider = isDiagnosticsProvider(upstream) ? upstream : undefined;
   const balanceAlertManager = config.balanceAlerts.enabled
     ? new CommandCodeBalanceAlertManager(config.balanceAlerts, app.log)
@@ -453,7 +587,10 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     status: "ok",
     service: "commandcode-bridge",
     version: BRIDGE_VERSION,
-    upstream: "commandcode-alpha-generate",
+    upstream:
+      config.upstreamMode === "provider"
+        ? "commandcode-provider-api"
+        : "commandcode-alpha-generate",
     endpoint: `${config.host}:${config.port}`,
     port: config.port,
     default_model: config.defaultModel,
@@ -602,7 +739,12 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     try {
       const parsed = chatCompletionRequestSchema.parse(request.body);
       const openAIRequest = asOpenAIRequest(parsed);
-      if (!isSupportedToolChoice(openAIRequest.tool_choice)) {
+      const resolvedModel = resolveModel(openAIRequest.model, config);
+      const useProviderChat =
+        !eventPipelineAll &&
+        config.upstreamMode === "provider" &&
+        !isClaudeModelId(resolvedModel.upstreamModel);
+      if (!useProviderChat && !isSupportedToolChoice(openAIRequest.tool_choice)) {
         return reply
           .code(400)
           .send(
@@ -613,7 +755,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
             ),
           );
       }
-      const resolvedModel = resolveModel(openAIRequest.model, config);
       const id = `chatcmpl_${randomUUID().replace(/-/g, "")}`;
       const created = Math.floor(Date.now() / 1000);
       const abortController = new AbortController();
@@ -621,6 +762,18 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       reply.raw.on("close", () => {
         if (!reply.raw.writableEnded) abortController.abort();
       });
+
+      if (useProviderChat) {
+        return await handleProviderChat({
+          reply,
+          request: openAIRequest,
+          providerClient,
+          resolvedModel,
+          signal: abortController.signal,
+          config,
+        });
+      }
+
       const commandCodeBody = buildCommandCodeGenerateBody({
         request: openAIRequest,
         upstreamModel: resolvedModel.upstreamModel,

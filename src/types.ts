@@ -217,11 +217,15 @@ export interface OpenAIChatCompletion {
   usage: OpenAIUsage;
 }
 
+export type CommandCodeUpstreamMode = "provider" | "alpha";
+
 export interface BridgeConfig {
   host: string;
   port: number;
   apiBase: string;
   cliVersion: string;
+  upstreamMode: CommandCodeUpstreamMode;
+  zdr: boolean;
   defaultModel: string;
   allowedModels: string[];
   allowUnknownModels: boolean;

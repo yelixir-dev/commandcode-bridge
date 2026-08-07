@@ -24,6 +24,8 @@ const baseConfig: BridgeConfig = {
   port: 9992,
   apiBase: "https://api.commandcode.ai",
   cliVersion: "1.14.0",
+  upstreamMode: "alpha",
+  zdr: false,
   defaultModel: "deepseek/deepseek-v4-pro",
   allowedModels: ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],
   allowUnknownModels: false,

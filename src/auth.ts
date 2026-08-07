@@ -169,11 +169,21 @@ function loadCredentialsFromFile(path: string): CommandCodeCredential[] {
   }
 }
 
+const API_KEY_ENV_NAMES = ["COMMAND_CODE_API_KEY", "COMMANDCODE_API_KEY", "CMD_API_KEY"] as const;
+
+export function configuredApiKeyEnvName(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string | undefined {
+  return API_KEY_ENV_NAMES.find((name) => Boolean(env[name]?.trim()));
+}
+
 export function loadCommandCodeApiKeyFromEnvOrFile(
   options: LoadApiKeyOptions = {},
 ): string | undefined {
   const env = options.env ?? process.env;
-  const envKey = stringValue(env.COMMANDCODE_API_KEY);
+  const envKey = API_KEY_ENV_NAMES.map((name) => stringValue(env[name])).find(
+    (value): value is string => Boolean(value),
+  );
   if (envKey) return envKey;
 
   const authPaths = options.authPaths ?? [

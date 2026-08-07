@@ -15,6 +15,7 @@ import type {
   BridgeConfig,
   CommandCodeEmptyVisibleResponsePolicy,
   CommandCodeRoutingPolicy,
+  CommandCodeUpstreamMode,
 } from "./types.js";
 
 export const DEFAULT_MODEL = "deepseek/deepseek-v4-pro";
@@ -61,6 +62,10 @@ function parseNonNegativeNumber(value: string | undefined, fallback: number): nu
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined || value.trim() === "") return fallback;
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+}
+
+function parseUpstreamMode(value: string | undefined): CommandCodeUpstreamMode {
+  return value?.trim().toLowerCase() === "alpha" ? "alpha" : "provider";
 }
 
 function parseRoutingPolicy(value: string | undefined): CommandCodeRoutingPolicy {
@@ -187,6 +192,8 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     port: serverFromFile.port,
     apiBase: (env.COMMANDCODE_API_BASE?.trim() || "https://api.commandcode.ai").replace(/\/+$/, ""),
     cliVersion: env.COMMANDCODE_CLI_VERSION?.trim() || "1.14.0",
+    upstreamMode: parseUpstreamMode(env.COMMANDCODE_UPSTREAM_MODE),
+    zdr: parseBoolean(env.COMMANDCODE_ZDR, false),
     defaultModel,
     allowedModels,
     allowUnknownModels: parseBoolean(env.COMMANDCODE_ALLOW_UNKNOWN_MODELS, false),

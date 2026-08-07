@@ -389,18 +389,20 @@ npm run smoke
 
 ### CommandCode upstream options
 
-| Variable                           | Default                      | Description                                                                                                              |
-| ---------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `COMMANDCODE_API_KEY`              | unset                        | Single upstream CommandCode API key. If unset, the bridge can read the normal CommandCode auth file.                     |
-| `COMMANDCODE_API_KEYS`             | unset                        | Comma-separated multi-key `id=key` list, for example `primary=...,secondary=...`. Takes precedence over single-key mode. |
-| `COMMANDCODE_CREDENTIALS`          | unset                        | JSON credential array/object or comma-separated multi-key list. Useful for structured deployment systems.                |
-| `COMMANDCODE_CREDENTIALS_FILE`     | unset                        | Path to a JSON credentials file. Highest upstream credential precedence. Recommended for complex multi-key setups.       |
-| `COMMANDCODE_API_BASE`             | `https://api.commandcode.ai` | Upstream CommandCode API base URL. Change only for testing or if CommandCode changes endpoint base.                      |
-| `COMMANDCODE_DEFAULT_MODEL`        | `deepseek/deepseek-v4-pro`   | Upstream model used by `model: "default"`.                                                                               |
-| `COMMANDCODE_ALLOWED_MODELS`       | Pro + Flash                  | Comma-separated allowlist. Requests outside this list are rejected unless unknown models are allowed.                    |
-| `COMMANDCODE_ALLOW_UNKNOWN_MODELS` | `false`                      | Allows arbitrary model IDs to pass through. Not recommended for production.                                              |
-| `COMMANDCODE_CLI_VERSION`          | `1.14.0`                     | Version header sent upstream to match the tested CommandCode CLI behavior.                                               |
-| `COMMANDCODE_TIMEOUT_MS`           | `300000`                     | Upstream generation timeout.                                                                                             |
+| Variable                           | Default                      | Description                                                                                                                                                  |
+| ---------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `COMMANDCODE_API_KEY`              | unset                        | Single upstream CommandCode API key. Also recognized: `COMMAND_CODE_API_KEY`, `CMD_API_KEY`. If unset, the bridge can read the normal CommandCode auth file. |
+| `COMMANDCODE_API_KEYS`             | unset                        | Comma-separated multi-key `id=key` list, for example `primary=...,secondary=...`. Takes precedence over single-key mode.                                     |
+| `COMMANDCODE_CREDENTIALS`          | unset                        | JSON credential array/object or comma-separated multi-key list. Useful for structured deployment systems.                                                    |
+| `COMMANDCODE_CREDENTIALS_FILE`     | unset                        | Path to a JSON credentials file. Highest upstream credential precedence. Recommended for complex multi-key setups.                                           |
+| `COMMANDCODE_UPSTREAM_MODE`        | `provider`                   | `provider` calls the official Provider API for non-Claude models; `alpha` forces the legacy `/alpha/generate` tunnel for every model.                        |
+| `COMMANDCODE_ZDR`                  | `false`                      | Sends `x-cmd-zdr: 1` (zero data retention) on Provider API requests.                                                                                         |
+| `COMMANDCODE_API_BASE`             | `https://api.commandcode.ai` | Upstream CommandCode API base URL. Change only for testing or if CommandCode changes endpoint base.                                                          |
+| `COMMANDCODE_DEFAULT_MODEL`        | `deepseek/deepseek-v4-pro`   | Upstream model used by `model: "default"`.                                                                                                                   |
+| `COMMANDCODE_ALLOWED_MODELS`       | Pro + Flash                  | Comma-separated allowlist. Requests outside this list are rejected unless unknown models are allowed.                                                        |
+| `COMMANDCODE_ALLOW_UNKNOWN_MODELS` | `false`                      | Allows arbitrary model IDs to pass through. Not recommended for production.                                                                                  |
+| `COMMANDCODE_CLI_VERSION`          | `1.14.0`                     | Version header sent upstream to match the tested CommandCode CLI behavior.                                                                                   |
+| `COMMANDCODE_TIMEOUT_MS`           | `300000`                     | Upstream generation timeout.                                                                                                                                 |
 
 Credential file shape:
 

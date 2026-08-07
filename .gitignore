@@ -12,3 +12,7 @@ release/env.production
 *.tgz
 .DS_Store
 npm-debug.log*
+.commandcode/
+.omo/
+.senpi/
+.tmp/

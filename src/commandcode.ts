@@ -97,12 +97,14 @@ async function responseBody(response: Response): Promise<unknown> {
   }
 }
 
+export { responseBody };
+
 function slugFromWorkingDir(workingDir: string): string {
   const last = workingDir.split(/[\\/]/).filter(Boolean).pop() ?? "workspace";
   return last.replace(/[^a-zA-Z0-9_.-]/g, "-").slice(0, 80) || "workspace";
 }
 
-function createTimeoutSignal(timeoutMs: number): AbortSignal {
+export function createTimeoutSignal(timeoutMs: number): AbortSignal {
   const timeoutFactory = (
     AbortSignal as typeof AbortSignal & { timeout?: (milliseconds: number) => AbortSignal }
   ).timeout;
@@ -117,7 +119,7 @@ function createTimeoutSignal(timeoutMs: number): AbortSignal {
   return controller.signal;
 }
 
-function combineAbortSignals(signals: AbortSignal[]): AbortSignal {
+export function combineAbortSignals(signals: AbortSignal[]): AbortSignal {
   const anyFactory = (
     AbortSignal as typeof AbortSignal & { any?: (signals: AbortSignal[]) => AbortSignal }
   ).any;
@@ -279,27 +281,32 @@ export class CommandCodeBillingClient {
   }
 }
 
+export function createCommandCodeCredentialRouter(
+  config: BridgeConfig,
+): CommandCodeCredentialRouter {
+  const billingClient = new CommandCodeBillingClient(config);
+  return new CommandCodeCredentialRouter({
+    credentials: config.commandCodeCredentials,
+    policy: config.commandCodeRoutingPolicy,
+    fallbackPolicy: config.commandCodeFallbackRoutingPolicy ?? "round_robin",
+    maxInFlightPerCredential: config.commandCodeMaxInFlightPerCredential ?? 4,
+    maxTotalInFlight: config.commandCodeMaxTotalInFlight,
+    billingRefreshMs: config.commandCodeBillingRefreshMs,
+    billingTimeoutMs: config.commandCodeBillingTimeoutMs,
+    cooldownMs: config.commandCodeCredentialCooldownMs,
+    billingProvider: (credential: CommandCodeCredential, signal: AbortSignal) =>
+      billingClient.getSnapshot(credential, signal),
+    validateBillingBeforeSelect: true,
+  });
+}
+
 export class CommandCodeClient implements CommandCodeUpstream {
   private readonly config: BridgeConfig;
   private readonly router: CommandCodeCredentialRouter;
 
   public constructor(config: BridgeConfig) {
     this.config = config;
-    const billingClient = new CommandCodeBillingClient(config);
-    const routerOptions = {
-      credentials: config.commandCodeCredentials,
-      policy: config.commandCodeRoutingPolicy,
-      fallbackPolicy: config.commandCodeFallbackRoutingPolicy ?? "round_robin",
-      maxInFlightPerCredential: config.commandCodeMaxInFlightPerCredential ?? 4,
-      maxTotalInFlight: config.commandCodeMaxTotalInFlight,
-      billingRefreshMs: config.commandCodeBillingRefreshMs,
-      billingTimeoutMs: config.commandCodeBillingTimeoutMs,
-      cooldownMs: config.commandCodeCredentialCooldownMs,
-      billingProvider: (credential: CommandCodeCredential, signal: AbortSignal) =>
-        billingClient.getSnapshot(credential, signal),
-      validateBillingBeforeSelect: true,
-    };
-    this.router = new CommandCodeCredentialRouter(routerOptions);
+    this.router = createCommandCodeCredentialRouter(config);
   }
 
   public async getCredentialDiagnostics(

@@ -3,6 +3,19 @@ import { describe, expect, it } from "vitest";
 import { dashboardHtml } from "../src/dashboard.js";
 
 describe("dashboard UI", () => {
+  it("shows the summed current balance next to the credentials heading", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+    });
+
+    expect(html).toContain('id="credTotalBalance"');
+    expect(html).toContain("Number(bm.currentBalance??b?.currentBalance??bm.monthlyCredits)");
+    expect(html).toContain("'$'+total.toFixed(2)");
+  });
+
   it("shows the bridge version in the header instead of the endpoint", () => {
     const html = dashboardHtml({
       server: { host: "0.0.0.0", port: 9992 },
@@ -13,7 +26,7 @@ describe("dashboard UI", () => {
     });
 
     expect(html).toContain('id="bridgeVersion"');
-    expect(html).toContain("v1.14.0");
+    expect(html).toContain("v1.14.0.a");
     expect(html).not.toContain('id="endpoint"');
   });
 
