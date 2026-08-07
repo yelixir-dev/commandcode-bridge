@@ -174,9 +174,9 @@ write_env_line() {
 
 generate_key() {
   if command -v node >/dev/null 2>&1; then
-    node -e "console.log('sk-cmdbridge-'+require('crypto').randomBytes(3).toString('hex'))"
+    node -e "console.log('sk-cmdbridge-'+require('crypto').randomBytes(24).toString('hex'))"
   elif command -v openssl >/dev/null 2>&1; then
-    printf 'sk-cmdbridge-%s\n' "$(openssl rand -hex 3)"
+    printf 'sk-cmdbridge-%s\n' "$(openssl rand -hex 24)"
   else
     fail "need node or openssl to generate BRIDGE_API_KEY"
   fi

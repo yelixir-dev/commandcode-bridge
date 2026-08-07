@@ -148,20 +148,47 @@ describe("configuration and model aliases", () => {
     ]);
   });
 
-  it("preserves context windows through definition-to-config catalog merging", () => {
+  it("keeps canonical metadata for built-ins while preserving custom model metadata", () => {
     const merged = mergeModelCatalog([
-      { id: "deepseek/deepseek-v4-pro", enabled: false, contextWindow: 900_000 },
-      { id: "custom/long", enabled: true, contextWindow: 300_000 },
-    ] as Array<{ id: string; enabled: boolean; contextWindow: number }>) as Array<{
+      {
+        id: "deepseek/deepseek-v4-pro",
+        enabled: false,
+        provider: "Legacy Provider",
+        aliases: ["legacy-deepseek"],
+        notes: "stale pricing",
+        contextWindow: 900_000,
+      },
+      {
+        id: "custom/long",
+        enabled: true,
+        provider: "Custom",
+        aliases: ["custom-long"],
+        notes: "custom metadata",
+        contextWindow: 300_000,
+      },
+    ]) as Array<{
       id: string;
+      provider?: string;
+      aliases?: string[];
+      notes?: string;
       contextWindow?: number;
     }>;
     const byId = new Map(merged.map((model) => [model.id, model]));
 
-    expect(byId.get("deepseek/deepseek-v4-pro")?.contextWindow).toBe(900_000);
+    expect(byId.get("deepseek/deepseek-v4-pro")).toMatchObject({
+      provider: "DeepSeek",
+      aliases: expect.not.arrayContaining(["legacy-deepseek"]),
+      contextWindow: 1_000_000,
+    });
+    expect(byId.get("deepseek/deepseek-v4-pro")?.notes).not.toBe("stale pricing");
     expect(byId.get("deepseek/deepseek-v4-flash")?.contextWindow).toBe(1_000_000);
     expect(byId.get("zai-org/GLM-5.1")?.contextWindow).toBeUndefined();
-    expect(byId.get("custom/long")?.contextWindow).toBe(300_000);
+    expect(byId.get("custom/long")).toMatchObject({
+      provider: "Custom",
+      aliases: ["custom-long"],
+      notes: "custom metadata",
+      contextWindow: 300_000,
+    });
   });
 
   it("keeps only the established default models enabled", () => {
@@ -228,6 +255,37 @@ describe("configuration and model aliases", () => {
     for (const [legacyId, canonicalId] of Object.entries(renamedIds)) {
       expect(normalizeModelName(legacyId), legacyId).toBe(canonicalId);
     }
+  });
+
+  it("retires removed 1.3.1 built-ins instead of forwarding them as custom models", () => {
+    const retiredIds = [
+      "MiniMaxAI/MiniMax-M3-Free",
+      "anthropic/claude-opus-4.6",
+      "anthropic/claude-opus-4-5-20251101",
+      "anthropic/claude-sonnet-4-5-20250929",
+      "anthropic/claude-sonnet-4-20250514",
+      "inclusionai/ling-3.0-flash-free",
+    ];
+    const merged = mergeModelCatalog(
+      retiredIds.map((id) => ({ id, enabled: true })),
+      retiredIds,
+      normalizeModelName,
+      false,
+    );
+
+    expect(merged.map((model) => model.id)).not.toEqual(expect.arrayContaining(retiredIds));
+    const config = loadBridgeConfig({
+      env: {
+        COMMANDCODE_DEFAULT_MODEL: "anthropic/claude-opus-4.6",
+        COMMANDCODE_ALLOWED_MODELS: retiredIds.join(","),
+      },
+    });
+    expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
+    expect(config.allowedModels).not.toEqual(expect.arrayContaining(retiredIds));
+    const allowUnknownConfig = loadBridgeConfig({
+      env: { COMMANDCODE_ALLOW_UNKNOWN_MODELS: "true" },
+    });
+    expect(() => resolveModel(retiredIds[0], allowUnknownConfig)).toThrow(/not allowed/i);
   });
 
   it("resolves common aliases to CommandCode model ids", () => {

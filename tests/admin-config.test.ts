@@ -138,6 +138,49 @@ describe("JSON dashboard configuration", () => {
     expect(config.modelCatalog!.find((model) => model.id === "gpt-5.5")?.enabled).toBe(false);
   });
 
+  it("migrates persisted 1.3.1 model state without losing custom models", () => {
+    const file = tempConfigFile({
+      models: [
+        {
+          id: "gpt-5.6-terra",
+          enabled: false,
+          provider: "Legacy Provider",
+          notes: "$2.50/M in · $15/M out",
+          contextWindow: 1,
+        },
+        { id: "anthropic/claude-opus-4.6", enabled: true },
+        {
+          id: "custom/local-model",
+          enabled: true,
+          provider: "Local",
+          notes: "user metadata",
+          contextWindow: 123_456,
+        },
+      ],
+      credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+
+    const config = loadBridgeConfig({
+      env: { COMMANDCODE_CREDENTIALS_FILE: file },
+      authPaths: [],
+    });
+    const byId = new Map(config.modelCatalog?.map((model) => [model.id, model]));
+
+    expect(byId.get("gpt-5.6-terra")).toMatchObject({
+      enabled: false,
+      provider: "OpenAI",
+      notes: "$1/M in · $6/M out",
+      contextWindow: 1_050_000,
+    });
+    expect(byId.has("anthropic/claude-opus-4.6")).toBe(false);
+    expect(byId.get("custom/local-model")).toMatchObject({
+      enabled: true,
+      provider: "Local",
+      notes: "user metadata",
+      contextWindow: 123_456,
+    });
+  });
+
   it("exposes redacted dashboard config and accepts credential/model edits", async () => {
     const file = tempConfigFile({
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -300,7 +343,7 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
-  it("saves dashboard JSON without requiring the bridge client API key", async () => {
+  it("requires the current bridge API key for same-host dashboard JSON writes", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -313,15 +356,28 @@ describe("JSON dashboard configuration", () => {
       configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
     });
 
-    const response = await app.inject({
+    const payload = {
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "round_robin" as const, maxInFlightPerCredential: 4 },
+      credentials: [{ id: "alpha", originalId: "alpha", weight: 1, enabled: true }],
+    };
+    const forgedResponse = await app.inject({
       method: "PUT",
       url: "/admin/config",
       headers: { host: "100.88.251.70:9992", origin: "http://100.88.251.70:9992" },
-      payload: {
-        server: { host: "0.0.0.0", port: 9992 },
-        routing: { policy: "round_robin", maxInFlightPerCredential: 4 },
-        credentials: [{ id: "alpha", originalId: "alpha", weight: 1, enabled: true }],
+      payload,
+    });
+    expect(forgedResponse.statusCode).toBe(401);
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: {
+        authorization: "Bearer bridge-secret",
+        host: "100.88.251.70:9992",
+        origin: "http://100.88.251.70:9992",
       },
+      payload,
     });
 
     expect(response.statusCode).toBe(200);
@@ -338,7 +394,7 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
-  it("restarts from the dashboard without requiring the bridge client API key", async () => {
+  it("requires the current bridge API key for same-host dashboard restarts", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",
       credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
@@ -350,20 +406,31 @@ describe("JSON dashboard configuration", () => {
       configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
     });
 
-    const response = await app.inject({
+    const forgedResponse = await app.inject({
       method: "POST",
       url: "/admin/restart",
       headers: { host: "100.88.251.70:9992", origin: "http://100.88.251.70:9992" },
       payload: {},
     });
+    expect(forgedResponse.statusCode).toBe(401);
 
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/restart",
+      headers: {
+        authorization: "Bearer bridge-secret",
+        host: "100.88.251.70:9992",
+        origin: "http://100.88.251.70:9992",
+      },
+      payload: {},
+    });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ ok: true, restart_requested: true });
 
     await app.close();
   });
 
-  it("keeps bridge client API routes authenticated while dashboard JSON saves are open", async () => {
+  it("keeps bridge client API routes authenticated", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",
       credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
@@ -400,13 +467,13 @@ describe("JSON dashboard configuration", () => {
       payload: { credentials: [{ id: "alpha", originalId: "alpha", weight: 1 }] },
     });
 
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toContain("admin_origin_forbidden");
+    expect(response.statusCode).toBe(401);
+    expect(response.body).toContain("unauthorized");
 
     await app.close();
   });
 
-  it("allows local browserless dashboard JSON writes for loopback maintenance", async () => {
+  it("requires bridge authentication for loopback maintenance after setup", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",
       credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
@@ -418,14 +485,109 @@ describe("JSON dashboard configuration", () => {
       configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
     });
 
-    const response = await app.inject({
+    const forgedResponse = await app.inject({
       method: "PUT",
       url: "/admin/config",
       headers: { host: "127.0.0.1:9992" },
       payload: { credentials: [{ id: "alpha", originalId: "alpha", weight: 1 }] },
     });
+    expect(forgedResponse.statusCode).toBe(401);
 
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: { authorization: "Bearer bridge-secret", host: "127.0.0.1:9992" },
+      payload: { credentials: [{ id: "alpha", originalId: "alpha", weight: 1 }] },
+    });
     expect(response.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it("allows one-time loopback bootstrap and restart when no bridge key exists", async () => {
+    const file = tempConfigFile({
+      credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { logLevel: "silent" },
+    });
+
+    const saveResponse = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: { host: "127.0.0.1:9992" },
+      payload: {
+        bridgeApiKey: "bootstrap-secret",
+        credentials: [{ id: "alpha", originalId: "alpha", weight: 1 }],
+      },
+    });
+    expect(saveResponse.statusCode).toBe(200);
+    expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
+      bridgeApiKey: "bootstrap-secret",
+      credentials: [{ id: "alpha", apiKey: "alpha-secret" }],
+    });
+
+    const restartResponse = await app.inject({
+      method: "POST",
+      url: "/admin/restart",
+      headers: { host: "localhost:9992" },
+      payload: {},
+    });
+    expect(restartResponse.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it("rejects remote bootstrap when no bridge key exists", async () => {
+    const file = tempConfigFile({
+      credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { logLevel: "silent" },
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: { host: "100.88.251.70:9992", origin: "http://100.88.251.70:9992" },
+      payload: {
+        bridgeApiKey: "attacker-key",
+        credentials: [{ id: "alpha", originalId: "alpha", weight: 1 }],
+      },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain("admin_bootstrap_loopback_required");
+
+    await app.close();
+  });
+
+  it("rejects DNS-rebinding hostnames that only start with a loopback-looking label", async () => {
+    const file = tempConfigFile({
+      credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { logLevel: "silent" },
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: { host: "127.attacker.example", origin: "http://127.attacker.example" },
+      payload: { bridgeApiKey: "attacker-key" },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain("admin_bootstrap_loopback_required");
 
     await app.close();
   });
@@ -449,8 +611,8 @@ describe("JSON dashboard configuration", () => {
       payload: { credentials: [{ id: "alpha", originalId: "alpha", weight: 1 }] },
     });
 
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toContain("admin_origin_forbidden");
+    expect(response.statusCode).toBe(401);
+    expect(response.body).toContain("unauthorized");
 
     await app.close();
   });
@@ -502,7 +664,8 @@ describe("JSON dashboard configuration", () => {
     expect(response.headers["content-type"]).toContain("text/html");
     expect(response.body).toContain("CommandCode Bridge Console");
     expect(response.body).toContain("Client API Key");
-    expect(response.body).not.toContain("Admin API Key");
+    expect(response.body).toContain("Current Admin API Key");
+    expect(response.body).not.toContain("bridge-secret");
     expect(response.body).not.toContain("configFilePath");
     expect(response.body).not.toContain(process.env.HOME ?? "__NO_HOME__");
     expect(response.headers["content-security-policy"]).toContain(

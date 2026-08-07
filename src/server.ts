@@ -150,7 +150,6 @@ function isDashboardAdminWrite(request: FastifyRequest): boolean {
 function shouldRequireAuth(request: FastifyRequest): boolean {
   if (request.method === "OPTIONS") return false;
   if (request.method === "GET" && request.url.startsWith("/admin/config")) return false;
-  if (isDashboardAdminWrite(request)) return false;
   if (request.method === "GET" && request.url.startsWith("/admin/commandcode/credentials")) {
     return false;
   }
@@ -160,7 +159,6 @@ function shouldRequireAuth(request: FastifyRequest): boolean {
 function isPublicAdminRequest(request: FastifyRequest): boolean {
   return (
     request.method === "OPTIONS" ||
-    isDashboardAdminWrite(request) ||
     (request.method === "GET" &&
       (request.url.startsWith("/admin/config") ||
         request.url.startsWith("/admin/commandcode/credentials")))
@@ -183,28 +181,27 @@ function sameHostnameOrigin(request: FastifyRequest): string | undefined {
 }
 
 function isLoopbackHost(host: string | undefined): boolean {
-  const hostname = host?.split(":")[0];
-  return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
-}
-
-function hasSameHostnameReferer(request: FastifyRequest): boolean {
-  const referer = request.headers.referer;
-  const host = request.headers.host;
-  if (!referer || !host) return false;
-  try {
-    const refererUrl = new URL(referer);
-    return refererUrl.protocol === "http:" && refererUrl.hostname === host.split(":")[0];
-  } catch {
-    return false;
-  }
-}
-
-function isDashboardWriteSourceAllowed(request: FastifyRequest): boolean {
-  if (sameHostnameOrigin(request)) return true;
-  if (hasSameHostnameReferer(request)) return true;
+  if (!host) return false;
+  const hostname = host.startsWith("[")
+    ? host.slice(1, host.indexOf("]"))
+    : host.split(":")[0]?.toLowerCase();
+  if (hostname === "::1" || hostname === "localhost") return true;
+  const octets = hostname?.split(".") ?? [];
   return (
-    !request.headers.origin && !request.headers.referer && isLoopbackHost(request.headers.host)
+    octets.length === 4 &&
+    octets[0] === "127" &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) >= 0 && Number(octet) <= 255)
   );
+}
+
+function isLoopbackAddress(address: string | undefined): boolean {
+  if (!address) return false;
+  const normalized = address.startsWith("::ffff:") ? address.slice("::ffff:".length) : address;
+  return normalized === "::1" || normalized.startsWith("127.");
+}
+
+function isLoopbackBootstrapRequest(request: FastifyRequest): boolean {
+  return isLoopbackAddress(request.ip) && isLoopbackHost(request.headers.host);
 }
 
 function asOpenAIRequest(
@@ -424,29 +421,26 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   }
 
   app.addHook("preHandler", async (request, reply) => {
-    if (isDashboardAdminWrite(request) && !isDashboardWriteSourceAllowed(request)) {
+    if (!shouldRequireAuth(request)) return;
+    if (
+      isDashboardAdminWrite(request) &&
+      !config.bridgeApiKey &&
+      !isLoopbackBootstrapRequest(request)
+    ) {
       return reply
         .code(403)
         .send(
           openAIError(
-            "Dashboard config writes must come from the same host as the bridge dashboard",
-            "authentication_error",
-            "admin_origin_forbidden",
+            "Admin bootstrap without BRIDGE_API_KEY requires a loopback connection and loopback Host",
+            "configuration_error",
+            "admin_bootstrap_loopback_required",
           ),
         );
     }
     if (isAdminRequest(request) && !isPublicAdminRequest(request) && !config.bridgeApiKey) {
-      return reply
-        .code(403)
-        .send(
-          openAIError(
-            "Admin endpoints require BRIDGE_API_KEY to be configured",
-            "configuration_error",
-            "admin_auth_not_configured",
-          ),
-        );
+      return;
     }
-    if (!config.bridgeApiKey || !shouldRequireAuth(request)) return;
+    if (!config.bridgeApiKey) return;
     const supplied = clientApiKey(request);
     if (!supplied || !safeEqual(supplied, config.bridgeApiKey)) {
       return reply

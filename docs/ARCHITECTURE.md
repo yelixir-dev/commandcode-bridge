@@ -39,6 +39,7 @@ DeepSeek V4 Pro
 5. The credential router selects one upstream key:
    - `round_robin` uses configured weights.
    - `depletion_aware` refreshes cached billing/usage snapshots and scores expiring credits by current balance pressure over the remaining period: `(monthlyCredits + freeCredits) / max(days until renewal, 0.25)`. Purchased credits are reserve capacity.
+   - `drain_first` drains the eligible credential with the least remaining time first (unknown-expiry credentials trail known ones).
    - Credentials can be scoped to specific upstream models with `allowedModels`.
 6. OpenAI messages are converted:
    - system messages → `params.system`

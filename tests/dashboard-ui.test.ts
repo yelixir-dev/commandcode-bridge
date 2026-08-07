@@ -121,7 +121,7 @@ describe("dashboard UI", () => {
     });
 
     expect(html).toContain(
-      "authKey(cfg?.bridgeApiKey)||authKey(localStorage.getItem('bridgeApiKey'))",
+      "authKey(cfg?.bridgeApiKey)||fullAdminAuthKey()||authKey(localStorage.getItem('bridgeApiKey'))",
     );
     expect(html).toContain("'authorization':'Bearer '+key");
   });
@@ -141,6 +141,25 @@ describe("dashboard UI", () => {
     expect(html).toContain("return isRedactedSecret(key)?''");
   });
 
+  it("lets existing users provide the current admin key separately from key rotation", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+      bridgeApiKey: "[REDACTED]",
+    });
+
+    expect(html).toContain('id="adminAuthKey"');
+    expect(html).toContain("function fullAdminAuthKey");
+    expect(html).toContain("if(!raw||isRedactedSecret(raw))return ''; return raw;}");
+    expect(html).toContain("fullAdminAuthKey()||authKey(localStorage.getItem('bridgeApiKey'))");
+    expect(html).toContain("현재 Admin API Key");
+    expect(html).toContain("Current Admin API Key");
+    expect(html).toContain("当前管理员 API Key");
+    expect(html).toContain("adminAuthRequired");
+  });
+
   it("can generate and persist a random client API key from the dashboard", () => {
     const html = dashboardHtml({
       server: { host: "0.0.0.0", port: 9992 },
@@ -151,6 +170,9 @@ describe("dashboard UI", () => {
     });
 
     expect(html).toContain("function randomBridgeKey");
+    expect(html).toContain("new Uint8Array(24)");
+    expect(html).not.toContain("new Uint8Array(3)");
+    expect(html).not.toContain("Math.random()");
     expect(html).toContain("cmdbr-");
     expect(html).toContain("generateBridgeKey");
     expect(html).toContain("pendingBridgeApiKey");

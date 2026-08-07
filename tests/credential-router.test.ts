@@ -234,6 +234,64 @@ describe("CommandCode credential routing", () => {
     ).resolves.toMatchObject({ id: "non-urgent" });
   });
 
+  it("drain_first drains the credential with the least remaining time first", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("later"), credential("sooner")],
+      policy: "drain_first",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) =>
+        selected.id === "sooner" ? state("sooner", 1, 2).billing! : state("later", 1, 10).billing!,
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "sooner",
+    });
+  });
+
+  it("drain_first keeps the first credential when expiry is unknown", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("first"), credential("second")],
+      policy: "drain_first",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      now: () => now,
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "first",
+    });
+  });
+
+  it("does not prioritize purchased-only reserve credits as expiring", async () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("purchased-only"), credential("expiring-monthly")],
+      policy: "daily_burn_priority",
+      billingRefreshMs: 60_000,
+      cooldownMs: 60_000,
+      validateBillingBeforeSelect: true,
+      now: () => now,
+      billingProvider: async (selected) => {
+        if (selected.id === "purchased-only") {
+          return {
+            fetchedAt: now,
+            monthlyCredits: 0,
+            purchasedCredits: 100,
+            freeCredits: 0,
+            currentPeriodEnd: new Date(now + DAY_MS).toISOString(),
+          };
+        }
+        return state("expiring-monthly", 10, 2).billing!;
+      },
+    });
+
+    await expect(router.select({ model: "deepseek/deepseek-v4-pro" })).resolves.toMatchObject({
+      id: "expiring-monthly",
+    });
+  });
+
   it("falls back to round-robin when billing probes fail", async () => {
     const router = new CommandCodeCredentialRouter({
       credentials: [credential("a"), credential("b")],

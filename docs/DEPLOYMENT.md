@@ -430,9 +430,14 @@ Credential file shape:
 Routing behavior:
 
 - `depletion_aware` prefers keys whose expiring/monthly credits need to be consumed before reset.
+- Every policy first prioritizes credentials with a positive monthly/free `expiringBalance` and no more than one day remaining. Purchased-only credits remain reserve capacity and never enter this urgent pool.
 - depleted or failing keys are cooled down and skipped when alternatives exist.
 - application-level stream errors before visible output can fail over to another eligible credential.
 - once visible output has been sent, the bridge surfaces the error rather than retrying and duplicating output.
+
+`GET /v1/models/:model` returns one available model. Known capacity is exposed consistently as `context_window`, `context_length`, and `max_context_length`.
+
+When upgrading a persisted 1.3.1 dashboard catalog, enabled state and custom models are preserved, built-in metadata is refreshed from 1.14.0, and retired built-in IDs are removed instead of being forwarded upstream. Admin writes and restarts require the current `BRIDGE_API_KEY`; only a keyless loopback runtime can bootstrap without one.
 
 ### Empty visible-content policy
 

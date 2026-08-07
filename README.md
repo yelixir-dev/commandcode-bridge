@@ -1,5 +1,6 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="CommandCode Bridge — OpenAI-compatible gateway for trusted CommandCode deployments" width="880">
+<img src="docs/assets/banner.svg" alt="CommandCode Bridge — OpenAI-compatible gateway for trusted CommandCode deployments" width="880">
+
 </p>
 
 <p align="center">
@@ -106,147 +107,88 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### API surface
 
-| Method | Path | Behavior |
-
-| --- | --- | --- |
-
-| `GET` | `/health` | Public, secret-free health and runtime summary. |
-
-| `GET` | `/dashboard` | Public read-only shell for trusted networks. |
-
-| `GET` | `/v1/models` | Authenticated when `BRIDGE_API_KEY` is configured; lists available models. |
-
-| `GET` | `/v1/models/:model` | Authenticated when configured; retrieves one available model. |
-
-| `POST` | `/v1/chat/completions` | Authenticated when configured; streaming or non-streaming chat. |
-
-| `GET` | `/admin/config` | Public redacted dashboard state on the trusted network. |
-
-| `GET` | `/admin/commandcode/credentials` | Public redacted diagnostics; `?refresh=true` refreshes billing. |
-
-| `PUT` | `/admin/config` | Same-host/loopback dashboard write; requires a credentials file. |
-
-| `POST` | `/admin/restart` | Same-host/loopback restart request. |
+| Method | Path                             | Behavior                                                                                                            |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/health`                        | Public, secret-free health and runtime summary.                                                                     |
+| `GET`  | `/dashboard`                     | Public read-only shell for trusted networks.                                                                        |
+| `GET`  | `/v1/models`                     | Authenticated when `BRIDGE_API_KEY` is configured; lists available models.                                          |
+| `GET`  | `/v1/models/:model`              | Authenticated when configured; retrieves one available model.                                                       |
+| `POST` | `/v1/chat/completions`           | Authenticated when configured; streaming or non-streaming chat.                                                     |
+| `GET`  | `/admin/config`                  | Public redacted dashboard state on the trusted network.                                                             |
+| `GET`  | `/admin/commandcode/credentials` | Public redacted diagnostics; `?refresh=true` refreshes billing.                                                     |
+| `PUT`  | `/admin/config`                  | Requires the current `BRIDGE_API_KEY`; a keyless runtime may bootstrap only over a loopback peer and loopback Host. |
+| `POST` | `/admin/restart`                 | Uses the same authentication rule; the pre-restart key remains current until restart completes.                     |
 
 ### Model metadata and exact catalog
 
 Each model object includes `id`, `object`, `created`, and provider-derived `owned_by`. Known context is repeated in `context_window`, `context_length`, and `max_context_length`. Exactly five models have no published context and therefore omit all three capacity fields. This is the exact 1.14.0 canonical catalog; “Default” is the built-in enabled state.
 
-| Provider | Canonical model ID | Context | Default |
-
-| --- | --- | ---: | :---: |
-
-| DeepSeek | `deepseek/deepseek-v4-pro` | 1,000,000 | Yes |
-
-| DeepSeek | `deepseek/deepseek-v4-flash` | 1,000,000 | Yes |
-
-| Moonshot | `moonshotai/Kimi-K3` | 1,000,000 | No |
-
-| Moonshot | `moonshotai/Kimi-K2.7-Code` | 256,000 | No |
-
-| Moonshot | `moonshotai/Kimi-K2.7-Code-Highspeed` | 262,000 | No |
-
-| Moonshot | `moonshotai/Kimi-K2.6` | 256,000 | Yes |
-
-| Moonshot | `moonshotai/Kimi-K2.5` | 256,000 | No |
-
-| Z.ai | `zai-org/GLM-5.2` | 1,000,000 | No |
-
-| Z.ai | `zai-org/GLM-5.2-Fast` | 1,000,000 | No |
-
-| Z.ai | `zai-org/GLM-5.1` | Not published | Yes |
-
-| Z.ai | `zai-org/GLM-5` | 200,000 | No |
-
-| MiniMax | `MiniMaxAI/MiniMax-M3` | 1,000,000 | No |
-
-| MiniMax | `MiniMaxAI/MiniMax-M2.7` | Not published | Yes |
-
-| MiniMax | `MiniMaxAI/MiniMax-M2.5` | 200,000 | No |
-
-| Xiaomi | `xiaomi/mimo-v2.5-pro` | 1,000,000 | No |
-
-| Xiaomi | `xiaomi/mimo-v2.5` | 1,000,000 | No |
-
-| Qwen | `Qwen/Qwen3.8-Max` | 1,000,000 | No |
-
-| Qwen | `Qwen/Qwen3.7-Max` | 1,000,000 | No |
-
-| Qwen | `Qwen/Qwen3.7-Plus` | 1,000,000 | No |
-
-| Qwen | `Qwen/Qwen3.7-Flash` | 1,000,000 | No |
-
-| Qwen | `Qwen/Qwen3.6-Max-Preview` | Not published | No |
-
-| Qwen | `Qwen/Qwen3.6-Plus` | Not published | Yes |
-
-| StepFun | `stepfun/Step-3.7-Flash` | 256,000 | No |
-
-| StepFun | `stepfun/Step-3.5-Flash` | 1,000,000 | No |
-
-| Tencent | `tencent/hy3-paid` | 262,000 | No |
-
-| NVIDIA | `nvidia/nemotron-3-ultra-550b-a55b` | 1,000,000 | No |
-
-| Thinking Machines | `thinkingmachines/inkling` | 256,000 | No |
-
-| Thinking Machines | `thinkingmachines/inkling-small` | 1,000,000 | No |
-
-| Poolside | `poolside/laguna-s-2.1-free` | 256,000 | No |
-
-| Anthropic | `claude-sonnet-5` | 1,000,000 | No |
-
-| Anthropic | `claude-sonnet-4-6` | 1,000,000 | No |
-
-| Anthropic | `claude-fable-5` | 1,000,000 | No |
-
-| Anthropic | `claude-opus-5` | 1,000,000 | No |
-
-| Anthropic | `claude-opus-4-8` | 1,000,000 | No |
-
-| Anthropic | `claude-opus-4-7` | 1,000,000 | No |
-
-| Anthropic | `claude-haiku-4-5-20251001` | 200,000 | No |
-
-| OpenAI | `gpt-5.6-sol` | 1,050,000 | No |
-
-| OpenAI | `gpt-5.6-terra` | 1,050,000 | No |
-
-| OpenAI | `gpt-5.6-luna` | 1,050,000 | No |
-
-| OpenAI | `gpt-5.5` | Not published | No |
-
-| OpenAI | `gpt-5.4` | 400,000 | No |
-
-| OpenAI | `gpt-5.3-codex` | 400,000 | No |
-
-| OpenAI | `gpt-5.4-mini` | 400,000 | No |
-
-| Google | `google/gemini-3.6-flash` | 1,000,000 | No |
-
-| Google | `google/gemini-3.5-flash` | 1,000,000 | No |
-
-| Google | `google/gemini-3.5-flash-lite` | 1,000,000 | No |
-
-| Google | `google/gemini-3.1-flash-lite` | 1,000,000 | No |
-
-| Sakana | `sakana/fugu-ultra` | 1,000,000 | No |
-
-| Meta | `meta/muse-spark-1.1` | 1,050,000 | No |
-
-| Meta | `meta/muse-spark-1.2` | 1,050,000 | No |
-
-| Meta | `meta/muse-spark-1.2-contributor` | 1,050,000 | No |
-
-| xAI | `xai/grok-4.5` | 500,000 | No |
+| Provider          | Canonical model ID                    |       Context | Default |
+| ----------------- | ------------------------------------- | ------------: | :-----: |
+| DeepSeek          | `deepseek/deepseek-v4-pro`            |     1,000,000 |   Yes   |
+| DeepSeek          | `deepseek/deepseek-v4-flash`          |     1,000,000 |   Yes   |
+| Moonshot          | `moonshotai/Kimi-K3`                  |     1,000,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code`           |       256,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code-Highspeed` |       262,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K2.6`                |       256,000 |   Yes   |
+| Moonshot          | `moonshotai/Kimi-K2.5`                |       256,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.2`                     |     1,000,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.2-Fast`                |     1,000,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.1`                     | Not published |   Yes   |
+| Z.ai              | `zai-org/GLM-5`                       |       200,000 |   No    |
+| MiniMax           | `MiniMaxAI/MiniMax-M3`                |     1,000,000 |   No    |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.7`              | Not published |   Yes   |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.5`              |       200,000 |   No    |
+| Xiaomi            | `xiaomi/mimo-v2.5-pro`                |     1,000,000 |   No    |
+| Xiaomi            | `xiaomi/mimo-v2.5`                    |     1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.8-Max`                    |     1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.7-Max`                    |     1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.7-Plus`                   |     1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.7-Flash`                  |     1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.6-Max-Preview`            | Not published |   No    |
+| Qwen              | `Qwen/Qwen3.6-Plus`                   | Not published |   Yes   |
+| StepFun           | `stepfun/Step-3.7-Flash`              |       256,000 |   No    |
+| StepFun           | `stepfun/Step-3.5-Flash`              |     1,000,000 |   No    |
+| Tencent           | `tencent/hy3-paid`                    |       262,000 |   No    |
+| NVIDIA            | `nvidia/nemotron-3-ultra-550b-a55b`   |     1,000,000 |   No    |
+| Thinking Machines | `thinkingmachines/inkling`            |       256,000 |   No    |
+| Thinking Machines | `thinkingmachines/inkling-small`      |     1,000,000 |   No    |
+| Poolside          | `poolside/laguna-s-2.1-free`          |       256,000 |   No    |
+| Anthropic         | `claude-sonnet-5`                     |     1,000,000 |   No    |
+| Anthropic         | `claude-sonnet-4-6`                   |     1,000,000 |   No    |
+| Anthropic         | `claude-fable-5`                      |     1,000,000 |   No    |
+| Anthropic         | `claude-opus-5`                       |     1,000,000 |   No    |
+| Anthropic         | `claude-opus-4-8`                     |     1,000,000 |   No    |
+| Anthropic         | `claude-opus-4-7`                     |     1,000,000 |   No    |
+| Anthropic         | `claude-haiku-4-5-20251001`           |       200,000 |   No    |
+| OpenAI            | `gpt-5.6-sol`                         |     1,050,000 |   No    |
+| OpenAI            | `gpt-5.6-terra`                       |     1,050,000 |   No    |
+| OpenAI            | `gpt-5.6-luna`                        |     1,050,000 |   No    |
+| OpenAI            | `gpt-5.5`                             | Not published |   No    |
+| OpenAI            | `gpt-5.4`                             |       400,000 |   No    |
+| OpenAI            | `gpt-5.3-codex`                       |       400,000 |   No    |
+| OpenAI            | `gpt-5.4-mini`                        |       400,000 |   No    |
+| Google            | `google/gemini-3.6-flash`             |     1,000,000 |   No    |
+| Google            | `google/gemini-3.5-flash`             |     1,000,000 |   No    |
+| Google            | `google/gemini-3.5-flash-lite`        |     1,000,000 |   No    |
+| Google            | `google/gemini-3.1-flash-lite`        |     1,000,000 |   No    |
+| Sakana            | `sakana/fugu-ultra`                   |     1,000,000 |   No    |
+| Meta              | `meta/muse-spark-1.1`                 |     1,050,000 |   No    |
+| Meta              | `meta/muse-spark-1.2`                 |     1,050,000 |   No    |
+| Meta              | `meta/muse-spark-1.2-contributor`     |     1,050,000 |   No    |
+| xAI               | `xai/grok-4.5`                        |       500,000 |   No    |
 
 ### Dashboard and credential routing
 
 Open `http://127.0.0.1:9992/dashboard`. The mobile-first UI stores its Korean/English/Chinese locale in `localStorage` with Korean fallback. It shows online/version state; edits bind, client key, routing and per-key concurrency; manages and refreshes redacted credentials; and folds the model catalog by provider with enabled/total counts. Secret fields left blank preserve existing keys. Save writes JSON and restart applies changes. Raw upstream keys are never returned.
 
-`daily_burn_priority` is the default and weights required daily burn (`depletion_aware` is its legacy alias); `balance_priority` prefers usable balance; `round_robin` rotates smoothly by weight; `drain_first` uses the first eligible key. Every policy first narrows to eligible credentials expiring within 1 day. Manual disablement, `allowedModels`, in-flight caps, exhausted/expired balance, auth failure, and 429/5xx/timeout cooldown can exclude a key. Each request stays on one key; failover occurs only before visible output.
+`daily_burn_priority` is the default and weights required daily burn (`depletion_aware` is its legacy alias); `balance_priority` prefers usable balance; `round_robin` rotates smoothly by weight; `drain_first` drains the eligible key with the least remaining time, then moves to the next. Every policy first narrows to eligible credentials expiring within 1 day. Manual disablement, `allowedModels`, in-flight caps, exhausted/expired balance, auth failure, and 429/5xx/timeout cooldown can exclude a key. Each request stays on one key; failover occurs only before visible output.
 
 ### Configuration and operations
+
+Upgrades from a persisted 1.3.1 dashboard catalog preserve each current model's enabled state and all custom models, while refreshing built-in metadata from the 1.14.0 canonical definitions. Six retired 1.3.1 IDs are removed rather than forwarded as unknown upstream models; a retired configured default falls back to `deepseek/deepseek-v4-pro`.
+
+Existing browsers with a saved key continue without interruption. On a fresh browser, enter the current key in **Current Admin API Key** before saving or restarting. A runtime with no key can bootstrap only from a real loopback connection whose Host is also loopback.
 
 Credential precedence is `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, `COMMANDCODE_API_KEY`, then CLI auth files. Core defaults are `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.14.0`, `COMMANDCODE_TIMEOUT_MS=300000`, and `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`. `BRIDGE_API_KEY` protects `/v1/*` when set; clients may use Bearer or `x-api-key`. Protect credential JSON with `chmod 600`. Optional balance alerts are off. Optional `commandcode-router` is for least-in-flight routing across multiple bridge hosts.
 

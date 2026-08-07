@@ -49,7 +49,9 @@ describe("installer scripts", () => {
     expect(script).toContain("write_env_line BRIDGE_API_KEY");
     expect(script).toContain("write_env_line COMMANDCODE_ALLOWED_MODELS");
     expect(script).toContain("sk-cmdbridge-");
-    expect(script).toContain("randomBytes(3)");
+    expect(script).toContain("randomBytes(24)");
+    expect(script).toContain("openssl rand -hex 24");
+    expect(script).not.toContain("randomBytes(3)");
     expect(script).toContain("read -rs key_input");
     expect(script).toContain("ensure_commandcode_cli");
     expect(script).toContain("extract_commandcode_api_key");

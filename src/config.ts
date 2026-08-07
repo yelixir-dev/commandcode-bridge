@@ -5,7 +5,12 @@ import {
   readDashboardConfigFile,
   resolveConfigFilePath,
 } from "./dashboard-config.js";
-import { defaultModelCatalog, mergeModelCatalog, modelAliasMap } from "./model-catalog.js";
+import {
+  defaultModelCatalog,
+  isLegacyRetiredModelId,
+  mergeModelCatalog,
+  modelAliasMap,
+} from "./model-catalog.js";
 import type {
   BridgeConfig,
   CommandCodeEmptyVisibleResponsePolicy,
@@ -114,8 +119,15 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     host: env.HOST?.trim() || "127.0.0.1",
     port: parseNumber(env.PORT, 9992),
   });
-  const defaultModel = normalizeModelName(env.COMMANDCODE_DEFAULT_MODEL?.trim() || DEFAULT_MODEL);
-  const allowedFromEnv = parseCsv(env.COMMANDCODE_ALLOWED_MODELS).map(normalizeModelName);
+  const requestedDefaultModel = normalizeModelName(
+    env.COMMANDCODE_DEFAULT_MODEL?.trim() || DEFAULT_MODEL,
+  );
+  const defaultModel = isLegacyRetiredModelId(requestedDefaultModel)
+    ? DEFAULT_MODEL
+    : requestedDefaultModel;
+  const allowedFromEnv = parseCsv(env.COMMANDCODE_ALLOWED_MODELS)
+    .map(normalizeModelName)
+    .filter((model) => !isLegacyRetiredModelId(model));
   const configuredModelCatalog = dashboardConfig.models
     ? mergeModelCatalog(dashboardConfig.models, allowedFromEnv, normalizeModelName, false)
     : allowedFromEnv.length > 0
@@ -232,7 +244,10 @@ export function resolveModel(model: string | undefined, config: BridgeConfig): R
       : normalizeModelName(requestedModel);
   const publicModel = upstreamModel;
 
-  if (!config.allowUnknownModels && !config.allowedModels.includes(upstreamModel)) {
+  if (
+    isLegacyRetiredModelId(upstreamModel) ||
+    (!config.allowUnknownModels && !config.allowedModels.includes(upstreamModel))
+  ) {
     throw new ModelNotAllowedError(requestedModel, config.allowedModels);
   }
 
@@ -267,7 +282,7 @@ function ownedBySlug(value: string | undefined): string {
 
 export function publicModelOwnedBy(model: string, config: BridgeConfig): string {
   if (model.startsWith("commandcode/")) return "commandcode";
-  const upstreamModel = normalizeModelName(model);
+  const upstreamModel = model === "default" ? config.defaultModel : normalizeModelName(model);
   const catalogEntry = config.modelCatalog?.find((entry) => entry.id === upstreamModel);
   return ownedBySlug(catalogEntry?.provider ?? upstreamModel.split("/")[0]);
 }

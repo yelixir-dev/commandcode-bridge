@@ -73,6 +73,8 @@ The explicit routing metric is current balance pressure over the remaining subsc
 
 `depletion_aware` routing uses smooth weighted selection over that routing score, so accounts with more expiring balance per remaining day receive more traffic. Purchased credits are treated as reserve capacity (`purchasedCredits / 365`) only when monthly/free credits are unavailable. If billing probes fail, routing falls back to configured weights/round-robin rather than blocking generation.
 
+Before any configured policy runs, the router narrows candidates to credentials with positive monthly/free `expiringBalance` and no more than one day remaining when such candidates exist. Purchased-only balances are explicitly excluded from this urgent pool.
+
 Credential health rules:
 
 - 401: disable the credential for the process lifetime.

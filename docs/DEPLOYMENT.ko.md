@@ -429,9 +429,14 @@ Credential JSON 파일 예시:
 라우팅 동작 요약:
 
 - `depletion_aware`는 reset 전에 소진해야 하는 monthly/free credit 압력이 높은 key에 더 많은 traffic을 보냅니다.
+- 모든 policy는 monthly/free `expiringBalance`가 양수이고 남은 기간이 1일 이하인 credential을 먼저 사용합니다. purchased-only credit은 reserve이므로 urgent pool에 들어가지 않습니다.
 - 고갈되었거나 실패한 key는 cooldown 동안 제외됩니다.
 - visible output 전 application-level stream error가 오면 다른 credential로 failover할 수 있습니다.
 - 이미 visible output을 보낸 뒤에는 중복 출력을 피하기 위해 retry하지 않고 error를 표면화합니다.
+
+`GET /v1/models/:model`은 available model 하나를 반환합니다. 알려진 capacity는 `context_window`, `context_length`, `max_context_length`에 동일하게 노출됩니다.
+
+저장된 1.3.1 dashboard catalog 업그레이드 시 enabled state와 custom model은 보존하고 built-in metadata는 1.14.0 기준으로 갱신하며 retired built-in ID는 upstream으로 전달하지 않습니다. Admin write와 restart는 현재 `BRIDGE_API_KEY`가 필요하고, key 없는 loopback runtime만 인증 없이 bootstrap할 수 있습니다.
 
 ### 빈 visible content 방어 정책
 

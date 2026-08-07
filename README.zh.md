@@ -1,5 +1,6 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="CommandCode Bridge — 面向可信环境的 OpenAI-compatible CommandCode 网关" width="880">
+<img src="docs/assets/banner.svg" alt="CommandCode Bridge — 面向可信环境的 OpenAI-compatible CommandCode 网关" width="880">
+
 </p>
 
 <p align="center">
@@ -106,147 +107,88 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### API 表面
 
-| Method | Path | Behavior |
-
-| --- | --- | --- |
-
-| `GET` | `/health` | Public、secret-free health/runtime summary。 |
-
-| `GET` | `/dashboard` | 可信 network 的 public read-only shell。 |
-
-| `GET` | `/v1/models` | 配置 `BRIDGE_API_KEY` 时认证；列出 available model。 |
-
-| `GET` | `/v1/models/:model` | 配置时认证；查询一个 available model。 |
-
-| `POST` | `/v1/chat/completions` | 配置时认证；streaming/non-streaming chat。 |
-
-| `GET` | `/admin/config` | 可信 network 上的 public redacted dashboard state。 |
-
-| `GET` | `/admin/commandcode/credentials` | Public redacted diagnostics；`?refresh=true` 刷新 billing。 |
-
-| `PUT` | `/admin/config` | Same-host/loopback dashboard write；需要 credentials file。 |
-
-| `POST` | `/admin/restart` | Same-host/loopback restart 请求。 |
+| Method | Path                             | Behavior                                                                                   |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `GET`  | `/health`                        | Public、secret-free health/runtime summary。                                               |
+| `GET`  | `/dashboard`                     | 可信 network 的 public read-only shell。                                                   |
+| `GET`  | `/v1/models`                     | 配置 `BRIDGE_API_KEY` 时认证；列出 available model。                                       |
+| `GET`  | `/v1/models/:model`              | 配置时认证；查询一个 available model。                                                     |
+| `POST` | `/v1/chat/completions`           | 配置时认证；streaming/non-streaming chat。                                                 |
+| `GET`  | `/admin/config`                  | 可信 network 上的 public redacted dashboard state。                                        |
+| `GET`  | `/admin/commandcode/credentials` | Public redacted diagnostics；`?refresh=true` 刷新 billing。                                |
+| `PUT`  | `/admin/config`                  | 需要当前 `BRIDGE_API_KEY`；无 key runtime 仅可在 peer 与 Host 都为 loopback 时 bootstrap。 |
+| `POST` | `/admin/restart`                 | 使用相同认证规则；restart 完成前旧 key 仍是 current key。                                  |
 
 ### Model metadata 与准确 catalog
 
 每个 model object 包含 `id`、`object`、`created` 和 provider-derived `owned_by`。已知 context 同时写入 `context_window`、`context_length`、`max_context_length`。恰有 5 个模型没有公开 context，因此省略全部三个 capacity field。以下是准确的 1.14.0 canonical catalog；“默认启用”表示 built-in enabled state。
 
-| Provider | Canonical model ID | Context | 默认启用 |
-
-| --- | --- | ---: | :---: |
-
-| DeepSeek | `deepseek/deepseek-v4-pro` | 1,000,000 | 是 |
-
-| DeepSeek | `deepseek/deepseek-v4-flash` | 1,000,000 | 是 |
-
-| Moonshot | `moonshotai/Kimi-K3` | 1,000,000 | 否 |
-
-| Moonshot | `moonshotai/Kimi-K2.7-Code` | 256,000 | 否 |
-
-| Moonshot | `moonshotai/Kimi-K2.7-Code-Highspeed` | 262,000 | 否 |
-
-| Moonshot | `moonshotai/Kimi-K2.6` | 256,000 | 是 |
-
-| Moonshot | `moonshotai/Kimi-K2.5` | 256,000 | 否 |
-
-| Z.ai | `zai-org/GLM-5.2` | 1,000,000 | 否 |
-
-| Z.ai | `zai-org/GLM-5.2-Fast` | 1,000,000 | 否 |
-
-| Z.ai | `zai-org/GLM-5.1` | 未公布 | 是 |
-
-| Z.ai | `zai-org/GLM-5` | 200,000 | 否 |
-
-| MiniMax | `MiniMaxAI/MiniMax-M3` | 1,000,000 | 否 |
-
-| MiniMax | `MiniMaxAI/MiniMax-M2.7` | 未公布 | 是 |
-
-| MiniMax | `MiniMaxAI/MiniMax-M2.5` | 200,000 | 否 |
-
-| Xiaomi | `xiaomi/mimo-v2.5-pro` | 1,000,000 | 否 |
-
-| Xiaomi | `xiaomi/mimo-v2.5` | 1,000,000 | 否 |
-
-| Qwen | `Qwen/Qwen3.8-Max` | 1,000,000 | 否 |
-
-| Qwen | `Qwen/Qwen3.7-Max` | 1,000,000 | 否 |
-
-| Qwen | `Qwen/Qwen3.7-Plus` | 1,000,000 | 否 |
-
-| Qwen | `Qwen/Qwen3.7-Flash` | 1,000,000 | 否 |
-
-| Qwen | `Qwen/Qwen3.6-Max-Preview` | 未公布 | 否 |
-
-| Qwen | `Qwen/Qwen3.6-Plus` | 未公布 | 是 |
-
-| StepFun | `stepfun/Step-3.7-Flash` | 256,000 | 否 |
-
-| StepFun | `stepfun/Step-3.5-Flash` | 1,000,000 | 否 |
-
-| Tencent | `tencent/hy3-paid` | 262,000 | 否 |
-
-| NVIDIA | `nvidia/nemotron-3-ultra-550b-a55b` | 1,000,000 | 否 |
-
-| Thinking Machines | `thinkingmachines/inkling` | 256,000 | 否 |
-
-| Thinking Machines | `thinkingmachines/inkling-small` | 1,000,000 | 否 |
-
-| Poolside | `poolside/laguna-s-2.1-free` | 256,000 | 否 |
-
-| Anthropic | `claude-sonnet-5` | 1,000,000 | 否 |
-
-| Anthropic | `claude-sonnet-4-6` | 1,000,000 | 否 |
-
-| Anthropic | `claude-fable-5` | 1,000,000 | 否 |
-
-| Anthropic | `claude-opus-5` | 1,000,000 | 否 |
-
-| Anthropic | `claude-opus-4-8` | 1,000,000 | 否 |
-
-| Anthropic | `claude-opus-4-7` | 1,000,000 | 否 |
-
-| Anthropic | `claude-haiku-4-5-20251001` | 200,000 | 否 |
-
-| OpenAI | `gpt-5.6-sol` | 1,050,000 | 否 |
-
-| OpenAI | `gpt-5.6-terra` | 1,050,000 | 否 |
-
-| OpenAI | `gpt-5.6-luna` | 1,050,000 | 否 |
-
-| OpenAI | `gpt-5.5` | 未公布 | 否 |
-
-| OpenAI | `gpt-5.4` | 400,000 | 否 |
-
-| OpenAI | `gpt-5.3-codex` | 400,000 | 否 |
-
-| OpenAI | `gpt-5.4-mini` | 400,000 | 否 |
-
-| Google | `google/gemini-3.6-flash` | 1,000,000 | 否 |
-
-| Google | `google/gemini-3.5-flash` | 1,000,000 | 否 |
-
-| Google | `google/gemini-3.5-flash-lite` | 1,000,000 | 否 |
-
-| Google | `google/gemini-3.1-flash-lite` | 1,000,000 | 否 |
-
-| Sakana | `sakana/fugu-ultra` | 1,000,000 | 否 |
-
-| Meta | `meta/muse-spark-1.1` | 1,050,000 | 否 |
-
-| Meta | `meta/muse-spark-1.2` | 1,050,000 | 否 |
-
-| Meta | `meta/muse-spark-1.2-contributor` | 1,050,000 | 否 |
-
-| xAI | `xai/grok-4.5` | 500,000 | 否 |
+| Provider          | Canonical model ID                    |   Context | 默认启用 |
+| ----------------- | ------------------------------------- | --------: | :------: |
+| DeepSeek          | `deepseek/deepseek-v4-pro`            | 1,000,000 |    是    |
+| DeepSeek          | `deepseek/deepseek-v4-flash`          | 1,000,000 |    是    |
+| Moonshot          | `moonshotai/Kimi-K3`                  | 1,000,000 |    否    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code`           |   256,000 |    否    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code-Highspeed` |   262,000 |    否    |
+| Moonshot          | `moonshotai/Kimi-K2.6`                |   256,000 |    是    |
+| Moonshot          | `moonshotai/Kimi-K2.5`                |   256,000 |    否    |
+| Z.ai              | `zai-org/GLM-5.2`                     | 1,000,000 |    否    |
+| Z.ai              | `zai-org/GLM-5.2-Fast`                | 1,000,000 |    否    |
+| Z.ai              | `zai-org/GLM-5.1`                     |    未公布 |    是    |
+| Z.ai              | `zai-org/GLM-5`                       |   200,000 |    否    |
+| MiniMax           | `MiniMaxAI/MiniMax-M3`                | 1,000,000 |    否    |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.7`              |    未公布 |    是    |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.5`              |   200,000 |    否    |
+| Xiaomi            | `xiaomi/mimo-v2.5-pro`                | 1,000,000 |    否    |
+| Xiaomi            | `xiaomi/mimo-v2.5`                    | 1,000,000 |    否    |
+| Qwen              | `Qwen/Qwen3.8-Max`                    | 1,000,000 |    否    |
+| Qwen              | `Qwen/Qwen3.7-Max`                    | 1,000,000 |    否    |
+| Qwen              | `Qwen/Qwen3.7-Plus`                   | 1,000,000 |    否    |
+| Qwen              | `Qwen/Qwen3.7-Flash`                  | 1,000,000 |    否    |
+| Qwen              | `Qwen/Qwen3.6-Max-Preview`            |    未公布 |    否    |
+| Qwen              | `Qwen/Qwen3.6-Plus`                   |    未公布 |    是    |
+| StepFun           | `stepfun/Step-3.7-Flash`              |   256,000 |    否    |
+| StepFun           | `stepfun/Step-3.5-Flash`              | 1,000,000 |    否    |
+| Tencent           | `tencent/hy3-paid`                    |   262,000 |    否    |
+| NVIDIA            | `nvidia/nemotron-3-ultra-550b-a55b`   | 1,000,000 |    否    |
+| Thinking Machines | `thinkingmachines/inkling`            |   256,000 |    否    |
+| Thinking Machines | `thinkingmachines/inkling-small`      | 1,000,000 |    否    |
+| Poolside          | `poolside/laguna-s-2.1-free`          |   256,000 |    否    |
+| Anthropic         | `claude-sonnet-5`                     | 1,000,000 |    否    |
+| Anthropic         | `claude-sonnet-4-6`                   | 1,000,000 |    否    |
+| Anthropic         | `claude-fable-5`                      | 1,000,000 |    否    |
+| Anthropic         | `claude-opus-5`                       | 1,000,000 |    否    |
+| Anthropic         | `claude-opus-4-8`                     | 1,000,000 |    否    |
+| Anthropic         | `claude-opus-4-7`                     | 1,000,000 |    否    |
+| Anthropic         | `claude-haiku-4-5-20251001`           |   200,000 |    否    |
+| OpenAI            | `gpt-5.6-sol`                         | 1,050,000 |    否    |
+| OpenAI            | `gpt-5.6-terra`                       | 1,050,000 |    否    |
+| OpenAI            | `gpt-5.6-luna`                        | 1,050,000 |    否    |
+| OpenAI            | `gpt-5.5`                             |    未公布 |    否    |
+| OpenAI            | `gpt-5.4`                             |   400,000 |    否    |
+| OpenAI            | `gpt-5.3-codex`                       |   400,000 |    否    |
+| OpenAI            | `gpt-5.4-mini`                        |   400,000 |    否    |
+| Google            | `google/gemini-3.6-flash`             | 1,000,000 |    否    |
+| Google            | `google/gemini-3.5-flash`             | 1,000,000 |    否    |
+| Google            | `google/gemini-3.5-flash-lite`        | 1,000,000 |    否    |
+| Google            | `google/gemini-3.1-flash-lite`        | 1,000,000 |    否    |
+| Sakana            | `sakana/fugu-ultra`                   | 1,000,000 |    否    |
+| Meta              | `meta/muse-spark-1.1`                 | 1,050,000 |    否    |
+| Meta              | `meta/muse-spark-1.2`                 | 1,050,000 |    否    |
+| Meta              | `meta/muse-spark-1.2-contributor`     | 1,050,000 |    否    |
+| xAI               | `xai/grok-4.5`                        |   500,000 |    否    |
 
 ### Dashboard 与 credential routing
 
 打开 `http://127.0.0.1:9992/dashboard`。移动优先 UI 以韩文为 fallback，并把韩文/英文/中文 locale 存入 `localStorage`。它显示 online/version，编辑 bind、client key、routing、每 key concurrency，管理和刷新 redacted credential；model catalog 按 provider fold，显示 enabled/total count。空 secret field 保留原 key。Save 写入 JSON，restart 后应用。永不返回 raw upstream key。
 
-`daily_burn_priority` 是按 required daily burn 加权的默认值，`depletion_aware` 是 legacy alias；`balance_priority` 偏好 usable balance；`round_robin` 平滑按 weight 轮换；`drain_first` 使用首个 eligible key。所有 policy 先缩小到 1 天内到期的 eligible credential。Manual disable、`allowedModels`、in-flight cap、exhausted/expired balance、auth failure、429/5xx/timeout cooldown 都可排除 key。每个请求固定一个 key；仅在 visible output 前 failover。
+`daily_burn_priority` 是按 required daily burn 加权的默认值，`depletion_aware` 是 legacy alias；`balance_priority` 偏好 usable balance；`round_robin` 平滑按 weight 轮换；`drain_first` 优先耗尽剩余期限最短的 eligible key，再移动到下一个。所有 policy 先缩小到 1 天内到期的 eligible credential。Manual disable、`allowedModels`、in-flight cap、exhausted/expired balance、auth failure、429/5xx/timeout cooldown 都可排除 key。每个请求固定一个 key；仅在 visible output 前 failover。
 
 ### 配置与运维
+
+从持久化的 1.3.1 dashboard catalog 升级时，会保留当前 model 的 enabled state 和所有 custom model，并用 1.14.0 canonical 定义刷新 built-in metadata。6 个已退役的 1.3.1 ID 不会作为 unknown upstream model 转发；若 default 已退役，则安全回退到 `deepseek/deepseek-v4-pro`。
+
+浏览器已保存 key 的现有用户可继续使用。新浏览器在保存或重启前，需要在 **当前管理员 API Key** 中输入一次现有 key。无 key runtime 仅在真实 loopback 连接且 Host 也是 loopback 时允许 bootstrap。
 
 Credential 优先级为 `COMMANDCODE_CREDENTIALS_FILE`、`COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`、`COMMANDCODE_API_KEY`、CLI auth file。核心默认值：`HOST=127.0.0.1`、`PORT=9992`、`COMMANDCODE_ROUTING_POLICY=daily_burn_priority`、`COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`、`COMMANDCODE_CLI_VERSION=1.14.0`、`COMMANDCODE_TIMEOUT_MS=300000`、`COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`。设置后 `BRIDGE_API_KEY` 保护 `/v1/*`；client 可使用 Bearer 或 `x-api-key`。用 `chmod 600` 保护 credential JSON。Balance alert 默认关闭。可选 `commandcode-router` 用于多个 bridge host 的 least-in-flight routing。
 

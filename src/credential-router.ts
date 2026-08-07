@@ -115,7 +115,9 @@ function daysUntil(value: string | null | undefined, now: number): number | unde
 }
 
 function hasUrgentExpiry(state: CommandCodeCredentialState, now: number): boolean {
-  const end = Date.parse(state.billing?.currentPeriodEnd ?? "");
+  if (!state.billing || calculateCreditMetrics(state.billing, now).expiringBalance <= 0)
+    return false;
+  const end = Date.parse(state.billing.currentPeriodEnd ?? "");
   if (!Number.isFinite(end)) return false;
   const remaining = end - now;
   return remaining > 0 && remaining <= DAY_MS;
@@ -533,10 +535,30 @@ export class CommandCodeCredentialRouter {
     candidates: CommandCodeCredentialState[],
     now: number,
   ): CommandCodeCredentialState {
-    if (policy === "drain_first")
-      return candidates[0] ?? this.selectSmoothWeighted(candidates, now);
+    if (policy === "drain_first") return this.selectLeastRemaining(candidates, now);
     if (policy === "balance_priority") return this.selectHighestBalance(candidates, now);
     return this.selectSmoothWeighted(candidates, now);
+  }
+
+  private selectLeastRemaining(
+    candidates: CommandCodeCredentialState[],
+    now: number,
+  ): CommandCodeCredentialState {
+    let best = candidates[0];
+    if (!best) throw new NoAvailableCommandCodeCredentialError();
+    let bestDaysRemaining: number | undefined;
+    for (const state of candidates) {
+      const daysRemaining = state.billing
+        ? daysUntil(state.billing.currentPeriodEnd, now)
+        : undefined;
+      if (daysRemaining === undefined) continue;
+      if (bestDaysRemaining === undefined || daysRemaining < bestDaysRemaining) {
+        best = state;
+        bestDaysRemaining = daysRemaining;
+      }
+    }
+    // Unknown-expiry credentials trail known-expiry ones; the first is retained.
+    return best;
   }
 
   private selectHighestBalance(

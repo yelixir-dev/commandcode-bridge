@@ -11,6 +11,19 @@ export interface CommandCodeModelDefinition {
   notes?: string;
 }
 
+export const LEGACY_RETIRED_MODEL_IDS: ReadonlySet<string> = new Set([
+  "MiniMaxAI/MiniMax-M3-Free",
+  "anthropic/claude-opus-4.6",
+  "anthropic/claude-opus-4-5-20251101",
+  "anthropic/claude-sonnet-4-5-20250929",
+  "anthropic/claude-sonnet-4-20250514",
+  "inclusionai/ling-3.0-flash-free",
+]);
+
+export function isLegacyRetiredModelId(id: string): boolean {
+  return LEGACY_RETIRED_MODEL_IDS.has(id.trim());
+}
+
 export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
   {
     id: "deepseek/deepseek-v4-pro",
@@ -565,32 +578,22 @@ export function mergeModelCatalog(
   const configured = new Map<string, Partial<CommandCodeModelConfig>>();
   for (const entry of configuredModels ?? []) {
     if (typeof entry.id !== "string" || entry.id.trim().length === 0) continue;
-    configured.set(normalize(entry.id.trim()), entry);
+    const id = entry.id.trim();
+    const normalizedId = normalize(id);
+    if (isLegacyRetiredModelId(id) || isLegacyRetiredModelId(normalizedId)) continue;
+    configured.set(normalizedId, entry);
   }
 
   const catalog: CommandCodeModelConfig[] = [];
   for (const base of Array.from(definitions.values())) {
     const override = configured.get(base.id);
     const model: CommandCodeModelConfig = {
-      id: base.id,
+      ...base,
       enabled:
         override?.enabled ??
         (enableMissingDefinitions ? base.enabled : envAllowedModels.includes(base.id)),
     };
-    const label = override?.label ?? base.label;
-    const provider = override?.provider ?? base.provider;
-    const family = override?.family ?? base.family;
-    if (label) model.label = label;
-    if (provider) model.provider = provider;
-    if (family) model.family = family;
-    const aliases = override?.aliases ?? base.aliases;
-    const notes = override?.notes ?? base.notes;
-    const contextWindow = override?.contextWindow ?? base.contextWindow;
-    if (aliases) model.aliases = aliases;
-    if (notes) model.notes = notes;
-    if (typeof contextWindow === "number" && Number.isInteger(contextWindow) && contextWindow > 0) {
-      model.contextWindow = contextWindow;
-    }
+    if (base.aliases) model.aliases = [...base.aliases];
     catalog.push(model);
   }
 

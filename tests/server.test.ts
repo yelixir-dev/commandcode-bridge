@@ -314,7 +314,8 @@ describe("Fastify OpenAI-compatible server", () => {
     const app = await createTestApp({
       upstream: new FakeCommandCodeClient(),
       configOverrides: {
-        allowedModels: ["deepseek/deepseek-v4-pro", "Qwen/Qwen3.6-Plus"],
+        defaultModel: "gpt-5.4",
+        allowedModels: ["deepseek/deepseek-v4-pro", "Qwen/Qwen3.6-Plus", "gpt-5.4"],
         modelCatalog: [
           {
             id: "deepseek/deepseek-v4-pro",
@@ -329,6 +330,12 @@ describe("Fastify OpenAI-compatible server", () => {
             aliases: ["qwen3.6-plus"],
             enabled: true,
           },
+          {
+            id: "gpt-5.4",
+            provider: "OpenAI",
+            family: "gpt",
+            enabled: true,
+          },
         ],
       },
     });
@@ -340,7 +347,10 @@ describe("Fastify OpenAI-compatible server", () => {
     expect(byId.get("deepseek/deepseek-v4-pro")?.owned_by).toBe("deepseek");
     expect(byId.get("Qwen/Qwen3.6-Plus")?.owned_by).toBe("qwen");
     expect(byId.get("qwen3.6-plus")?.owned_by).toBe("qwen");
+    expect(byId.get("default")?.owned_by).toBe("openai");
     expect(byId.get("commandcode/default")?.owned_by).toBe("commandcode");
+    const defaultResponse = await app.inject({ method: "GET", url: "/v1/models/default" });
+    expect(defaultResponse.json()).toMatchObject({ id: "default", owned_by: "openai" });
     await app.close();
   });
 
