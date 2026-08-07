@@ -410,6 +410,13 @@ describe("dashboard UI", () => {
     expect(html.indexOf('class="footerbar"')).toBeLessThan(html.indexOf('<section class="grid">'));
   });
 
+  it("extracts the upstream error message from save failures", () => {
+    const html = dashboardHtml();
+    expect(html).toContain("function saveErrorMessage(e)");
+    expect(html).toContain("const msg=j?.error?.message");
+    expect(html).toContain("tr('saveFailed')+saveErrorMessage(e)");
+  });
+
   it("contains Korean, English, and Chinese dashboard translations with locale fallback", () => {
     const html = dashboardHtml({
       server: { host: "127.0.0.1", port: 9992 },
