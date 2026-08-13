@@ -343,7 +343,7 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
-  it("allows same-host dashboard JSON writes without the current bridge API key", async () => {
+  it("requires the current bridge API key for same-host dashboard JSON writes", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -368,6 +368,40 @@ describe("JSON dashboard configuration", () => {
       payload,
     });
 
+    expect(response.statusCode).toBe(401);
+    expect(response.body).toContain("unauthorized");
+
+    await app.close();
+  });
+
+  it("allows same-host dashboard JSON writes with the current bridge API key", async () => {
+    const file = tempConfigFile({
+      bridgeApiKey: "bridge-secret",
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: {
+        authorization: "Bearer bridge-secret",
+        host: "100.88.251.70:9992",
+        origin: "http://100.88.251.70:9992",
+      },
+      payload: {
+        server: { host: "0.0.0.0", port: 9992 },
+        routing: { policy: "round_robin" as const, maxInFlightPerCredential: 4 },
+        credentials: [{ id: "alpha", originalId: "alpha", weight: 1, enabled: true }],
+      },
+    });
+
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ dirty: true, restart_required: true });
     const persisted = JSON.parse(readFileSync(file, "utf8")) as {
@@ -382,7 +416,7 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
-  it("allows same-host dashboard restarts without the current bridge API key", async () => {
+  it("requires the current bridge API key for same-host dashboard restarts", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",
       credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
@@ -398,6 +432,34 @@ describe("JSON dashboard configuration", () => {
       method: "POST",
       url: "/admin/restart",
       headers: { host: "100.88.251.70:9992", origin: "http://100.88.251.70:9992" },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.body).toContain("unauthorized");
+
+    await app.close();
+  });
+
+  it("allows same-host dashboard restarts with the current bridge API key", async () => {
+    const file = tempConfigFile({
+      bridgeApiKey: "bridge-secret",
+      credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/restart",
+      headers: {
+        authorization: "Bearer bridge-secret",
+        host: "100.88.251.70:9992",
+        origin: "http://100.88.251.70:9992",
+      },
       payload: {},
     });
     expect(response.statusCode).toBe(200);
@@ -424,7 +486,7 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
-  it("rejects browserless non-loopback dashboard JSON writes", async () => {
+  it("rejects cross-port localhost dashboard writes without the current bridge API key", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",
       credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
@@ -439,7 +501,35 @@ describe("JSON dashboard configuration", () => {
     const response = await app.inject({
       method: "PUT",
       url: "/admin/config",
-      headers: { host: "100.88.251.70:9992" },
+      headers: { host: "127.0.0.1:9992", origin: "http://127.0.0.1:3000" },
+      payload: { credentials: [{ id: "alpha", originalId: "alpha", weight: 1 }] },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.body).toContain("unauthorized");
+
+    await app.close();
+  });
+
+  it("rejects DNS-rebinding dashboard writes without the current bridge API key", async () => {
+    const file = tempConfigFile({
+      bridgeApiKey: "bridge-secret",
+      credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+    const app = await createApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { COMMANDCODE_CREDENTIALS_FILE: file },
+      configAuthPaths: [],
+      configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/config",
+      headers: {
+        host: "rebind.attacker.example:9992",
+        origin: "http://rebind.attacker.example",
+      },
       payload: { credentials: [{ id: "alpha", originalId: "alpha", weight: 1 }] },
     });
 
