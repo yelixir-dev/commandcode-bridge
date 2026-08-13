@@ -1,6 +1,6 @@
 # Dashboard Design Contract
 
-The dashboard follows the Emil editorial system. This document is the frontend contract for future dashboard changes; implementation changes must preserve the existing IDs, translations, API behavior, and save/restart flow.
+The dashboard follows the Emil editorial system. This document is the frontend contract for future dashboard changes; implementation changes must preserve the remaining IDs, translations, API behavior, and save/restart flow. Same-origin dashboard saves and restarts do not require re-entering the client API key.
 
 ## Color tokens
 
@@ -40,6 +40,12 @@ Rules use `#d9d0c4`; muted copy uses `#6d665e`. Shadows stay restrained at `0 14
 - The rust plus/minus marker must clearly communicate collapsed and expanded state.
 - Model IDs, notes, and toggles remain inside their provider fold.
 - A model toggle updates configuration and the fold's enabled metadata/count in place. It must not rebuild the model container or call `render()`, because doing so would close an open fold.
+
+## Credential folds
+
+- Every credential is a native `<details class="credential-fold">` with no `open` attribute, so each key is collapsed on initial render.
+- The summary keeps the credential name and current status visible while the editor, metrics, enable toggle, delete action, and API-key field remain inside the fold.
+- Opening or closing a credential must not alter its configuration or the save/restart flow.
 
 ## Accessibility
 

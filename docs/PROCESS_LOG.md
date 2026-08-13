@@ -34,3 +34,42 @@
 - Fixed two tool-call reliability blockers found during strict review: malformed `tool_calls` now fail OpenAI-style validation, and normal Fastify request close no longer aborts upstream generation.
 - Hardened follow-up tool history conversion: assistant `tool_calls` are no longer flattened into visible prose such as `Assistant requested tool calls`, tool results no longer expose OpenAI call IDs, and a system guard marks prior function context as internal bridge context.
 - Verification: `npm run typecheck`, all 72 Vitest tests, `npm run build`, LaunchAgent restart, `/health`, and Hermes provider tool-loop smoke all passed.
+
+## 2026-05-18 to 2026-06-25
+
+- Extracted the model catalog, aliases, and pricing into `src/model-catalog.ts`.
+- Added startup configuration smoke coverage and hardened server configuration validation.
+- Added a Korean, English, and Chinese dashboard language switcher with persisted selection, plus `README.zh.md`.
+- Kept the bridge aligned with CommandCode releases from `0.26.7` through `0.40.3`; most intervening commits were version and catalog synchronization.
+
+## 2026-07-24
+
+- Aligned request conversion, types, the model catalog, and tests with the CommandCode `1.3.1` contract.
+- Preserved `developer` messages and tool-call history across the revised upstream request shape.
+
+## 2026-08-06
+
+- Established CommandCode `1.14.0` as the release baseline and added per-model context-window metadata.
+- Added `DESIGN.md` and refreshed the architecture, deployment, security, and multilingual README documentation.
+- Expanded credential routing, dashboard, server configuration, and contract test coverage for the new release.
+
+## 2026-08-07
+
+- Released bridge version `1.14.0.c`.
+- Made the official CommandCode Provider API the default path, with startup model-catalog refresh and the legacy `/alpha/generate` tunnel retained for unsupported plans and Claude models.
+- Added quota-aware multi-key routing, soonest-expiring balance drain priority, pre-output failover, and a configurable five-attempt transient retry budget.
+- Hardened admin authentication and credential updates with timing-safe comparison and secret preservation.
+- Consolidated the admin API key field into the server configuration card and surfaced backend save errors in the dashboard.
+
+## Current status — 2026-08-13
+
+- Branch: `main`, synchronized with `origin/main` when this status audit began.
+- Package: `commandcode-bridge` `1.14.0.c`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
+- Model surface: 52 statically aligned models with live Provider API refresh when available.
+- Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
+- Deployment surface: Docker/Compose, Linux install/uninstall scripts, nginx and systemd release assets, and GitHub/GitLab CI definitions.
+- Verification: `npm run typecheck`, `npm run lint`, all 199 Vitest tests in 14 files, and `npm run build` pass on this workstation.
+- Known local exception: `npm run format:check` fails only because the untracked workspace instruction file `AGENTS.md` is not Prettier-formatted. It is not part of the tracked product tree and was left untouched.
+- Live upstream smoke was not repeated because it requires a running bridge and an upstream CommandCode account; the last recorded live bridge/tool-loop smoke remains the 2026-05-16 entry.
+- Session recovery note: the current Senpi transcript exists at the path in `PI_SESSION_FILE`. Cross-platform local session search found no recoverable project implementation transcript covering the missing period, so the entries above were reconstructed from Git history and verified against the current source and test suite.

@@ -112,6 +112,26 @@ describe("dashboard UI", () => {
     expect(html.indexOf("data-cenabled")).toBeLessThan(html.indexOf("data-del"));
   });
 
+  it("renders every credential as a closed native disclosure card", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [{ id: "alpha", enabled: true, apiKeyConfigured: true }],
+      models: [],
+    });
+    const credentialRender = html.slice(
+      html.indexOf("$('creds').innerHTML"),
+      html.indexOf("document.querySelectorAll('[data-cid]')"),
+    );
+
+    expect.soft(credentialRender).toContain('<details class="cred credential-fold"');
+    expect.soft(credentialRender).toContain("<summary");
+    expect.soft(credentialRender).toContain('class="credential-body"');
+    expect.soft(credentialRender).not.toMatch(/<details[^>]*\sopen(?:\s|=|>)/);
+    expect.soft(html).toContain(".credential-fold:not([open]) .credential-body");
+    expect.soft(html).toContain(".provider-fold:not([open]) .provider-models{display:none}");
+  });
+
   it("keeps save/restart actions in normal document flow with no overlay hit-target", () => {
     const html = dashboardHtml({
       server: { host: "127.0.0.1", port: 9992 },
@@ -144,7 +164,7 @@ describe("dashboard UI", () => {
     expect(html).toContain("Duplicate CommandCode API key");
   });
 
-  it("uses the loaded admin API key for writes when browser storage is empty or stale", () => {
+  it("uses a stored client API key when one is available", () => {
     const html = dashboardHtml({
       server: { host: "0.0.0.0", port: 9992 },
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -154,7 +174,7 @@ describe("dashboard UI", () => {
     });
 
     expect(html).toContain(
-      "authKey(cfg?.bridgeApiKey)||fullAdminAuthKey()||authKey(localStorage.getItem('bridgeApiKey'))",
+      "authKey(cfg?.bridgeApiKey)||authKey(localStorage.getItem('bridgeApiKey'))",
     );
     expect(html).toContain("'authorization':'Bearer '+key");
   });
@@ -174,7 +194,7 @@ describe("dashboard UI", () => {
     expect(html).toContain("return isRedactedSecret(key)?''");
   });
 
-  it("lets existing users provide the current admin key separately from key rotation", () => {
+  it("does not ask for the current admin key before save or restart", () => {
     const html = dashboardHtml({
       server: { host: "0.0.0.0", port: 9992 },
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -183,14 +203,11 @@ describe("dashboard UI", () => {
       bridgeApiKey: "[REDACTED]",
     });
 
-    expect(html).toContain('id="adminAuthKey"');
-    expect(html).toContain("function fullAdminAuthKey");
-    expect(html).toContain("if(!raw||isRedactedSecret(raw))return ''; return raw;}");
-    expect(html).toContain("fullAdminAuthKey()||authKey(localStorage.getItem('bridgeApiKey'))");
-    expect(html).toContain("현재 Admin API Key");
-    expect(html).toContain("Current Admin API Key");
-    expect(html).toContain("当前管理员 API Key");
-    expect(html).toContain("adminAuthRequired");
+    expect(html).not.toContain('id="adminAuthKey"');
+    expect(html).not.toContain("function fullAdminAuthKey");
+    expect(html).not.toContain("현재 Admin API Key");
+    expect(html).not.toContain("Current Admin API Key");
+    expect(html).not.toContain("当前管理员 API Key");
   });
 
   it("can generate and persist a random client API key from the dashboard", () => {

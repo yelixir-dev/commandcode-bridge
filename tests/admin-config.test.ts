@@ -343,7 +343,7 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
-  it("requires the current bridge API key for same-host dashboard JSON writes", async () => {
+  it("allows same-host dashboard JSON writes without the current bridge API key", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",
       routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
@@ -361,22 +361,10 @@ describe("JSON dashboard configuration", () => {
       routing: { policy: "round_robin" as const, maxInFlightPerCredential: 4 },
       credentials: [{ id: "alpha", originalId: "alpha", weight: 1, enabled: true }],
     };
-    const forgedResponse = await app.inject({
-      method: "PUT",
-      url: "/admin/config",
-      headers: { host: "100.88.251.70:9992", origin: "http://100.88.251.70:9992" },
-      payload,
-    });
-    expect(forgedResponse.statusCode).toBe(401);
-
     const response = await app.inject({
       method: "PUT",
       url: "/admin/config",
-      headers: {
-        authorization: "Bearer bridge-secret",
-        host: "100.88.251.70:9992",
-        origin: "http://100.88.251.70:9992",
-      },
+      headers: { host: "100.88.251.70:9992", origin: "http://100.88.251.70:9992" },
       payload,
     });
 
@@ -394,7 +382,7 @@ describe("JSON dashboard configuration", () => {
     await app.close();
   });
 
-  it("requires the current bridge API key for same-host dashboard restarts", async () => {
+  it("allows same-host dashboard restarts without the current bridge API key", async () => {
     const file = tempConfigFile({
       bridgeApiKey: "bridge-secret",
       credentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
@@ -406,22 +394,10 @@ describe("JSON dashboard configuration", () => {
       configOverrides: { bridgeApiKey: "bridge-secret", logLevel: "silent" },
     });
 
-    const forgedResponse = await app.inject({
-      method: "POST",
-      url: "/admin/restart",
-      headers: { host: "100.88.251.70:9992", origin: "http://100.88.251.70:9992" },
-      payload: {},
-    });
-    expect(forgedResponse.statusCode).toBe(401);
-
     const response = await app.inject({
       method: "POST",
       url: "/admin/restart",
-      headers: {
-        authorization: "Bearer bridge-secret",
-        host: "100.88.251.70:9992",
-        origin: "http://100.88.251.70:9992",
-      },
+      headers: { host: "100.88.251.70:9992", origin: "http://100.88.251.70:9992" },
       payload: {},
     });
     expect(response.statusCode).toBe(200);
@@ -664,7 +640,7 @@ describe("JSON dashboard configuration", () => {
     expect(response.headers["content-type"]).toContain("text/html");
     expect(response.body).toContain("CommandCode Bridge Console");
     expect(response.body).toContain("Client API Key");
-    expect(response.body).toContain("Current Admin API Key");
+    expect(response.body).not.toContain("Current Admin API Key");
     expect(response.body).not.toContain("bridge-secret");
     expect(response.body).not.toContain("configFilePath");
     expect(response.body).not.toContain(process.env.HOME ?? "__NO_HOME__");

@@ -599,6 +599,9 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
 
   app.addHook("preHandler", async (request, reply) => {
     if (!shouldRequireAuth(request)) return;
+    if (isDashboardAdminWrite(request) && config.bridgeApiKey && sameHostnameOrigin(request)) {
+      return;
+    }
     if (
       isDashboardAdminWrite(request) &&
       !config.bridgeApiKey &&
