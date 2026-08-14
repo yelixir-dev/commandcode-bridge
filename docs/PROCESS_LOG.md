@@ -81,10 +81,15 @@
 - Released bridge version `1.25.0.a` aligned with CommandCode CLI `1.25.0`.
 - Added `zai-org/GLM-5.3`, `google/gemini-3.7-flash`, and `xai/grok-4.6` to the static catalog (55 models). CLI 1.22 itself only merged `read_multiple_files` into `read_file` and does not change the bridge wire.
 
+## 2026-08-15
+
+- Released bridge version `1.25.0.b`.
+- Added dashboard enable-all / disable-all controls beside the models heading.
+
 ## Current status — 2026-08-15
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.25.0.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.25.0.b`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
 - Model surface: 55 statically aligned models with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.

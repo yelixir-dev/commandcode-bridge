@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.25.0.a-b57920?style=flat-square" alt="Version 1.25.0.a"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.25.0.b-b57920?style=flat-square" alt="Version 1.25.0.b"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-52-1f6f78?style=flat-square" alt="52 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -20,7 +20,7 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이트웨이입니다. 표준 OpenAI-compatible 모델·채팅 endpoint를 제공하고 eligible upstream credential 사이에서 요청을 라우팅하며, CommandCode **1.25.0**에 맞춘 정확한 **55-model** catalog를 게시합니다. Bridge 버전은 항상 현재 CommandCode CLI 버전을 따라가며 그 뒤에 문자 접미사를 붙입니다(예: **1.25.0.a**). 접미사는 bridge 전용 release를 뜻합니다.
+CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이트웨이입니다. 표준 OpenAI-compatible 모델·채팅 endpoint를 제공하고 eligible upstream credential 사이에서 요청을 라우팅하며, CommandCode **1.25.0**에 맞춘 정확한 **55-model** catalog를 게시합니다. Bridge 버전은 항상 현재 CommandCode CLI 버전을 따라가며 그 뒤에 문자 접미사를 붙입니다(예: **1.25.0.b**). 접미사는 bridge 전용 release를 뜻합니다.
 
 [기능](#기능) · [설치](#설치) · [사용법](#사용법) · [동작 방식](#동작-방식) · [저장소 구성](#저장소-구성) · [현재 제한](#현재-제한) · [라이선스](#라이선스)
 

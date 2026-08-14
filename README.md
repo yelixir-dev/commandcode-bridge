@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.25.0.a-b57920?style=flat-square" alt="Version 1.25.0.a"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.25.0.b-b57920?style=flat-square" alt="Version 1.25.0.b"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-52-1f6f78?style=flat-square" alt="52 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -20,7 +20,7 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **55-model** catalog aligned with CommandCode **1.25.0**. The bridge version always tracks the current CommandCode CLI version with a letter suffix (for example **1.25.0.a**); the suffix marks bridge-only releases.
+CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **55-model** catalog aligned with CommandCode **1.25.0**. The bridge version always tracks the current CommandCode CLI version with a letter suffix (for example **1.25.0.b**); the suffix marks bridge-only releases.
 
 [What it does](#what-it-does) · [Install](#install) · [Usage](#usage) · [How it works](#how-it-works) · [Repository layout](#repository-layout) · [Current limitations](#current-limitations) · [License](#license)
 
