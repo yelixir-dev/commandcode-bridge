@@ -61,10 +61,15 @@
 - Hardened admin authentication and credential updates with timing-safe comparison and secret preservation.
 - Consolidated the admin API key field into the server configuration card and surfaced backend save errors in the dashboard.
 
-## Current status — 2026-08-13
+## 2026-08-15
+
+- Released bridge version `1.14.0.d`.
+- Forwarded OpenAI follow-up tool history to Alpha as native `tool-call` / `role:tool` parts instead of flattening it into user text, so non-streaming tool loops can complete after the first call.
+
+## Current status — 2026-08-15
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.14.0.c`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.14.0.d`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
 - Model surface: 52 statically aligned models with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
