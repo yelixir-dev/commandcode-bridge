@@ -154,21 +154,112 @@ describe("OpenAI to CommandCode conversion", () => {
     });
 
     expect(body.params.tools).toHaveLength(1);
-    expect(body.params.messages.map((message) => message.role)).toEqual(["user", "user", "user"]);
+    expect(body.params.messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+      "tool",
+      "user",
+    ]);
+    expect(body.params.messages[1]).toEqual({
+      role: "assistant",
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "call_weather",
+          toolName: "get_weather",
+          input: { city: "Seoul" },
+        },
+      ],
+    });
+    expect(body.params.messages[2]).toEqual({
+      role: "tool",
+      content: [
+        {
+          type: "tool-result",
+          toolCallId: "call_weather",
+          toolName: "get_weather",
+          output: { type: "text", value: '{"temperature":"12C"}' },
+        },
+      ],
+    });
 
     const serializedMessages = JSON.stringify(body.params.messages);
     expect(serializedMessages).not.toContain("Assistant requested tool calls");
     expect(serializedMessages).not.toContain("Tool result for");
-    expect(serializedMessages).not.toContain('"role":"tool"');
     expect(serializedMessages).not.toContain("tool_calls");
     expect(serializedMessages).not.toContain("tool_call_id");
-    expect(serializedMessages).not.toContain("call_weather");
+    expect(serializedMessages).not.toContain("Prior function execution context");
+    expect(body.params.system).not.toMatch(/internal bridge context/i);
+  });
 
-    expect(serializedMessages).toContain("get_weather");
-    expect(serializedMessages).toContain("Seoul");
-    expect(serializedMessages).toContain("12C");
-    expect(body.params.system).toMatch(/internal bridge context/i);
-    expect(body.params.system).toMatch(/do not quote|do not expose|do not mention/i);
+  it("merges consecutive tool results into one native tool message", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4-pro",
+        messages: [
+          { role: "user", content: "Need both." },
+          {
+            role: "assistant",
+            content: "Checking.",
+            tool_calls: [
+              {
+                id: "call_weather",
+                type: "function",
+                function: { name: "get_weather", arguments: '{"city":"Seoul"}' },
+              },
+              {
+                id: "call_time",
+                type: "function",
+                function: { name: "get_time", arguments: '{"city":"Seoul"}' },
+              },
+            ],
+          },
+          { role: "tool", tool_call_id: "call_weather", content: "12C" },
+          { role: "tool", tool_call_id: "call_time", content: "09:00" },
+        ],
+      },
+      upstreamModel: "deepseek/deepseek-v4-pro",
+      now: () => new Date("2026-05-11T00:00:00Z"),
+      cwd: () => "/tmp/project",
+      environment: "linux-x64, Node.js test",
+      threadId: "00000000-0000-4000-8000-000000000000",
+    });
+
+    expect(body.params.messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+      "tool",
+    ]);
+    expect(body.params.messages[1]?.content).toEqual([
+      { type: "text", text: "Checking." },
+      {
+        type: "tool-call",
+        toolCallId: "call_weather",
+        toolName: "get_weather",
+        input: { city: "Seoul" },
+      },
+      {
+        type: "tool-call",
+        toolCallId: "call_time",
+        toolName: "get_time",
+        input: { city: "Seoul" },
+      },
+    ]);
+    expect(body.params.messages[2]?.content).toHaveLength(2);
+    expect(body.params.messages[2]?.content).toEqual([
+      {
+        type: "tool-result",
+        toolCallId: "call_weather",
+        toolName: "get_weather",
+        output: { type: "text", value: "12C" },
+      },
+      {
+        type: "tool-result",
+        toolCallId: "call_time",
+        toolName: "get_time",
+        output: { type: "text", value: "09:00" },
+      },
+    ]);
   });
 
   it("injects JSON-only guidance for OpenAI response_format", () => {

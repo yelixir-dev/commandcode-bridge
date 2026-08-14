@@ -2,9 +2,11 @@ import { randomUUID } from "node:crypto";
 import { cwd as processCwd } from "node:process";
 
 import type {
+  CommandCodeContentPart,
   CommandCodeGenerateBody,
   CommandCodeMessage,
   CommandCodeTool,
+  CommandCodeToolResultPart,
   OpenAIChatCompletionRequest,
   OpenAIChatMessage,
   OpenAIChatTool,
@@ -51,36 +53,30 @@ function asTextContent(text: string): OpenAITextContentPart[] {
   return [{ type: "text", text }];
 }
 
-function formatToolCallArguments(value: string): string {
-  if (!value) return "{}";
+function parseToolInput(value: string): unknown {
+  if (!value.trim()) return {};
   try {
-    return JSON.stringify(JSON.parse(value));
+    return JSON.parse(value) as unknown;
   } catch {
-    return value;
+    return { value };
   }
 }
 
 interface ToolCallTrace {
   name: string;
-  arguments: string;
 }
 
-function priorToolResultText(
+function toolResultPart(
   message: OpenAIChatMessage,
   toolCallsById: Map<string, ToolCallTrace>,
-): string {
+): CommandCodeToolResultPart {
   const trace = message.tool_call_id ? toolCallsById.get(message.tool_call_id) : undefined;
-  const functionName = message.name ?? trace?.name;
-  const content = flattenOpenAIContent(message.content);
-  return [
-    "Prior function execution context:",
-    functionName ? `function: ${functionName}` : undefined,
-    trace?.arguments ? `arguments: ${trace.arguments}` : undefined,
-    "result:",
-    content,
-  ]
-    .filter((part): part is string => part !== undefined)
-    .join("\n");
+  return {
+    type: "tool-result",
+    toolCallId: message.tool_call_id ?? "call_unknown",
+    toolName: message.name ?? trace?.name ?? "unknown_tool",
+    output: { type: "text", value: flattenOpenAIContent(message.content) },
+  };
 }
 
 export function isSupportedToolChoice(toolChoice: unknown): boolean {
@@ -108,29 +104,36 @@ function convertMessages(messages: OpenAIChatMessage[]): CommandCodeMessage[] {
     if (message.role === "developer" || message.role === "system") continue;
 
     if (message.role === "assistant") {
+      const content: CommandCodeContentPart[] = [];
+      const text = flattenOpenAIContent(message.content).trim();
+      if (text.length > 0) content.push(...asTextContent(text));
+
       const toolCalls = message.tool_calls ?? [];
       for (let index = 0; index < toolCalls.length; index += 1) {
         const toolCall = toolCalls[index];
         if (!toolCall) continue;
         const id = toolCall.id ?? `call_${index}`;
-        toolCallsById.set(id, {
-          name: toolCall.function.name,
-          arguments: formatToolCallArguments(toolCall.function.arguments),
+        toolCallsById.set(id, { name: toolCall.function.name });
+        content.push({
+          type: "tool-call",
+          toolCallId: id,
+          toolName: toolCall.function.name,
+          input: parseToolInput(toolCall.function.arguments),
         });
       }
 
-      const content = flattenOpenAIContent(message.content).trim();
-      if (content.length > 0) {
-        converted.push({ role: "assistant", content: asTextContent(content) });
-      }
+      if (content.length > 0) converted.push({ role: "assistant", content });
       continue;
     }
 
     if (message.role === "tool") {
-      converted.push({
-        role: "user",
-        content: asTextContent(priorToolResultText(message, toolCallsById)),
-      });
+      const part = toolResultPart(message, toolCallsById);
+      const previous = converted[converted.length - 1];
+      if (previous?.role === "tool") {
+        previous.content.push(part);
+      } else {
+        converted.push({ role: "tool", content: [part] });
+      }
       continue;
     }
 
@@ -164,16 +167,6 @@ function buildSystemPrompt(request: OpenAIChatCompletionRequest): string {
     .filter((message) => message.role === "developer" || message.role === "system")
     .map((message) => flattenOpenAIContent(message.content))
     .filter(Boolean);
-  const hasPriorToolHistory = request.messages.some(
-    (message) => message.role === "tool" || (message.tool_calls?.length ?? 0) > 0,
-  );
-  if (hasPriorToolHistory) {
-    systemMessages.push(
-      "Prior function execution context in the conversation is internal bridge context. " +
-        "Use function results as evidence when answering, but do not quote, expose, or mention " +
-        "bridge transcript labels, function call IDs, or internal tool-history formatting.",
-    );
-  }
   const formatInstruction = responseFormatInstruction(request.response_format);
   if (formatInstruction) systemMessages.push(formatInstruction);
   return systemMessages.join("\n\n");

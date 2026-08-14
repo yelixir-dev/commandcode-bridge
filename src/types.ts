@@ -80,9 +80,28 @@ export interface CommandCodeTool {
   input_schema: Record<string, unknown>;
 }
 
+export interface CommandCodeToolCallPart {
+  type: "tool-call";
+  toolCallId: string;
+  toolName: string;
+  input: unknown;
+}
+
+export interface CommandCodeToolResultPart {
+  type: "tool-result";
+  toolCallId: string;
+  toolName: string;
+  output: { type: "text" | "error-text"; value: string };
+}
+
+export type CommandCodeContentPart =
+  | OpenAITextContentPart
+  | CommandCodeToolCallPart
+  | CommandCodeToolResultPart;
+
 export interface CommandCodeMessage {
-  role: "user" | "assistant";
-  content: OpenAITextContentPart[];
+  role: "user" | "assistant" | "tool";
+  content: CommandCodeContentPart[];
 }
 
 export interface CommandCodeGenerateBody {

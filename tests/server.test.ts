@@ -426,20 +426,23 @@ describe("Fastify OpenAI-compatible server", () => {
     expect(fake.seenBodies[0]?.params.tools).toHaveLength(1);
     expect(fake.seenBodies[0]?.params.messages.map((message) => message.role)).toEqual([
       "user",
-      "user",
+      "assistant",
+      "tool",
       "user",
     ]);
     const serializedMessages = JSON.stringify(fake.seenBodies[0]?.params.messages);
     expect(serializedMessages).not.toContain("Assistant requested tool calls");
     expect(serializedMessages).not.toContain("Tool result for");
-    expect(serializedMessages).not.toContain('"role":"tool"');
     expect(serializedMessages).not.toContain("tool_calls");
     expect(serializedMessages).not.toContain("tool_call_id");
-    expect(serializedMessages).not.toContain("call_weather");
+    expect(serializedMessages).toContain('"role":"tool"');
+    expect(serializedMessages).toContain("call_weather");
+    expect(serializedMessages).toContain("tool-call");
+    expect(serializedMessages).toContain("tool-result");
     expect(serializedMessages).toContain("get_weather");
     expect(serializedMessages).toContain("Seoul");
     expect(serializedMessages).toContain("12C");
-    expect(fake.seenBodies[0]?.params.system).toMatch(/internal bridge context/i);
+    expect(fake.seenBodies[0]?.params.system).not.toMatch(/internal bridge context/i);
     await app.close();
   });
 
