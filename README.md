@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.14.0.f-b57920?style=flat-square" alt="Version 1.14.0.f"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.25.0.a-b57920?style=flat-square" alt="Version 1.25.0.a"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-52-1f6f78?style=flat-square" alt="52 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -20,7 +20,7 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **52-model** catalog aligned with CommandCode **1.14.0**. The bridge version always tracks the current CommandCode CLI version with a letter suffix (for example **1.14.0.f**); the suffix marks bridge-only releases.
+CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **55-model** catalog aligned with CommandCode **1.25.0**. The bridge version always tracks the current CommandCode CLI version with a letter suffix (for example **1.25.0.a**); the suffix marks bridge-only releases.
 
 [What it does](#what-it-does) · [Install](#install) · [Usage](#usage) · [How it works](#how-it-works) · [Repository layout](#repository-layout) · [Current limitations](#current-limitations) · [License](#license)
 
@@ -48,7 +48,7 @@ CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode accou
 
 ### Linux rootless installer
 
-The installer targets Linux user systemd, requires Node.js 22+ for CommandCode CLI 1.14.0, imports CLI auth when available, writes private state under `~/.config/commandcode-bridge`, installs under `~/.local/share/commandcode-bridge`, and safely defaults to `127.0.0.1:9992`. Use `0.0.0.0` only behind a trusted LAN/VPN/tailnet/firewall/reverse proxy with `BRIDGE_API_KEY`. Use `sudo loginctl enable-linger "$USER"` for pre-login startup; uninstall with `./uninstall.sh` or `./uninstall.sh --purge-config`.
+The installer targets Linux user systemd, requires Node.js 22+ for CommandCode CLI 1.25.0, imports CLI auth when available, writes private state under `~/.config/commandcode-bridge`, installs under `~/.local/share/commandcode-bridge`, and safely defaults to `127.0.0.1:9992`. Use `0.0.0.0` only behind a trusted LAN/VPN/tailnet/firewall/reverse proxy with `BRIDGE_API_KEY`. Use `sudo loginctl enable-linger "$USER"` for pre-login startup; uninstall with `./uninstall.sh` or `./uninstall.sh --purge-config`.
 
 ```bash
 ./install.sh

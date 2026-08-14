@@ -9,14 +9,14 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
-  it("advertises CommandCode CLI 1.14.0 by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.14.0");
+  it("advertises CommandCode CLI 1.25.0 by default while allowing override", () => {
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.25.0");
     expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "1.14.0-test" } }).cliVersion).toBe(
       "1.14.0-test",
     );
   });
 
-  it("matches the exact CommandCode 1.14.0 canonical catalog and advertised prices", () => {
+  it("matches the exact CommandCode 1.25.0 canonical catalog and advertised prices", () => {
     const expectedPrices = new Map<string, [number, number]>([
       ["deepseek/deepseek-v4-pro", [0.435, 0.87]],
       ["deepseek/deepseek-v4-flash", [0.14, 0.28]],
@@ -25,6 +25,7 @@ describe("configuration and model aliases", () => {
       ["moonshotai/Kimi-K2.7-Code-Highspeed", [1.9, 8]],
       ["moonshotai/Kimi-K2.6", [0.95, 4]],
       ["moonshotai/Kimi-K2.5", [0.6, 3]],
+      ["zai-org/GLM-5.3", [1.4, 4.4]],
       ["zai-org/GLM-5.2", [1.4, 4.4]],
       ["zai-org/GLM-5.2-Fast", [3, 10.25]],
       ["zai-org/GLM-5.1", [1.4, 4.4]],
@@ -61,6 +62,7 @@ describe("configuration and model aliases", () => {
       ["gpt-5.4", [2.5, 15]],
       ["gpt-5.3-codex", [2, 8]],
       ["gpt-5.4-mini", [0.75, 4.5]],
+      ["google/gemini-3.7-flash", [0.75, 3.75]],
       ["google/gemini-3.6-flash", [1.5, 7.5]],
       ["google/gemini-3.5-flash", [1.5, 9]],
       ["google/gemini-3.5-flash-lite", [0.3, 2.5]],
@@ -70,10 +72,11 @@ describe("configuration and model aliases", () => {
       ["meta/muse-spark-1.2", [1.25, 4.25]],
       ["meta/muse-spark-1.2-contributor", [0.1, 0.2]],
       ["xai/grok-4.5", [2, 6]],
+      ["xai/grok-4.6", [2, 6]],
     ]);
     const catalog = loadBridgeConfig({ env: {} }).modelCatalog ?? [];
 
-    expect(catalog).toHaveLength(52);
+    expect(catalog).toHaveLength(55);
     expect(catalog.map((model) => model.id)).toEqual([...expectedPrices.keys()]);
     for (const model of catalog) {
       const match = model.notes?.match(/^\$(\d+(?:\.\d+)?)\/M in · \$(\d+(?:\.\d+)?)\/M out/);
@@ -82,7 +85,7 @@ describe("configuration and model aliases", () => {
     }
   });
 
-  it("matches the exact CommandCode 1.14.0 published context windows", () => {
+  it("matches the exact CommandCode 1.25.0 published context windows", () => {
     const expectedContextWindows = new Map<string, number | undefined>([
       ["deepseek/deepseek-v4-pro", 1_000_000],
       ["deepseek/deepseek-v4-flash", 1_000_000],
@@ -91,6 +94,7 @@ describe("configuration and model aliases", () => {
       ["moonshotai/Kimi-K2.7-Code-Highspeed", 262_000],
       ["moonshotai/Kimi-K2.6", 256_000],
       ["moonshotai/Kimi-K2.5", 256_000],
+      ["zai-org/GLM-5.3", 1_000_000],
       ["zai-org/GLM-5.2", 1_000_000],
       ["zai-org/GLM-5.2-Fast", 1_000_000],
       ["zai-org/GLM-5.1", undefined],
@@ -127,6 +131,7 @@ describe("configuration and model aliases", () => {
       ["gpt-5.4", 400_000],
       ["gpt-5.3-codex", 400_000],
       ["gpt-5.4-mini", 400_000],
+      ["google/gemini-3.7-flash", 1_050_000],
       ["google/gemini-3.6-flash", 1_000_000],
       ["google/gemini-3.5-flash", 1_000_000],
       ["google/gemini-3.5-flash-lite", 1_000_000],
@@ -136,6 +141,7 @@ describe("configuration and model aliases", () => {
       ["meta/muse-spark-1.2", 1_050_000],
       ["meta/muse-spark-1.2-contributor", 1_050_000],
       ["xai/grok-4.5", 500_000],
+      ["xai/grok-4.6", 500_000],
     ]);
     const definitions = COMMANDCODE_MODEL_DEFINITIONS as Array<{
       id: string;

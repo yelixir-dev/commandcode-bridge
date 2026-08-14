@@ -52,11 +52,13 @@ export interface EmptyVisibleResponseDiagnostics {
 export class CommandCodeEmptyVisibleResponseError extends Error {
   public readonly upstreamStatus = 502;
   public readonly upstreamMessage =
-    "CommandCode upstream consumed the response budget without visible text or tool calls";
+    "CommandCode upstream consumed the response budget without visible text or tool calls. Raise max_tokens to at least 32 for reasoning models.";
   public readonly diagnostics: EmptyVisibleResponseDiagnostics;
 
   public constructor(diagnostics: EmptyVisibleResponseDiagnostics) {
-    super("CommandCode upstream consumed the response budget without visible text or tool calls");
+    super(
+      "CommandCode upstream consumed the response budget without visible text or tool calls. Raise max_tokens to at least 32 for reasoning models.",
+    );
     this.name = "CommandCodeEmptyVisibleResponseError";
     this.diagnostics = diagnostics;
   }

@@ -115,6 +115,7 @@ describe("CommandCode to OpenAI conversion", () => {
       }),
     ).rejects.toMatchObject({
       name: "CommandCodeEmptyVisibleResponseError",
+      message: expect.stringMatching(/Raise max_tokens to at least 32/i),
       diagnostics: {
         model: "deepseek/deepseek-v4-pro",
         finishReason: "length",

@@ -19,6 +19,13 @@ export function isCompatibilityProbePath(url: string): boolean {
   return COMPATIBILITY_PROBE_PATHS.has(normalizeRequestPath(url));
 }
 
+export function isQuietRequestLogObject(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const record = value as { req?: { url?: unknown }; url?: unknown };
+  const url = record.req?.url ?? record.url;
+  return typeof url === "string" && isCompatibilityProbePath(url);
+}
+
 export function compatibilityProbeNotFoundBody(): {
   error: { message: string; type: "invalid_request_error"; code: "not_found" };
 } {
