@@ -66,10 +66,15 @@
 - Released bridge version `1.14.0.d`.
 - Forwarded OpenAI follow-up tool history to Alpha as native `tool-call` / `role:tool` parts instead of flattening it into user text, so non-streaming tool loops can complete after the first call.
 
+## 2026-08-15
+
+- Released bridge version `1.14.0.e`.
+- Added warn-level empty-visible diagnostics, a one-shot non-streaming retry for `finish_reason=length` with no visible text or tool calls, JSON guidance for compatibility-probe 404s, and runtime `bridgeApiKeySource` on `/health` and `/admin/config`.
+
 ## Current status — 2026-08-15
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.14.0.d`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.14.0.e`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
 - Model surface: 52 statically aligned models with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
