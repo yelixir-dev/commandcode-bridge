@@ -46,7 +46,7 @@ describe("dashboard UI", () => {
     });
 
     expect(html).toContain('id="bridgeVersion"');
-    expect(html).toContain("v1.25.0.a");
+    expect(html).toContain("v1.25.0.b");
     expect(html).not.toContain('id="endpoint"');
   });
 
@@ -365,6 +365,24 @@ describe("dashboard UI", () => {
     expect.soft(modelRender).toMatch(/summary[\s\S]*provider[\s\S]*enabled[\s\S]*\/[\s\S]*total/);
     expect.soft(modelRender).toMatch(/provider[\s\S]*\.sort\(/);
     expect.soft(html).toContain(".provider-fold:not([open]) .provider-models{display:none}");
+  });
+
+  it("places enable-all and disable-all controls beside the models heading", () => {
+    const html = dashboardHtml({
+      server: { host: "127.0.0.1", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+    });
+    const heading = html.slice(html.indexOf('data-i18n="models"'), html.indexOf('id="models"'));
+    expect(heading).toContain('id="enableAllModels"');
+    expect(heading).toContain('id="disableAllModels"');
+    expect(heading.indexOf("enableAllModels")).toBeLessThan(heading.indexOf("disableAllModels"));
+    expect(html).toContain("function setAllModels(enabled)");
+    expect(html).toContain("enableAllModels:'모두 켜기'");
+    expect(html).toContain("disableAllModels:'모두 끄기'");
+    expect(html).toContain("enableAllModels:'Enable all'");
+    expect(html).toContain("disableAllModels:'Disable all'");
   });
 
   it("updates a provider enabled count without rebuilding its open details element", () => {
