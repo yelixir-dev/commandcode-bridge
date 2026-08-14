@@ -79,10 +79,6 @@ function toolResultPart(
   };
 }
 
-export function isSupportedToolChoice(toolChoice: unknown): boolean {
-  return toolChoice === undefined || toolChoice === "auto" || toolChoice === "none";
-}
-
 export function convertOpenAITools(
   tools: OpenAIChatTool[] | undefined,
   toolChoice?: unknown,

@@ -308,12 +308,32 @@ describe("Fastify OpenAI-compatible server", () => {
     await app.close();
   });
 
+  it("retrieves slash model ids from the raw unencoded path", async () => {
+    const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/models/deepseek/deepseek-v4-pro",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: "deepseek/deepseek-v4-pro",
+      object: "model",
+      owned_by: "deepseek",
+    });
+    await app.close();
+  });
+
   it("returns an OpenAI model_not_found error when retrieving an unknown model", async () => {
     const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
     const response = await app.inject({ method: "GET", url: "/v1/models/not-a-model" });
+    const slashUnknown = await app.inject({ method: "GET", url: "/v1/models/missing/vendor-id" });
 
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({
+      error: { type: "invalid_request_error", code: "model_not_found" },
+    });
+    expect(slashUnknown.statusCode).toBe(404);
+    expect(slashUnknown.json()).toMatchObject({
       error: { type: "invalid_request_error", code: "model_not_found" },
     });
     await app.close();
@@ -516,8 +536,9 @@ describe("Fastify OpenAI-compatible server", () => {
     await app.close();
   });
 
-  it("rejects unsupported forced tool_choice values instead of silently ignoring them", async () => {
-    const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
+  it("treats forced tool_choice as auto and still forwards tools upstream", async () => {
+    const fake = new FakeCommandCodeClient();
+    const app = await createTestApp({ upstream: fake });
     const response = await app.inject({
       method: "POST",
       url: "/v1/chat/completions",
@@ -533,8 +554,14 @@ describe("Fastify OpenAI-compatible server", () => {
         messages: [{ role: "user", content: "hi" }],
       },
     });
-    expect(response.statusCode).toBe(400);
-    expect(response.json().error.code).toBe("unsupported_tool_choice");
+    expect(response.statusCode).toBe(200);
+    expect(fake.seenBodies[0]?.params.tools).toEqual([
+      {
+        type: "function",
+        name: "get_weather",
+        input_schema: { type: "object", properties: {} },
+      },
+    ]);
     await app.close();
   });
 

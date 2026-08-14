@@ -4,7 +4,6 @@ import {
   buildCommandCodeGenerateBody,
   convertOpenAITools,
   flattenOpenAIContent,
-  isSupportedToolChoice,
 } from "../src/converter.js";
 
 describe("OpenAI to CommandCode conversion", () => {
@@ -39,16 +38,10 @@ describe("OpenAI to CommandCode conversion", () => {
       },
     ]);
     expect(convertOpenAITools(openAITools, "none")).toEqual([]);
-  });
-
-  it("supports only safe tool_choice values that can be honored by CommandCode", () => {
-    expect(isSupportedToolChoice(undefined)).toBe(true);
-    expect(isSupportedToolChoice("auto")).toBe(true);
-    expect(isSupportedToolChoice("none")).toBe(true);
-    expect(isSupportedToolChoice("required")).toBe(false);
-    expect(isSupportedToolChoice({ type: "function", function: { name: "get_weather" } })).toBe(
-      false,
-    );
+    expect(
+      convertOpenAITools(openAITools, { type: "function", function: { name: "get_weather" } }),
+    ).toEqual(tools);
+    expect(convertOpenAITools(openAITools, "required")).toEqual(tools);
   });
 
   it("builds a minimal streaming CommandCode body with system prompts preserved", () => {

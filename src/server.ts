@@ -57,7 +57,7 @@ import {
   NoAvailableCommandCodeCredentialError,
 } from "./credential-router.js";
 import { CommandCodeBalanceAlertManager } from "./balance-alerts.js";
-import { buildCommandCodeGenerateBody, isSupportedToolChoice } from "./converter.js";
+import { buildCommandCodeGenerateBody } from "./converter.js";
 import { BRIDGE_VERSION } from "./version.js";
 import {
   CommandCodeEmptyResponseError,
@@ -837,8 +837,14 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     data: publicModelList(config).map((model) => publicModelObject(model, config)),
   }));
 
-  app.get("/v1/models/:model", async (request, reply) => {
-    const { model } = request.params as { model: string };
+  app.get("/v1/models/*", async (request, reply) => {
+    const wildcard = (request.params as { "*"?: string })["*"] ?? "";
+    let model = wildcard;
+    try {
+      model = decodeURIComponent(wildcard);
+    } catch {
+      model = wildcard;
+    }
     if (!publicModelList(config).includes(model)) {
       return reply
         .code(404)
@@ -863,17 +869,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
         !isClaudeModelId(resolvedModel.upstreamModel) &&
         (config.upstreamMode === "provider" ||
           (config.upstreamMode === "auto" && providerAccessAvailable));
-      if (!useProviderChat && !isSupportedToolChoice(openAIRequest.tool_choice)) {
-        return reply
-          .code(400)
-          .send(
-            openAIError(
-              'Unsupported tool_choice. This bridge supports only omitted, "auto", or "none" because CommandCode /alpha/generate does not expose a stable forced-tool selector.',
-              "invalid_request_error",
-              "unsupported_tool_choice",
-            ),
-          );
-      }
       const id = `chatcmpl_${randomUUID().replace(/-/g, "")}`;
       const created = Math.floor(Date.now() / 1000);
       const abortController = new AbortController();
