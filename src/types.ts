@@ -264,6 +264,7 @@ export interface BridgeConfig {
   allowedModels: string[];
   allowUnknownModels: boolean;
   bridgeApiKey: string | undefined;
+  bridgeApiKeySource: "dashboard_config" | "env" | "none";
   commandCodeApiKey: string | undefined;
   commandCodeCredentials: CommandCodeCredential[];
   commandCodeRoutingPolicy: CommandCodeRoutingPolicy;
@@ -285,6 +286,8 @@ export interface BridgeConfig {
   corsOrigin: string | undefined;
   includeReasoning: boolean;
   emptyVisibleResponsePolicy: CommandCodeEmptyVisibleResponsePolicy;
+  emptyVisibleRetryMaxAttempts: number;
+  emptyVisibleRetryBackoffMs: number;
   balanceAlerts: CommandCodeBalanceAlertConfig;
   timeoutMs: number;
 }

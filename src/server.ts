@@ -9,7 +9,12 @@ import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z, ZodError } from "zod";
 
-import { CommandCodeAuthError, CommandCodeClient, CommandCodeHttpError } from "./commandcode.js";
+import {
+  CommandCodeAuthError,
+  CommandCodeClient,
+  CommandCodeHttpError,
+  retryBackoff,
+} from "./commandcode.js";
 import {
   loadBridgeConfig,
   ModelNotAllowedError,
@@ -37,7 +42,16 @@ import {
   writeDashboardConfigFile,
   type DashboardConfigUpdate,
 } from "./dashboard-config.js";
+import {
+  compatibilityProbeNotFoundBody,
+  isCompatibilityProbePath,
+} from "./compatibility-probes.js";
 import { dashboardHtml } from "./dashboard.js";
+import {
+  collectOpenAICompletionWithEmptyVisibleRetry,
+  emptyVisibleWarnPayload,
+  requestedMaxTokens,
+} from "./empty-visible.js";
 import {
   type CommandCodeCredentialDiagnostic,
   NoAvailableCommandCodeCredentialError,
@@ -46,7 +60,6 @@ import { CommandCodeBalanceAlertManager } from "./balance-alerts.js";
 import { buildCommandCodeGenerateBody, isSupportedToolChoice } from "./converter.js";
 import { BRIDGE_VERSION } from "./version.js";
 import {
-  collectOpenAICompletion,
   CommandCodeEmptyResponseError,
   CommandCodeEmptyVisibleResponseError,
   CommandCodeEventError,
@@ -182,17 +195,59 @@ async function refreshProviderModelCatalog(
 
 async function handleProviderChat(options: {
   reply: FastifyReply;
+  httpRequest: FastifyRequest;
   request: OpenAIChatCompletionRequest;
   providerClient: CommandCodeProviderClient;
   resolvedModel: ResolvedModel;
   signal: AbortSignal;
   config: BridgeConfig;
 }): Promise<boolean | null> {
-  const { reply, request, providerClient, resolvedModel, signal, config } = options;
+  const { reply, httpRequest, request, providerClient, resolvedModel, signal, config } = options;
   const body = buildProviderChatRequestBody(request, resolvedModel.upstreamModel);
-  let response: Response;
+  const retries = request.stream ? 0 : Math.max(0, config.emptyVisibleRetryMaxAttempts);
+  const maxTokens = requestedMaxTokens(request);
+  let response: Response | undefined;
   try {
-    response = await providerClient.chat(body, signal);
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      if (attempt > 0 && config.emptyVisibleRetryBackoffMs > 0) {
+        await retryBackoff(attempt, config.emptyVisibleRetryBackoffMs);
+      }
+      response = await providerClient.chat(body, signal);
+      if (request.stream || !response.ok) break;
+      const completion = (await response.clone().json()) as Record<string, unknown>;
+      if (typeof completion.model === "string") completion.model = resolvedModel.publicModel;
+      const firstChoice =
+        Array.isArray(completion.choices) && isRecord(completion.choices[0])
+          ? completion.choices[0]
+          : undefined;
+      const message =
+        firstChoice && isRecord(firstChoice.message) ? firstChoice.message : undefined;
+      const content = typeof message?.content === "string" ? message.content : "";
+      const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+      const emptyVisible =
+        config.emptyVisibleResponsePolicy === "error_on_length" &&
+        firstChoice?.finish_reason === "length" &&
+        content.length === 0 &&
+        toolCalls.length === 0;
+      if (!emptyVisible) break;
+      const retrying = attempt < retries;
+      httpRequest.log.warn(
+        emptyVisibleWarnPayload({
+          model: resolvedModel.publicModel,
+          finishReason: "length",
+          visibleContentLength: content.length,
+          toolCallCount: toolCalls.length,
+          maxTokens,
+          stream: false,
+          requestId: httpRequest.id,
+          attempt: attempt + 1,
+          retrying,
+        }),
+        "empty visible response from CommandCode upstream",
+      );
+      if (!retrying) break;
+    }
+    if (!response) throw new Error("provider chat produced no response");
   } catch (error) {
     if (
       error instanceof CommandCodeHttpError &&
@@ -423,6 +478,7 @@ function dashboardConfigResponse(
     dirty,
     restart_required: dirty,
     bridgeApiKey: config.bridgeApiKey ? "[REDACTED]" : undefined,
+    bridgeApiKeySource: config.bridgeApiKeySource,
     server: {
       host: config.host,
       port: config.port,
@@ -578,6 +634,12 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     return reply.code(204).send();
   });
   await app.register(rateLimit, { max: config.rateLimitMax, timeWindow: config.rateLimitWindow });
+  app.setNotFoundHandler((request, reply) => {
+    if (isCompatibilityProbePath(request.url)) {
+      request.log.debug({ url: request.url }, "compatibility probe");
+    }
+    return reply.code(404).send(compatibilityProbeNotFoundBody());
+  });
 
   let balanceAlertTimer: NodeJS.Timeout | undefined;
   if (balanceAlertManager) {
@@ -641,6 +703,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     models: publicModelList(config),
     auth: {
       bridge_api_key_configured: Boolean(config.bridgeApiKey),
+      bridge_api_key_source: config.bridgeApiKeySource,
       commandcode_api_key_configured: Boolean(config.commandCodeApiKey),
       commandcode_credential_count: config.commandCodeCredentials.length,
       commandcode_routing_policy: config.commandCodeRoutingPolicy,
@@ -822,6 +885,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
       if (useProviderChat) {
         const handled = await handleProviderChat({
           reply,
+          httpRequest: request,
           request: openAIRequest,
           providerClient,
           resolvedModel,
@@ -839,7 +903,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
         request: openAIRequest,
         upstreamModel: resolvedModel.upstreamModel,
       });
-      const events = upstream.generate(commandCodeBody, abortController.signal);
 
       if (openAIRequest.stream) {
         return await writeStreamingResponse(
@@ -848,7 +911,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
             id,
             created,
             model: resolvedModel.publicModel,
-            events,
+            events: upstream.generate(commandCodeBody, abortController.signal),
             includeReasoning: config.includeReasoning,
             emptyVisibleResponsePolicy: config.emptyVisibleResponsePolicy,
             includeUsage: openAIRequest.stream_options?.include_usage ?? false,
@@ -856,13 +919,20 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
         );
       }
 
-      return await collectOpenAICompletion({
+      return await collectOpenAICompletionWithEmptyVisibleRetry({
+        upstream,
+        body: commandCodeBody,
+        signal: abortController.signal,
         id,
         created,
         model: resolvedModel.publicModel,
-        events,
         includeReasoning: config.includeReasoning,
         emptyVisibleResponsePolicy: config.emptyVisibleResponsePolicy,
+        retryMaxAttempts: config.emptyVisibleRetryMaxAttempts,
+        retryBackoffMs: config.emptyVisibleRetryBackoffMs,
+        maxTokens: requestedMaxTokens(openAIRequest),
+        requestId: request.id,
+        log: request.log,
       });
     } catch (error: unknown) {
       if (error instanceof ZodError) {

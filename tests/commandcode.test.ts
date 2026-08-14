@@ -30,6 +30,7 @@ const baseConfig: BridgeConfig = {
   allowedModels: ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],
   allowUnknownModels: false,
   bridgeApiKey: undefined,
+  bridgeApiKeySource: "none",
   commandCodeApiKey: "alpha-secret",
   commandCodeCredentials: [
     { id: "alpha", apiKey: "alpha-secret", weight: 1 },
@@ -48,6 +49,8 @@ const baseConfig: BridgeConfig = {
   corsOrigin: undefined,
   includeReasoning: false,
   emptyVisibleResponsePolicy: "error_on_length",
+  emptyVisibleRetryMaxAttempts: 1,
+  emptyVisibleRetryBackoffMs: 250,
   balanceAlerts: {
     enabled: false,
     minCurrentBalance: 1,

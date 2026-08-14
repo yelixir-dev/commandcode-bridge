@@ -30,6 +30,7 @@ function providerConfig(overrides: Partial<BridgeConfig> = {}): BridgeConfig {
     allowedModels: ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],
     allowUnknownModels: false,
     bridgeApiKey: undefined,
+    bridgeApiKeySource: "none",
     commandCodeApiKey: "provider-secret",
     commandCodeCredentials: [{ id: "alpha", apiKey: "provider-secret", weight: 1 }],
     commandCodeRoutingPolicy: "round_robin",
@@ -45,6 +46,8 @@ function providerConfig(overrides: Partial<BridgeConfig> = {}): BridgeConfig {
     corsOrigin: undefined,
     includeReasoning: false,
     emptyVisibleResponsePolicy: "error_on_length",
+    emptyVisibleRetryMaxAttempts: 1,
+    emptyVisibleRetryBackoffMs: 250,
     balanceAlerts: {
       enabled: false,
       minCurrentBalance: 1,

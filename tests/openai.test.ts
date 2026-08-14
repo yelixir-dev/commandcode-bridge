@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectOpenAICompletion,
-  CommandCodeEmptyVisibleResponseError,
   CommandCodeEventError,
   mapUsageToOpenAI,
   streamOpenAIChunks,
@@ -114,7 +113,15 @@ describe("CommandCode to OpenAI conversion", () => {
         model: "deepseek/deepseek-v4-pro",
         events: lengthOnlyEvents(),
       }),
-    ).rejects.toBeInstanceOf(CommandCodeEmptyVisibleResponseError);
+    ).rejects.toMatchObject({
+      name: "CommandCodeEmptyVisibleResponseError",
+      diagnostics: {
+        model: "deepseek/deepseek-v4-pro",
+        finishReason: "length",
+        visibleContentLength: 0,
+        toolCallCount: 0,
+      },
+    });
   });
 
   it("can explicitly allow empty length completions for compatibility", async () => {

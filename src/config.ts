@@ -202,6 +202,11 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     allowUnknownModels: parseBoolean(env.COMMANDCODE_ALLOW_UNKNOWN_MODELS, false),
     bridgeApiKey:
       stringValue(dashboardConfig.bridgeApiKey) || env.BRIDGE_API_KEY?.trim() || undefined,
+    bridgeApiKeySource: stringValue(dashboardConfig.bridgeApiKey)
+      ? "dashboard_config"
+      : env.BRIDGE_API_KEY?.trim()
+        ? "env"
+        : "none",
     commandCodeApiKey: commandCodeCredentials[0]?.apiKey,
     commandCodeCredentials,
     commandCodeRoutingPolicy: routingPolicy,
@@ -225,6 +230,11 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     emptyVisibleResponsePolicy: parseEmptyVisibleResponsePolicy(
       env.COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY,
     ),
+    emptyVisibleRetryMaxAttempts: parseNonNegativeNumber(
+      env.COMMANDCODE_EMPTY_VISIBLE_RETRY_MAX_ATTEMPTS,
+      1,
+    ),
+    emptyVisibleRetryBackoffMs: parseNumber(env.COMMANDCODE_EMPTY_VISIBLE_RETRY_BACKOFF_MS, 250),
     balanceAlerts: {
       enabled: parseBoolean(env.COMMANDCODE_BALANCE_ALERT_ENABLED, false),
       minCurrentBalance: parseNonNegativeNumber(

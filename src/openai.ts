@@ -42,14 +42,23 @@ export class CommandCodeEmptyResponseError extends Error {
   }
 }
 
+export interface EmptyVisibleResponseDiagnostics {
+  model: string;
+  finishReason: "length";
+  visibleContentLength: number;
+  toolCallCount: number;
+}
+
 export class CommandCodeEmptyVisibleResponseError extends Error {
   public readonly upstreamStatus = 502;
   public readonly upstreamMessage =
     "CommandCode upstream consumed the response budget without visible text or tool calls";
+  public readonly diagnostics: EmptyVisibleResponseDiagnostics;
 
-  public constructor() {
+  public constructor(diagnostics: EmptyVisibleResponseDiagnostics) {
     super("CommandCode upstream consumed the response budget without visible text or tool calls");
     this.name = "CommandCodeEmptyVisibleResponseError";
+    this.diagnostics = diagnostics;
   }
 }
 
@@ -339,7 +348,12 @@ export async function collectOpenAICompletion(
       finishReason: finalReason,
     })
   ) {
-    throw new CommandCodeEmptyVisibleResponseError();
+    throw new CommandCodeEmptyVisibleResponseError({
+      model: options.model,
+      finishReason: "length",
+      visibleContentLength: content.length,
+      toolCallCount: toolCalls.length,
+    });
   }
 
   const message: OpenAIChatCompletion["choices"][number]["message"] = {
@@ -538,7 +552,16 @@ export async function* streamOpenAIChunks(
       finishReason: finalReason,
     })
   ) {
-    yield sse(streamExceptionPayload(new CommandCodeEmptyVisibleResponseError()));
+    yield sse(
+      streamExceptionPayload(
+        new CommandCodeEmptyVisibleResponseError({
+          model: options.model,
+          finishReason: "length",
+          visibleContentLength,
+          toolCallCount,
+        }),
+      ),
+    );
     yield "data: [DONE]\n\n";
     return;
   }

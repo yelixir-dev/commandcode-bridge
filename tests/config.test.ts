@@ -247,6 +247,23 @@ describe("configuration and model aliases", () => {
     expect(config.balanceAlerts.enabled).toBe(false);
     expect(config.balanceAlerts.minCurrentBalance).toBe(1);
     expect(config.emptyVisibleResponsePolicy).toBe("error_on_length");
+    expect(config.emptyVisibleRetryMaxAttempts).toBe(1);
+    expect(config.emptyVisibleRetryBackoffMs).toBe(250);
+    expect(config.bridgeApiKeySource).toBe("none");
+  });
+
+  it("parses empty-visible retry budget and env bridge API key source", () => {
+    const config = loadBridgeConfig({
+      env: {
+        COMMANDCODE_EMPTY_VISIBLE_RETRY_MAX_ATTEMPTS: "0",
+        COMMANDCODE_EMPTY_VISIBLE_RETRY_BACKOFF_MS: "100",
+        BRIDGE_API_KEY: "env-bridge-key",
+      },
+    });
+    expect(config.emptyVisibleRetryMaxAttempts).toBe(0);
+    expect(config.emptyVisibleRetryBackoffMs).toBe(100);
+    expect(config.bridgeApiKey).toBe("env-bridge-key");
+    expect(config.bridgeApiKeySource).toBe("env");
   });
 
   it("parses opt-in balance alert thresholds from environment", () => {

@@ -72,6 +72,7 @@ describe("JSON dashboard configuration", () => {
       authPaths: [],
     });
     expect(config.bridgeApiKey).toBe("sk-cmdbridge-123abc");
+    expect(config.bridgeApiKeySource).toBe("dashboard_config");
   });
 
   it("lets JSON routing policy drive dashboard-managed configuration over legacy env", () => {

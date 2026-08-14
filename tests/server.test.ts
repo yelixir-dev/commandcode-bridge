@@ -89,6 +89,29 @@ class StartOnlyCommandCodeClient implements CommandCodeUpstream {
   }
 }
 
+class EmptyLengthThenOkCommandCodeClient implements CommandCodeUpstream {
+  public calls = 0;
+
+  async *generate(): AsyncIterable<CommandCodeEvent> {
+    this.calls += 1;
+    if (this.calls === 1) {
+      yield { type: "finish", finishReason: "length" };
+      return;
+    }
+    yield { type: "text-delta", text: "OK" };
+    yield { type: "finish", finishReason: "stop" };
+  }
+}
+
+class AlwaysEmptyLengthCommandCodeClient implements CommandCodeUpstream {
+  public calls = 0;
+
+  async *generate(): AsyncIterable<CommandCodeEvent> {
+    this.calls += 1;
+    yield { type: "finish", finishReason: "length" };
+  }
+}
+
 class ThrowingStreamCommandCodeClient implements CommandCodeUpstream {
   async *generate(): AsyncIterable<CommandCodeEvent> {
     yield { type: "start" };
@@ -133,6 +156,8 @@ describe("Fastify OpenAI-compatible server", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).not.toContain("secret_key");
     expect(response.body).not.toContain("user_secret");
+    expect(response.json().auth.bridge_api_key_configured).toBe(true);
+    expect(response.json().auth.bridge_api_key_source).toBe("none");
     await app.close();
   });
 
@@ -577,6 +602,69 @@ describe("Fastify OpenAI-compatible server", () => {
     expect(response.headers["content-type"]).toContain("text/event-stream");
     expect(response.body).toContain('"code":"commandcode_stream_error"');
     expect(response.body).toContain("data: [DONE]");
+    await app.close();
+  });
+
+  it("retries a non-streaming empty visible length response once by default", async () => {
+    const upstream = new EmptyLengthThenOkCommandCodeClient();
+    const app = await createTestApp({
+      upstream,
+      configOverrides: { emptyVisibleRetryBackoffMs: 0 },
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: {
+        model: "default",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "Return exactly OK." }],
+      },
+    });
+    expect(upstream.calls).toBe(2);
+    expect(response.statusCode).toBe(200);
+    expect(response.json().choices[0]?.message.content).toBe("OK");
+    await app.close();
+  });
+
+  it("still fails closed when empty visible retries are exhausted", async () => {
+    const upstream = new AlwaysEmptyLengthCommandCodeClient();
+    const app = await createTestApp({
+      upstream,
+      configOverrides: { emptyVisibleRetryMaxAttempts: 1, emptyVisibleRetryBackoffMs: 0 },
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: {
+        model: "default",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "Return exactly OK." }],
+      },
+    });
+    expect(upstream.calls).toBe(2);
+    expect(response.statusCode).toBe(502);
+    expect(response.json().error.code).toBe("commandcode_empty_visible_response");
+    await app.close();
+  });
+
+  it("reports env as the runtime bridge API key source", async () => {
+    const app = await createTestApp({
+      upstream: new FakeCommandCodeClient(),
+      configEnv: { BRIDGE_API_KEY: "env-source-key" },
+    });
+    const health = await app.inject({ method: "GET", url: "/health" });
+    expect(health.json().auth.bridge_api_key_source).toBe("env");
+    const config = await app.inject({ method: "GET", url: "/admin/config" });
+    expect(config.json().bridgeApiKeySource).toBe("env");
+    await app.close();
+  });
+
+  it("returns JSON guidance for Ollama-style compatibility probes", async () => {
+    const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
+    const response = await app.inject({ method: "GET", url: "/api/tags" });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe("not_found");
+    expect(response.json().error.message).toMatch(/\/v1/);
     await app.close();
   });
 });
