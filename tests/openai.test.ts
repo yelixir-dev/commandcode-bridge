@@ -78,10 +78,18 @@ function parseSsePayloads(chunks: string[]): unknown[] {
 
 describe("CommandCode to OpenAI conversion", () => {
   it("maps usage fields", () => {
-    expect(mapUsageToOpenAI({ inputTokens: 3, outputTokens: 2, totalTokens: 5 })).toEqual({
+    expect(
+      mapUsageToOpenAI({
+        inputTokens: 3,
+        outputTokens: 2,
+        totalTokens: 5,
+        inputTokenDetails: { cacheReadTokens: 1 },
+      }),
+    ).toEqual({
       prompt_tokens: 3,
       completion_tokens: 2,
       total_tokens: 5,
+      prompt_tokens_details: { cached_tokens: 1 },
     });
   });
 

@@ -75,10 +75,17 @@ export function mapUsageToOpenAI(usage: CommandCodeUsage | undefined): OpenAIUsa
   const promptTokens = usage?.inputTokens ?? 0;
   const completionTokens = usage?.outputTokens ?? 0;
   const totalTokens = usage?.totalTokens ?? promptTokens + completionTokens;
+  const cacheReadTokens = usage?.cachedInputTokens ?? usage?.inputTokenDetails?.["cacheReadTokens"];
   return {
     prompt_tokens: promptTokens,
     completion_tokens: completionTokens,
     total_tokens: totalTokens,
+    prompt_tokens_details: {
+      cached_tokens:
+        typeof cacheReadTokens === "number" && Number.isFinite(cacheReadTokens)
+          ? cacheReadTokens
+          : 0,
+    },
   };
 }
 
