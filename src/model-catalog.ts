@@ -315,6 +315,16 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     notes: "$2/M in · $6/M out",
   },
   {
+    id: "Qwen/Qwen3.8-27B",
+    label: "Qwen 3.8 27B",
+    provider: "Qwen",
+    family: "qwen",
+    aliases: ["qwen3.8-27b", "Qwen3.8-27B", "alibaba/qwen3.8-27b"],
+    contextWindow: 262_000,
+    enabledByDefault: false,
+    notes: "$0.4/M in · $3/M out",
+  },
+  {
     id: "Qwen/Qwen3.7-Max",
     label: "Qwen 3.7 Max",
     provider: "Qwen",

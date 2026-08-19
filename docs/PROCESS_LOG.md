@@ -86,12 +86,17 @@
 - Released bridge version `1.25.0.b`.
 - Added dashboard enable-all / disable-all controls beside the models heading.
 
-## Current status — 2026-08-15
+## 2026-08-19
+
+- Released bridge version `1.28.1.a` aligned with CommandCode CLI `1.28.1`.
+- Added `Qwen/Qwen3.8-27B` to the static catalog (56 models). GPT-5.6 Sol advertised price stays $5/$30 after the 1.27.1 standard-pricing note.
+
+## Current status — 2026-08-19
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.25.0.b`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.28.1.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
-- Model surface: 55 statically aligned models with live Provider API refresh when available.
+- Model surface: 56 statically aligned models with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
 - Deployment surface: Docker/Compose, Linux install/uninstall scripts, nginx and systemd release assets, and GitHub/GitLab CI definitions.
 - Verification: `npm run typecheck`, `npm run lint`, all 199 Vitest tests in 14 files, and `npm run build` pass on this workstation.

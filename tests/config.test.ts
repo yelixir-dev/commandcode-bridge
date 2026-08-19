@@ -9,14 +9,14 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
-  it("advertises CommandCode CLI 1.25.0 by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.25.0");
+  it("advertises CommandCode CLI 1.28.1 by default while allowing override", () => {
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.28.1");
     expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "1.14.0-test" } }).cliVersion).toBe(
       "1.14.0-test",
     );
   });
 
-  it("matches the exact CommandCode 1.25.0 canonical catalog and advertised prices", () => {
+  it("matches the exact CommandCode 1.28.1 canonical catalog and advertised prices", () => {
     const expectedPrices = new Map<string, [number, number]>([
       ["deepseek/deepseek-v4-pro", [0.435, 0.87]],
       ["deepseek/deepseek-v4-flash", [0.14, 0.28]],
@@ -36,6 +36,7 @@ describe("configuration and model aliases", () => {
       ["xiaomi/mimo-v2.5-pro", [0.435, 0.87]],
       ["xiaomi/mimo-v2.5", [0.14, 0.28]],
       ["Qwen/Qwen3.8-Max", [2, 6]],
+      ["Qwen/Qwen3.8-27B", [0.4, 3]],
       ["Qwen/Qwen3.7-Max", [2.5, 7.5]],
       ["Qwen/Qwen3.7-Plus", [0.4, 1.6]],
       ["Qwen/Qwen3.7-Flash", [0.03, 0.13]],
@@ -76,7 +77,7 @@ describe("configuration and model aliases", () => {
     ]);
     const catalog = loadBridgeConfig({ env: {} }).modelCatalog ?? [];
 
-    expect(catalog).toHaveLength(55);
+    expect(catalog).toHaveLength(56);
     expect(catalog.map((model) => model.id)).toEqual([...expectedPrices.keys()]);
     for (const model of catalog) {
       const match = model.notes?.match(/^\$(\d+(?:\.\d+)?)\/M in · \$(\d+(?:\.\d+)?)\/M out/);
@@ -85,7 +86,7 @@ describe("configuration and model aliases", () => {
     }
   });
 
-  it("matches the exact CommandCode 1.25.0 published context windows", () => {
+  it("matches the exact CommandCode 1.28.1 published context windows", () => {
     const expectedContextWindows = new Map<string, number | undefined>([
       ["deepseek/deepseek-v4-pro", 1_000_000],
       ["deepseek/deepseek-v4-flash", 1_000_000],
@@ -105,6 +106,7 @@ describe("configuration and model aliases", () => {
       ["xiaomi/mimo-v2.5-pro", 1_000_000],
       ["xiaomi/mimo-v2.5", 1_000_000],
       ["Qwen/Qwen3.8-Max", 1_000_000],
+      ["Qwen/Qwen3.8-27B", 262_000],
       ["Qwen/Qwen3.7-Max", 1_000_000],
       ["Qwen/Qwen3.7-Plus", 1_000_000],
       ["Qwen/Qwen3.7-Flash", 1_000_000],

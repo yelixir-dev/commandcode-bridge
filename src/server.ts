@@ -16,6 +16,7 @@ import {
   publicModelList,
   publicModelObject,
   resolveModel,
+  type ResolvedModel,
 } from "./config.js";
 import {
   defaultModelCatalog,
@@ -654,13 +655,15 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   });
 
   app.post("/v1/chat/completions", async (request, reply) => {
+    let resolvedModel: ResolvedModel | undefined;
     try {
       const parsed = chatCompletionRequestSchema.parse(request.body);
       const openAIRequest = asOpenAIRequest(parsed);
-      const resolvedModel = resolveModel(openAIRequest.model, config);
+      resolvedModel = resolveModel(openAIRequest.model, config);
+      const resolved = resolvedModel;
       const useProviderChat =
         !eventPipelineAll &&
-        !isClaudeModelId(resolvedModel.upstreamModel) &&
+        !isClaudeModelId(resolved.upstreamModel) &&
         (config.upstreamMode === "provider" ||
           (config.upstreamMode === "auto" && providerAccessAvailable));
       const id = `chatcmpl_${randomUUID().replace(/-/g, "")}`;
@@ -704,6 +707,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
             includeReasoning: config.includeReasoning,
             emptyVisibleResponsePolicy: config.emptyVisibleResponsePolicy,
             includeUsage: openAIRequest.stream_options?.include_usage ?? false,
+            requestId: request.id,
+            log: request.log,
           }),
         );
       }
@@ -766,18 +771,31 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
             : error instanceof CommandCodeEventError
               ? error.upstreamBody
               : undefined;
+        const errorCode =
+          error instanceof CommandCodeHttpError
+            ? "commandcode_http_error"
+            : error instanceof CommandCodeEventError
+              ? "commandcode_event_error"
+              : error instanceof CommandCodeEmptyVisibleResponseError
+                ? "commandcode_empty_visible_response"
+                : "commandcode_empty_response";
+        if (!(error instanceof CommandCodeEmptyVisibleResponseError)) {
+          request.log.warn(
+            {
+              code: errorCode,
+              upstream_status: upstreamStatus,
+              request_id: request.id,
+              model: resolvedModel?.publicModel,
+              error: error.message,
+            },
+            "non-streaming chat failed with an upstream error",
+          );
+        }
         return reply.code(502).send({
           error: {
             message: error.message,
             type: "upstream_error",
-            code:
-              error instanceof CommandCodeHttpError
-                ? "commandcode_http_error"
-                : error instanceof CommandCodeEventError
-                  ? "commandcode_event_error"
-                  : error instanceof CommandCodeEmptyVisibleResponseError
-                    ? "commandcode_empty_visible_response"
-                    : "commandcode_empty_response",
+            code: errorCode,
             upstream_status: upstreamStatus,
             upstream_body: upstreamBody,
           },

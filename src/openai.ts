@@ -66,6 +66,8 @@ export class CommandCodeEmptyVisibleResponseError extends Error {
 
 export interface StreamOpenAIChunksOptions extends CollectOpenAICompletionOptions {
   includeUsage?: boolean;
+  requestId?: string;
+  log?: { warn(payload: Record<string, unknown>, message: string): void };
 }
 
 export function mapUsageToOpenAI(usage: CommandCodeUsage | undefined): OpenAIUsage {
@@ -499,6 +501,20 @@ export async function* streamOpenAIChunks(
       }
     }
   } catch (error: unknown) {
+    options.log?.warn(
+      {
+        code: "commandcode_stream_error",
+        model: options.model,
+        request_id: options.requestId,
+        stream: true,
+        visible_content_length: visibleContentLength,
+        tool_call_count: toolCallCount,
+        saw_completion_signal: sawCompletionSignal,
+        finish_reason: finishReason ?? null,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "upstream stream failed mid-turn",
+    );
     yield sse(streamExceptionPayload(error));
     yield "data: [DONE]\n\n";
     return;

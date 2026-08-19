@@ -231,4 +231,34 @@ describe("CommandCode to OpenAI conversion", () => {
       upstreamMessage: "Insufficient Balance",
     });
   });
+
+  it("logs aborted upstream streams with turn diagnostics", async () => {
+    async function* failingEvents(): AsyncIterable<CommandCodeEvent> {
+      yield { type: "text-delta", text: "partial" };
+      throw new Error("simulated upstream socket reset");
+    }
+    const warnings: Array<Record<string, unknown>> = [];
+    const chunks: string[] = [];
+    for await (const responseChunk of streamOpenAIChunks({
+      id: "chatcmpl_stream_fail",
+      created: 1778420000,
+      model: "deepseek/deepseek-v4-pro",
+      events: failingEvents(),
+      log: { warn: (payload) => warnings.push(payload) },
+      requestId: "req-stream-fail",
+    })) {
+      chunks.push(responseChunk);
+    }
+    expect(chunks.join("")).toContain('"code":"commandcode_stream_error"');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      code: "commandcode_stream_error",
+      model: "deepseek/deepseek-v4-pro",
+      request_id: "req-stream-fail",
+      stream: true,
+      visible_content_length: 7,
+      tool_call_count: 0,
+    });
+    expect(String(warnings[0]?.error)).toContain("socket reset");
+  });
 });
