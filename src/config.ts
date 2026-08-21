@@ -194,7 +194,7 @@ export function loadBridgeConfig(options: LoadBridgeConfigOptions = {}): BridgeC
     host: serverFromFile.host,
     port: serverFromFile.port,
     apiBase: (env.COMMANDCODE_API_BASE?.trim() || "https://api.commandcode.ai").replace(/\/+$/, ""),
-    cliVersion: env.COMMANDCODE_CLI_VERSION?.trim() || "1.28.1",
+    cliVersion: env.COMMANDCODE_CLI_VERSION?.trim() || "1.31.0",
     upstreamMode: parseUpstreamMode(env.COMMANDCODE_UPSTREAM_MODE),
     zdr: parseBoolean(env.COMMANDCODE_ZDR, false),
     defaultModel,

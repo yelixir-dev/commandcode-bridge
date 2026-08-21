@@ -100,7 +100,7 @@ describe("JSON dashboard configuration", () => {
 
     expect(normalized).toEqual([
       { id: "deepseek/deepseek-v4-pro", enabled: true, contextWindow: 1_000_000 },
-      { id: "zai-org/GLM-5.1", enabled: false },
+      { id: "zai-org/GLM-5.1", enabled: false, contextWindow: 200_000 },
     ]);
   });
 
@@ -170,7 +170,7 @@ describe("JSON dashboard configuration", () => {
     expect(byId.get("gpt-5.6-terra")).toMatchObject({
       enabled: false,
       provider: "OpenAI",
-      notes: "$1/M in · $6/M out",
+      notes: "$2/M in · $12/M out",
       contextWindow: 1_050_000,
     });
     expect(byId.has("anthropic/claude-opus-4.6")).toBe(false);

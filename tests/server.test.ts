@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/server.js";
+import { defaultModelCatalog } from "../src/model-catalog.js";
 import type { CommandCodeCredentialDiagnostic } from "../src/credential-router.js";
 import type {
   CommandCodeEvent,
@@ -256,7 +257,27 @@ describe("Fastify OpenAI-compatible server", () => {
   });
 
   it("publishes context metadata for known models and omits it for unknown capacities", async () => {
-    const app = await createTestApp({ upstream: new FakeCommandCodeClient() });
+    const app = await createTestApp({
+      upstream: new FakeCommandCodeClient(),
+      configOverrides: {
+        modelCatalog: [
+          ...defaultModelCatalog(),
+          {
+            id: "custom/no-context",
+            label: "No Context",
+            provider: "Custom",
+            family: "custom",
+            enabled: true,
+          },
+        ],
+        allowedModels: [
+          ...defaultModelCatalog()
+            .filter((model) => model.enabled)
+            .map((model) => model.id),
+          "custom/no-context",
+        ],
+      },
+    });
     const response = await app.inject({ method: "GET", url: "/v1/models" });
     const rows = response.json().data as Array<Record<string, unknown> & { id: string }>;
     const byId = new Map(rows.map((model) => [model.id, model]));
@@ -276,7 +297,7 @@ describe("Fastify OpenAI-compatible server", () => {
         max_context_length: 1_000_000,
       });
     }
-    const unknownCapacity = byId.get("zai-org/GLM-5.1");
+    const unknownCapacity = byId.get("custom/no-context");
     expect(unknownCapacity).not.toHaveProperty("context_window");
     expect(unknownCapacity).not.toHaveProperty("context_length");
     expect(unknownCapacity).not.toHaveProperty("max_context_length");

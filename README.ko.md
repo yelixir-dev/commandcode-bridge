@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.28.1.a-b57920?style=flat-square" alt="Version 1.28.1.a"></a>
-  <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-52-1f6f78?style=flat-square" alt="52 models"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.31.0.a-b57920?style=flat-square" alt="Version 1.31.0.a"></a>
+  <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-57-1f6f78?style=flat-square" alt="57 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
 </p>
@@ -20,7 +20,7 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이트웨이입니다. 표준 OpenAI-compatible 모델·채팅 endpoint를 제공하고 eligible upstream credential 사이에서 요청을 라우팅하며, CommandCode **1.28.1**에 맞춘 정확한 **56-model** catalog를 게시합니다. Bridge 버전은 항상 현재 CommandCode CLI 버전을 따라가며 그 뒤에 문자 접미사를 붙입니다(예: **1.28.1.a**). 접미사는 bridge 전용 release를 뜻합니다.
+CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이트웨이입니다. 표준 OpenAI-compatible 모델·채팅 endpoint를 제공하고 eligible upstream credential 사이에서 요청을 라우팅하며, CommandCode **1.31.0**에 맞춘 정확한 **57-model** catalog를 게시합니다. Bridge 버전은 항상 현재 CommandCode CLI 버전을 따라가며 그 뒤에 문자 접미사를 붙입니다(예: **1.31.0.a**). 접미사는 bridge 전용 release를 뜻합니다.
 
 [기능](#기능) · [설치](#설치) · [사용법](#사용법) · [동작 방식](#동작-방식) · [저장소 구성](#저장소-구성) · [현재 제한](#현재-제한) · [라이선스](#라이선스)
 
@@ -36,7 +36,7 @@ CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이�
 
 - **실시간 model catalog.** Provider API를 쓸 수 있을 때 시작 시 공개 `GET /provider/v1/models`로 catalog를 갱신하므로 새 model과 context window가 static catalog release 없이 나타납니다.
 
-- **Context metadata.** catalog에 공개 context가 있으면 `context_window`, `context_length`, `max_context_length`를 제공합니다(정적 catalog가 비워 두는 5개 context는 live 값으로 채워집니다).
+- **Context metadata.** catalog에 공개 context가 있으면 `context_window`, `context_length`, `max_context_length`를 제공합니다.
 
 - **CLI 없는 balance alert.** billing/usage snapshot은 여전히 같은 Studio key로 `/alpha/billing`에서 가져오므로 routing과 alert은 CLI 없이 계속 동작합니다.
 
@@ -48,7 +48,7 @@ CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이�
 
 ### Linux rootless installer
 
-installer는 Linux user systemd용이며 CommandCode CLI 1.28.1 때문에 Node.js 22+를 요구합니다. 가능한 경우 CLI auth를 가져오고 private state는 `~/.config/commandcode-bridge`, 설치본은 `~/.local/share/commandcode-bridge`에 두며 안전한 기본값은 `127.0.0.1:9992`입니다. `0.0.0.0`은 `BRIDGE_API_KEY`를 켠 신뢰 LAN/VPN/tailnet/firewall/reverse proxy 뒤에서만 사용하십시오. 로그인 전 시작에는 `sudo loginctl enable-linger "$USER"`, 제거에는 `./uninstall.sh` 또는 `./uninstall.sh --purge-config`를 사용합니다.
+installer는 Linux user systemd용이며 CommandCode CLI 1.31.0 때문에 Node.js 22+를 요구합니다. 가능한 경우 CLI auth를 가져오고 private state는 `~/.config/commandcode-bridge`, 설치본은 `~/.local/share/commandcode-bridge`에 두며 안전한 기본값은 `127.0.0.1:9992`입니다. `0.0.0.0`은 `BRIDGE_API_KEY`를 켠 신뢰 LAN/VPN/tailnet/firewall/reverse proxy 뒤에서만 사용하십시오. 로그인 전 시작에는 `sudo loginctl enable-linger "$USER"`, 제거에는 `./uninstall.sh` 또는 `./uninstall.sh --purge-config`를 사용합니다.
 
 ```bash
 ./install.sh
@@ -125,62 +125,67 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Model metadata와 정확한 catalog
 
-각 model object는 `id`, `object`, `created`, provider 기반 `owned_by`를 포함합니다. 알려진 context는 `context_window`, `context_length`, `max_context_length`에 동일하게 나옵니다. Provider API를 쓸 수 있을 때는 시작 시 live `GET /provider/v1/models`로 catalog를 갱신해 정적 catalog가 비워 둔 5개 context를 채우고(현재 모두 `200,000`) 새로 추가된 model도 반영합니다. 아래 표는 배포되는 1.14.0 baseline이며 “기본 활성화”는 built-in enabled state입니다.
+각 model object는 `id`, `object`, `created`, provider 기반 `owned_by`를 포함합니다. 알려진 context는 `context_window`, `context_length`, `max_context_length`에 동일하게 나옵니다. Provider API를 쓸 수 있을 때는 시작 시 live `GET /provider/v1/models`로 catalog를 갱신해 새로 추가된 model도 반영합니다. 아래 표는 배포되는 1.31.0 baseline이며 “기본 활성화”는 built-in enabled state입니다.
 
-| Provider          | Canonical model ID                    |        Context | 기본 활성화 |
-| ----------------- | ------------------------------------- | -------------: | :---------: |
-| DeepSeek          | `deepseek/deepseek-v4-pro`            |      1,000,000 |     예      |
-| DeepSeek          | `deepseek/deepseek-v4-flash`          |      1,000,000 |     예      |
-| Moonshot          | `moonshotai/Kimi-K3`                  |      1,000,000 |   아니요    |
-| Moonshot          | `moonshotai/Kimi-K2.7-Code`           |        256,000 |   아니요    |
-| Moonshot          | `moonshotai/Kimi-K2.7-Code-Highspeed` |        262,000 |   아니요    |
-| Moonshot          | `moonshotai/Kimi-K2.6`                |        256,000 |     예      |
-| Moonshot          | `moonshotai/Kimi-K2.5`                |        256,000 |   아니요    |
-| Z.ai              | `zai-org/GLM-5.2`                     |      1,000,000 |   아니요    |
-| Z.ai              | `zai-org/GLM-5.2-Fast`                |      1,000,000 |   아니요    |
-| Z.ai              | `zai-org/GLM-5.1`                     | 200,000 (live) |     예      |
-| Z.ai              | `zai-org/GLM-5`                       |        200,000 |   아니요    |
-| MiniMax           | `MiniMaxAI/MiniMax-M3`                |      1,000,000 |   아니요    |
-| MiniMax           | `MiniMaxAI/MiniMax-M2.7`              | 200,000 (live) |     예      |
-| MiniMax           | `MiniMaxAI/MiniMax-M2.5`              |        200,000 |   아니요    |
-| Xiaomi            | `xiaomi/mimo-v2.5-pro`                |      1,000,000 |   아니요    |
-| Xiaomi            | `xiaomi/mimo-v2.5`                    |      1,000,000 |   아니요    |
-| Qwen              | `Qwen/Qwen3.8-Max`                    |      1,000,000 |   아니요    |
-| Qwen              | `Qwen/Qwen3.7-Max`                    |      1,000,000 |   아니요    |
-| Qwen              | `Qwen/Qwen3.7-Plus`                   |      1,000,000 |   아니요    |
-| Qwen              | `Qwen/Qwen3.7-Flash`                  |      1,000,000 |   아니요    |
-| Qwen              | `Qwen/Qwen3.6-Max-Preview`            | 200,000 (live) |   아니요    |
-| Qwen              | `Qwen/Qwen3.6-Plus`                   | 200,000 (live) |     예      |
-| StepFun           | `stepfun/Step-3.7-Flash`              |        256,000 |   아니요    |
-| StepFun           | `stepfun/Step-3.5-Flash`              |      1,000,000 |   아니요    |
-| Tencent           | `tencent/hy3-paid`                    |        262,000 |   아니요    |
-| NVIDIA            | `nvidia/nemotron-3-ultra-550b-a55b`   |      1,000,000 |   아니요    |
-| Thinking Machines | `thinkingmachines/inkling`            |        256,000 |   아니요    |
-| Thinking Machines | `thinkingmachines/inkling-small`      |      1,000,000 |   아니요    |
-| Poolside          | `poolside/laguna-s-2.1-free`          |        256,000 |   아니요    |
-| Anthropic         | `claude-sonnet-5`                     |      1,000,000 |   아니요    |
-| Anthropic         | `claude-sonnet-4-6`                   |      1,000,000 |   아니요    |
-| Anthropic         | `claude-fable-5`                      |      1,000,000 |   아니요    |
-| Anthropic         | `claude-opus-5`                       |      1,000,000 |   아니요    |
-| Anthropic         | `claude-opus-4-8`                     |      1,000,000 |   아니요    |
-| Anthropic         | `claude-opus-4-7`                     |      1,000,000 |   아니요    |
-| Anthropic         | `claude-haiku-4-5-20251001`           |        200,000 |   아니요    |
-| OpenAI            | `gpt-5.6-sol`                         |      1,050,000 |   아니요    |
-| OpenAI            | `gpt-5.6-terra`                       |      1,050,000 |   아니요    |
-| OpenAI            | `gpt-5.6-luna`                        |      1,050,000 |   아니요    |
-| OpenAI            | `gpt-5.5`                             | 200,000 (live) |   아니요    |
-| OpenAI            | `gpt-5.4`                             |        400,000 |   아니요    |
-| OpenAI            | `gpt-5.3-codex`                       |        400,000 |   아니요    |
-| OpenAI            | `gpt-5.4-mini`                        |        400,000 |   아니요    |
-| Google            | `google/gemini-3.6-flash`             |      1,000,000 |   아니요    |
-| Google            | `google/gemini-3.5-flash`             |      1,000,000 |   아니요    |
-| Google            | `google/gemini-3.5-flash-lite`        |      1,000,000 |   아니요    |
-| Google            | `google/gemini-3.1-flash-lite`        |      1,000,000 |   아니요    |
-| Sakana            | `sakana/fugu-ultra`                   |      1,000,000 |   아니요    |
-| Meta              | `meta/muse-spark-1.1`                 |      1,050,000 |   아니요    |
-| Meta              | `meta/muse-spark-1.2`                 |      1,050,000 |   아니요    |
-| Meta              | `meta/muse-spark-1.2-contributor`     |      1,050,000 |   아니요    |
-| xAI               | `xai/grok-4.5`                        |        500,000 |   아니요    |
+| Provider          | Canonical model ID                    |   Context | 기본 활성화 |
+| ----------------- | ------------------------------------- | --------: | :---------: |
+| DeepSeek          | `deepseek/deepseek-v4-pro`            | 1,000,000 |     예      |
+| DeepSeek          | `deepseek/deepseek-v4-flash`          | 1,000,000 |     예      |
+| Moonshot          | `moonshotai/Kimi-K3`                  | 1,000,000 |   아니요    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code`           |   256,000 |   아니요    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code-Highspeed` |   262,000 |   아니요    |
+| Moonshot          | `moonshotai/Kimi-K2.6`                |   256,000 |     예      |
+| Moonshot          | `moonshotai/Kimi-K2.5`                |   256,000 |   아니요    |
+| Z.ai              | `zai-org/GLM-5.3`                     | 1,000,000 |   아니요    |
+| Z.ai              | `zai-org/GLM-5.2`                     | 1,000,000 |   아니요    |
+| Z.ai              | `zai-org/GLM-5.2-Fast`                | 1,000,000 |   아니요    |
+| Z.ai              | `zai-org/GLM-5.1`                     |   200,000 |     예      |
+| Z.ai              | `zai-org/GLM-5`                       |   200,000 |   아니요    |
+| MiniMax           | `MiniMaxAI/MiniMax-M3`                | 1,000,000 |   아니요    |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.7`              |   200,000 |     예      |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.5`              |   200,000 |   아니요    |
+| Xiaomi            | `xiaomi/mimo-v2.5-pro`                | 1,000,000 |   아니요    |
+| Xiaomi            | `xiaomi/mimo-v2.5`                    | 1,000,000 |   아니요    |
+| Qwen              | `Qwen/Qwen3.8-Max`                    | 1,000,000 |   아니요    |
+| Qwen              | `Qwen/Qwen3.8-27B`                    |   262,144 |   아니요    |
+| Qwen              | `Qwen/Qwen3.7-Max`                    | 1,000,000 |   아니요    |
+| Qwen              | `Qwen/Qwen3.7-Plus`                   | 1,000,000 |   아니요    |
+| Qwen              | `Qwen/Qwen3.7-Flash`                  | 1,000,000 |   아니요    |
+| Qwen              | `Qwen/Qwen3.6-Max-Preview`            |   200,000 |   아니요    |
+| Qwen              | `Qwen/Qwen3.6-Plus`                   |   200,000 |     예      |
+| StepFun           | `stepfun/Step-3.7-Flash`              |   256,000 |   아니요    |
+| StepFun           | `stepfun/Step-3.5-Flash`              | 1,000,000 |   아니요    |
+| Tencent           | `tencent/hy3-paid`                    |   262,144 |   아니요    |
+| NVIDIA            | `nvidia/nemotron-3-ultra-550b-a55b`   | 1,000,000 |   아니요    |
+| Thinking Machines | `thinkingmachines/inkling`            |   256,000 |   아니요    |
+| Thinking Machines | `thinkingmachines/inkling-small`      | 1,000,000 |   아니요    |
+| Poolside          | `poolside/laguna-s-2.1-free`          |   256,000 |   아니요    |
+| Stealth           | `stealth/ox-alpha`                    | 1,048,576 |   아니요    |
+| Anthropic         | `claude-sonnet-5`                     | 1,000,000 |   아니요    |
+| Anthropic         | `claude-sonnet-4-6`                   | 1,000,000 |   아니요    |
+| Anthropic         | `claude-fable-5`                      | 1,000,000 |   아니요    |
+| Anthropic         | `claude-opus-5`                       | 1,000,000 |   아니요    |
+| Anthropic         | `claude-opus-4-8`                     | 1,000,000 |   아니요    |
+| Anthropic         | `claude-opus-4-7`                     | 1,000,000 |   아니요    |
+| Anthropic         | `claude-haiku-4-5-20251001`           |   200,000 |   아니요    |
+| OpenAI            | `gpt-5.6-sol`                         | 1,050,000 |   아니요    |
+| OpenAI            | `gpt-5.6-terra`                       | 1,050,000 |   아니요    |
+| OpenAI            | `gpt-5.6-luna`                        | 1,050,000 |   아니요    |
+| OpenAI            | `gpt-5.5`                             |   400,000 |   아니요    |
+| OpenAI            | `gpt-5.4`                             |   400,000 |   아니요    |
+| OpenAI            | `gpt-5.3-codex`                       |   400,000 |   아니요    |
+| OpenAI            | `gpt-5.4-mini`                        |   400,000 |   아니요    |
+| Google            | `google/gemini-3.7-flash`             | 1,048,576 |   아니요    |
+| Google            | `google/gemini-3.6-flash`             | 1,000,000 |   아니요    |
+| Google            | `google/gemini-3.5-flash`             | 1,000,000 |   아니요    |
+| Google            | `google/gemini-3.5-flash-lite`        | 1,000,000 |   아니요    |
+| Google            | `google/gemini-3.1-flash-lite`        | 1,000,000 |   아니요    |
+| Sakana            | `sakana/fugu-ultra`                   | 1,000,000 |   아니요    |
+| Meta              | `meta/muse-spark-1.1`                 | 1,048,576 |   아니요    |
+| Meta              | `meta/muse-spark-1.2`                 | 1,048,576 |   아니요    |
+| Meta              | `meta/muse-spark-1.2-contributor`     | 1,048,576 |   아니요    |
+| xAI               | `xai/grok-4.5`                        |   500,000 |   아니요    |
+| xAI               | `xai/grok-4.6`                        |   500,000 |   아니요    |
 
 ### Dashboard와 credential routing
 

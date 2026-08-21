@@ -9,17 +9,17 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
-  it("advertises CommandCode CLI 1.28.1 by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.28.1");
+  it("advertises CommandCode CLI 1.31.0 by default while allowing override", () => {
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.31.0");
     expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "1.14.0-test" } }).cliVersion).toBe(
       "1.14.0-test",
     );
   });
 
-  it("matches the exact CommandCode 1.28.1 canonical catalog and advertised prices", () => {
+  it("matches the exact CommandCode 1.31.0 canonical catalog and advertised prices", () => {
     const expectedPrices = new Map<string, [number, number]>([
-      ["deepseek/deepseek-v4-pro", [0.435, 0.87]],
-      ["deepseek/deepseek-v4-flash", [0.14, 0.28]],
+      ["deepseek/deepseek-v4-pro", [0.66, 1.98]],
+      ["deepseek/deepseek-v4-flash", [0.22, 0.66]],
       ["moonshotai/Kimi-K3", [3, 15]],
       ["moonshotai/Kimi-K2.7-Code", [0.95, 4]],
       ["moonshotai/Kimi-K2.7-Code-Highspeed", [1.9, 8]],
@@ -49,6 +49,7 @@ describe("configuration and model aliases", () => {
       ["thinkingmachines/inkling", [1, 4.05]],
       ["thinkingmachines/inkling-small", [0.5, 1.2]],
       ["poolside/laguna-s-2.1-free", [0, 0]],
+      ["stealth/ox-alpha", [0, 0]],
       ["claude-sonnet-5", [2, 10]],
       ["claude-sonnet-4-6", [3, 15]],
       ["claude-fable-5", [10, 50]],
@@ -57,8 +58,8 @@ describe("configuration and model aliases", () => {
       ["claude-opus-4-7", [5, 25]],
       ["claude-haiku-4-5-20251001", [1, 5]],
       ["gpt-5.6-sol", [5, 30]],
-      ["gpt-5.6-terra", [1, 6]],
-      ["gpt-5.6-luna", [0.1, 0.6]],
+      ["gpt-5.6-terra", [2, 12]],
+      ["gpt-5.6-luna", [0.2, 1.2]],
       ["gpt-5.5", [5, 30]],
       ["gpt-5.4", [2.5, 15]],
       ["gpt-5.3-codex", [2, 8]],
@@ -77,7 +78,7 @@ describe("configuration and model aliases", () => {
     ]);
     const catalog = loadBridgeConfig({ env: {} }).modelCatalog ?? [];
 
-    expect(catalog).toHaveLength(56);
+    expect(catalog).toHaveLength(57);
     expect(catalog.map((model) => model.id)).toEqual([...expectedPrices.keys()]);
     for (const model of catalog) {
       const match = model.notes?.match(/^\$(\d+(?:\.\d+)?)\/M in · \$(\d+(?:\.\d+)?)\/M out/);
@@ -86,7 +87,7 @@ describe("configuration and model aliases", () => {
     }
   });
 
-  it("matches the exact CommandCode 1.28.1 published context windows", () => {
+  it("matches the exact CommandCode 1.31.0 published context windows", () => {
     const expectedContextWindows = new Map<string, number | undefined>([
       ["deepseek/deepseek-v4-pro", 1_000_000],
       ["deepseek/deepseek-v4-flash", 1_000_000],
@@ -98,27 +99,28 @@ describe("configuration and model aliases", () => {
       ["zai-org/GLM-5.3", 1_000_000],
       ["zai-org/GLM-5.2", 1_000_000],
       ["zai-org/GLM-5.2-Fast", 1_000_000],
-      ["zai-org/GLM-5.1", undefined],
+      ["zai-org/GLM-5.1", 200_000],
       ["zai-org/GLM-5", 200_000],
       ["MiniMaxAI/MiniMax-M3", 1_000_000],
-      ["MiniMaxAI/MiniMax-M2.7", undefined],
+      ["MiniMaxAI/MiniMax-M2.7", 200_000],
       ["MiniMaxAI/MiniMax-M2.5", 200_000],
       ["xiaomi/mimo-v2.5-pro", 1_000_000],
       ["xiaomi/mimo-v2.5", 1_000_000],
       ["Qwen/Qwen3.8-Max", 1_000_000],
-      ["Qwen/Qwen3.8-27B", 262_000],
+      ["Qwen/Qwen3.8-27B", 262_144],
       ["Qwen/Qwen3.7-Max", 1_000_000],
       ["Qwen/Qwen3.7-Plus", 1_000_000],
       ["Qwen/Qwen3.7-Flash", 1_000_000],
-      ["Qwen/Qwen3.6-Max-Preview", undefined],
-      ["Qwen/Qwen3.6-Plus", undefined],
+      ["Qwen/Qwen3.6-Max-Preview", 200_000],
+      ["Qwen/Qwen3.6-Plus", 200_000],
       ["stepfun/Step-3.7-Flash", 256_000],
       ["stepfun/Step-3.5-Flash", 1_000_000],
-      ["tencent/hy3-paid", 262_000],
+      ["tencent/hy3-paid", 262_144],
       ["nvidia/nemotron-3-ultra-550b-a55b", 1_000_000],
       ["thinkingmachines/inkling", 256_000],
       ["thinkingmachines/inkling-small", 1_000_000],
       ["poolside/laguna-s-2.1-free", 256_000],
+      ["stealth/ox-alpha", 1_048_576],
       ["claude-sonnet-5", 1_000_000],
       ["claude-sonnet-4-6", 1_000_000],
       ["claude-fable-5", 1_000_000],
@@ -129,19 +131,19 @@ describe("configuration and model aliases", () => {
       ["gpt-5.6-sol", 1_050_000],
       ["gpt-5.6-terra", 1_050_000],
       ["gpt-5.6-luna", 1_050_000],
-      ["gpt-5.5", undefined],
+      ["gpt-5.5", 400_000],
       ["gpt-5.4", 400_000],
       ["gpt-5.3-codex", 400_000],
       ["gpt-5.4-mini", 400_000],
-      ["google/gemini-3.7-flash", 1_050_000],
+      ["google/gemini-3.7-flash", 1_048_576],
       ["google/gemini-3.6-flash", 1_000_000],
       ["google/gemini-3.5-flash", 1_000_000],
       ["google/gemini-3.5-flash-lite", 1_000_000],
       ["google/gemini-3.1-flash-lite", 1_000_000],
       ["sakana/fugu-ultra", 1_000_000],
-      ["meta/muse-spark-1.1", 1_050_000],
-      ["meta/muse-spark-1.2", 1_050_000],
-      ["meta/muse-spark-1.2-contributor", 1_050_000],
+      ["meta/muse-spark-1.1", 1_048_576],
+      ["meta/muse-spark-1.2", 1_048_576],
+      ["meta/muse-spark-1.2-contributor", 1_048_576],
       ["xai/grok-4.5", 500_000],
       ["xai/grok-4.6", 500_000],
     ]);
@@ -190,7 +192,7 @@ describe("configuration and model aliases", () => {
     });
     expect(byId.get("deepseek/deepseek-v4-pro")?.notes).not.toBe("stale pricing");
     expect(byId.get("deepseek/deepseek-v4-flash")?.contextWindow).toBe(1_000_000);
-    expect(byId.get("zai-org/GLM-5.1")?.contextWindow).toBeUndefined();
+    expect(byId.get("zai-org/GLM-5.1")?.contextWindow).toBe(200_000);
     expect(byId.get("custom/long")).toMatchObject({
       provider: "Custom",
       aliases: ["custom-long"],

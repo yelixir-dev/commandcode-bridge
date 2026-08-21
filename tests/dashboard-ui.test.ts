@@ -46,7 +46,7 @@ describe("dashboard UI", () => {
     });
 
     expect(html).toContain('id="bridgeVersion"');
-    expect(html).toContain("v1.28.1.a");
+    expect(html).toContain("v1.31.0.a");
     expect(html).not.toContain('id="endpoint"');
   });
 
