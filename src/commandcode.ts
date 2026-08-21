@@ -86,6 +86,7 @@ export async function* parseCommandCodeStream(
     const event = parseCommandCodeEventLine(buffer);
     if (event) yield event;
   } finally {
+    await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }
@@ -404,6 +405,11 @@ export class CommandCodeClient implements CommandCodeUpstream {
         else this.router.recordFailure(credential.id, { statusCode });
         finalized = true;
       };
+      const finalizeCallerAbort = () => {
+        if (finalized) return;
+        this.router.release(credential.id);
+        finalized = true;
+      };
 
       try {
         const response = await this.fetchGenerate(body, credential, effectiveSignal);
@@ -475,7 +481,8 @@ export class CommandCodeClient implements CommandCodeUpstream {
         return;
       } catch (error) {
         const statusCode = errorStatusCodeFromUnknown(error);
-        finalizeFailure(statusCode);
+        if (signal?.aborted === true) finalizeCallerAbort();
+        else finalizeFailure(statusCode);
         lastError = error;
         if (attempt < maxAttempts - 1 && shouldRetry(statusCode) && !effectiveSignal.aborted) {
           if (statusCode !== undefined && isFatalCredFailure(statusCode))

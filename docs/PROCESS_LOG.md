@@ -98,15 +98,23 @@
 - Repriced DeepSeek V4 Pro/Flash (off-peak $0.66/$1.98 and $0.22/$0.66; peak rates noted) and GPT-5.6 Terra/Luna ($2/$12, $0.2/$1.2) to the current published rates.
 - Filled static context windows from the live Provider API (GLM-5.1, MiniMax M2.7, Qwen 3.6 Max Preview/Plus, GPT-5.5) and corrected Qwen 3.8 27B/Tencent Hy3 to 262,144 and Gemini 3.7 Flash/Muse Spark/Ox Alpha to 1,048,576.
 
+## 2026-08-21
+
+- Released bridge version `1.32.1.a` aligned with CommandCode CLI `1.32.1`.
+- Added `deepseek/deepseek-v4-flash-vision-exp` to the static catalog (58 models).
+- Client disconnects during a completion now release the credential slot without recording a failure or cooldown, abort the upstream body read, and log a single info line instead of a 500 "Unhandled chat completion error"; previously an abort parked the credential in cooldown and burst requests failed 503.
+- Tool-call events whose name arrives as multiplexed XML-ish frames (observed on `stealth/ox-alpha`) are split into separate OpenAI `tool_calls` with deterministic ids, with a `commandcode_multiplexed_tool_call` warn log.
+- Live QA against `stealth/ox-alpha` verified: streaming tool calls, forced single tools, parallel tool calls, three-result tool history follow-ups, and abort-then-burst recovery.
+
 ## Current status — 2026-08-21
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.31.0.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.32.1.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
-- Model surface: 57 statically aligned models with live Provider API refresh when available.
+- Model surface: 58 statically aligned models with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
 - Deployment surface: Docker/Compose, Linux install/uninstall scripts, nginx and systemd release assets, and GitHub/GitLab CI definitions.
-- Verification: `npm run typecheck`, `npm run lint`, all 212 Vitest tests in 15 files, and `npm run build` pass on this workstation.
+- Verification: `npm run typecheck`, `npm run lint`, all 215 Vitest tests in 15 files, and `npm run build` pass on this workstation.
 - Known local exception: `npm run format:check` fails only because the untracked workspace instruction file `AGENTS.md` is not Prettier-formatted. It is not part of the tracked product tree and was left untouched.
 - Live upstream smoke was not repeated because it requires a running bridge and an upstream CommandCode account; the last recorded live bridge/tool-loop smoke remains the 2026-05-16 entry.
 - Session recovery note: the current Senpi transcript exists at the path in `PI_SESSION_FILE`. Cross-platform local session search found no recoverable project implementation transcript covering the missing period, so the entries above were reconstructed from Git history and verified against the current source and test suite.

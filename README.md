@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.31.0.a-b57920?style=flat-square" alt="Version 1.31.0.a"></a>
-  <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-57-1f6f78?style=flat-square" alt="57 models"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.32.1.a-b57920?style=flat-square" alt="Version 1.32.1.a"></a>
+  <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-58-1f6f78?style=flat-square" alt="58 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
 </p>
@@ -20,7 +20,7 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **57-model** catalog aligned with CommandCode **1.31.0**. The bridge version always tracks the current CommandCode CLI version with a letter suffix (for example **1.31.0.a**); the suffix marks bridge-only releases.
+CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode account. It presents standard OpenAI-compatible model and chat endpoints, routes work across eligible upstream credentials, and publishes an exact **58-model** catalog aligned with CommandCode **1.32.1**. The bridge version always tracks the current CommandCode CLI version with a letter suffix (for example **1.32.1.a**); the suffix marks bridge-only releases.
 
 [What it does](#what-it-does) · [Install](#install) · [Usage](#usage) · [How it works](#how-it-works) · [Repository layout](#repository-layout) · [Current limitations](#current-limitations) · [License](#license)
 
@@ -48,7 +48,7 @@ CommandCode Bridge is a trusted-environment HTTP gateway for a CommandCode accou
 
 ### Linux rootless installer
 
-The installer targets Linux user systemd, requires Node.js 22+ for CommandCode CLI 1.31.0, imports CLI auth when available, writes private state under `~/.config/commandcode-bridge`, installs under `~/.local/share/commandcode-bridge`, and safely defaults to `127.0.0.1:9992`. Use `0.0.0.0` only behind a trusted LAN/VPN/tailnet/firewall/reverse proxy with `BRIDGE_API_KEY`. Use `sudo loginctl enable-linger "$USER"` for pre-login startup; uninstall with `./uninstall.sh` or `./uninstall.sh --purge-config`.
+The installer targets Linux user systemd, requires Node.js 22+ for CommandCode CLI 1.32.1, imports CLI auth when available, writes private state under `~/.config/commandcode-bridge`, installs under `~/.local/share/commandcode-bridge`, and safely defaults to `127.0.0.1:9992`. Use `0.0.0.0` only behind a trusted LAN/VPN/tailnet/firewall/reverse proxy with `BRIDGE_API_KEY`. Use `sudo loginctl enable-linger "$USER"` for pre-login startup; uninstall with `./uninstall.sh` or `./uninstall.sh --purge-config`.
 
 ```bash
 ./install.sh
@@ -125,67 +125,68 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Model metadata and exact catalog
 
-Each model object includes `id`, `object`, `created`, and provider-derived `owned_by`. Known context is repeated in `context_window`, `context_length`, and `max_context_length`. When the Provider API is available the catalog is refreshed from the live `GET /provider/v1/models` at startup and picks up newly added models; the static table below is the shipped 1.31.0 baseline. “Default” is the built-in enabled state.
+Each model object includes `id`, `object`, `created`, and provider-derived `owned_by`. Known context is repeated in `context_window`, `context_length`, and `max_context_length`. When the Provider API is available the catalog is refreshed from the live `GET /provider/v1/models` at startup and picks up newly added models; the static table below is the shipped 1.32.1 baseline. “Default” is the built-in enabled state.
 
-| Provider          | Canonical model ID                    |   Context | Default |
-| ----------------- | ------------------------------------- | --------: | :-----: |
-| DeepSeek          | `deepseek/deepseek-v4-pro`            | 1,000,000 |   Yes   |
-| DeepSeek          | `deepseek/deepseek-v4-flash`          | 1,000,000 |   Yes   |
-| Moonshot          | `moonshotai/Kimi-K3`                  | 1,000,000 |   No    |
-| Moonshot          | `moonshotai/Kimi-K2.7-Code`           |   256,000 |   No    |
-| Moonshot          | `moonshotai/Kimi-K2.7-Code-Highspeed` |   262,000 |   No    |
-| Moonshot          | `moonshotai/Kimi-K2.6`                |   256,000 |   Yes   |
-| Moonshot          | `moonshotai/Kimi-K2.5`                |   256,000 |   No    |
-| Z.ai              | `zai-org/GLM-5.3`                     | 1,000,000 |   No    |
-| Z.ai              | `zai-org/GLM-5.2`                     | 1,000,000 |   No    |
-| Z.ai              | `zai-org/GLM-5.2-Fast`                | 1,000,000 |   No    |
-| Z.ai              | `zai-org/GLM-5.1`                     |   200,000 |   Yes   |
-| Z.ai              | `zai-org/GLM-5`                       |   200,000 |   No    |
-| MiniMax           | `MiniMaxAI/MiniMax-M3`                | 1,000,000 |   No    |
-| MiniMax           | `MiniMaxAI/MiniMax-M2.7`              |   200,000 |   Yes   |
-| MiniMax           | `MiniMaxAI/MiniMax-M2.5`              |   200,000 |   No    |
-| Xiaomi            | `xiaomi/mimo-v2.5-pro`                | 1,000,000 |   No    |
-| Xiaomi            | `xiaomi/mimo-v2.5`                    | 1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.8-Max`                    | 1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.8-27B`                    |   262,144 |   No    |
-| Qwen              | `Qwen/Qwen3.7-Max`                    | 1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.7-Plus`                   | 1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.7-Flash`                  | 1,000,000 |   No    |
-| Qwen              | `Qwen/Qwen3.6-Max-Preview`            |   200,000 |   No    |
-| Qwen              | `Qwen/Qwen3.6-Plus`                   |   200,000 |   Yes   |
-| StepFun           | `stepfun/Step-3.7-Flash`              |   256,000 |   No    |
-| StepFun           | `stepfun/Step-3.5-Flash`              | 1,000,000 |   No    |
-| Tencent           | `tencent/hy3-paid`                    |   262,144 |   No    |
-| NVIDIA            | `nvidia/nemotron-3-ultra-550b-a55b`   | 1,000,000 |   No    |
-| Thinking Machines | `thinkingmachines/inkling`            |   256,000 |   No    |
-| Thinking Machines | `thinkingmachines/inkling-small`      | 1,000,000 |   No    |
-| Poolside          | `poolside/laguna-s-2.1-free`          |   256,000 |   No    |
-| Stealth           | `stealth/ox-alpha`                    | 1,048,576 |   No    |
-| Anthropic         | `claude-sonnet-5`                     | 1,000,000 |   No    |
-| Anthropic         | `claude-sonnet-4-6`                   | 1,000,000 |   No    |
-| Anthropic         | `claude-fable-5`                      | 1,000,000 |   No    |
-| Anthropic         | `claude-opus-5`                       | 1,000,000 |   No    |
-| Anthropic         | `claude-opus-4-8`                     | 1,000,000 |   No    |
-| Anthropic         | `claude-opus-4-7`                     | 1,000,000 |   No    |
-| Anthropic         | `claude-haiku-4-5-20251001`           |   200,000 |   No    |
-| OpenAI            | `gpt-5.6-sol`                         | 1,050,000 |   No    |
-| OpenAI            | `gpt-5.6-terra`                       | 1,050,000 |   No    |
-| OpenAI            | `gpt-5.6-luna`                        | 1,050,000 |   No    |
-| OpenAI            | `gpt-5.5`                             |   400,000 |   No    |
-| OpenAI            | `gpt-5.4`                             |   400,000 |   No    |
-| OpenAI            | `gpt-5.3-codex`                       |   400,000 |   No    |
-| OpenAI            | `gpt-5.4-mini`                        |   400,000 |   No    |
-| Google            | `google/gemini-3.7-flash`             | 1,048,576 |   No    |
-| Google            | `google/gemini-3.6-flash`             | 1,000,000 |   No    |
-| Google            | `google/gemini-3.5-flash`             | 1,000,000 |   No    |
-| Google            | `google/gemini-3.5-flash-lite`        | 1,000,000 |   No    |
-| Google            | `google/gemini-3.1-flash-lite`        | 1,000,000 |   No    |
-| Sakana            | `sakana/fugu-ultra`                   | 1,000,000 |   No    |
-| Meta              | `meta/muse-spark-1.1`                 | 1,048,576 |   No    |
-| Meta              | `meta/muse-spark-1.2`                 | 1,048,576 |   No    |
-| Meta              | `meta/muse-spark-1.2-contributor`     | 1,048,576 |   No    |
-| xAI               | `xai/grok-4.5`                        |   500,000 |   No    |
-| xAI               | `xai/grok-4.6`                        |   500,000 |   No    |
+| Provider          | Canonical model ID                      |   Context | Default |
+| ----------------- | --------------------------------------- | --------: | :-----: |
+| DeepSeek          | `deepseek/deepseek-v4-pro`              | 1,000,000 |   Yes   |
+| DeepSeek          | `deepseek/deepseek-v4-flash`            | 1,000,000 |   Yes   |
+| DeepSeek          | `deepseek/deepseek-v4-flash-vision-exp` | 1,000,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K3`                    | 1,000,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code`             |   256,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K2.7-Code-Highspeed`   |   262,000 |   No    |
+| Moonshot          | `moonshotai/Kimi-K2.6`                  |   256,000 |   Yes   |
+| Moonshot          | `moonshotai/Kimi-K2.5`                  |   256,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.3`                       | 1,000,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.2`                       | 1,000,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.2-Fast`                  | 1,000,000 |   No    |
+| Z.ai              | `zai-org/GLM-5.1`                       |   200,000 |   Yes   |
+| Z.ai              | `zai-org/GLM-5`                         |   200,000 |   No    |
+| MiniMax           | `MiniMaxAI/MiniMax-M3`                  | 1,000,000 |   No    |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.7`                |   200,000 |   Yes   |
+| MiniMax           | `MiniMaxAI/MiniMax-M2.5`                |   200,000 |   No    |
+| Xiaomi            | `xiaomi/mimo-v2.5-pro`                  | 1,000,000 |   No    |
+| Xiaomi            | `xiaomi/mimo-v2.5`                      | 1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.8-Max`                      | 1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.8-27B`                      |   262,144 |   No    |
+| Qwen              | `Qwen/Qwen3.7-Max`                      | 1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.7-Plus`                     | 1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.7-Flash`                    | 1,000,000 |   No    |
+| Qwen              | `Qwen/Qwen3.6-Max-Preview`              |   200,000 |   No    |
+| Qwen              | `Qwen/Qwen3.6-Plus`                     |   200,000 |   Yes   |
+| StepFun           | `stepfun/Step-3.7-Flash`                |   256,000 |   No    |
+| StepFun           | `stepfun/Step-3.5-Flash`                | 1,000,000 |   No    |
+| Tencent           | `tencent/hy3-paid`                      |   262,144 |   No    |
+| NVIDIA            | `nvidia/nemotron-3-ultra-550b-a55b`     | 1,000,000 |   No    |
+| Thinking Machines | `thinkingmachines/inkling`              |   256,000 |   No    |
+| Thinking Machines | `thinkingmachines/inkling-small`        | 1,000,000 |   No    |
+| Poolside          | `poolside/laguna-s-2.1-free`            |   256,000 |   No    |
+| Stealth           | `stealth/ox-alpha`                      | 1,048,576 |   No    |
+| Anthropic         | `claude-sonnet-5`                       | 1,000,000 |   No    |
+| Anthropic         | `claude-sonnet-4-6`                     | 1,000,000 |   No    |
+| Anthropic         | `claude-fable-5`                        | 1,000,000 |   No    |
+| Anthropic         | `claude-opus-5`                         | 1,000,000 |   No    |
+| Anthropic         | `claude-opus-4-8`                       | 1,000,000 |   No    |
+| Anthropic         | `claude-opus-4-7`                       | 1,000,000 |   No    |
+| Anthropic         | `claude-haiku-4-5-20251001`             |   200,000 |   No    |
+| OpenAI            | `gpt-5.6-sol`                           | 1,050,000 |   No    |
+| OpenAI            | `gpt-5.6-terra`                         | 1,050,000 |   No    |
+| OpenAI            | `gpt-5.6-luna`                          | 1,050,000 |   No    |
+| OpenAI            | `gpt-5.5`                               |   400,000 |   No    |
+| OpenAI            | `gpt-5.4`                               |   400,000 |   No    |
+| OpenAI            | `gpt-5.3-codex`                         |   400,000 |   No    |
+| OpenAI            | `gpt-5.4-mini`                          |   400,000 |   No    |
+| Google            | `google/gemini-3.7-flash`               | 1,048,576 |   No    |
+| Google            | `google/gemini-3.6-flash`               | 1,000,000 |   No    |
+| Google            | `google/gemini-3.5-flash`               | 1,000,000 |   No    |
+| Google            | `google/gemini-3.5-flash-lite`          | 1,000,000 |   No    |
+| Google            | `google/gemini-3.1-flash-lite`          | 1,000,000 |   No    |
+| Sakana            | `sakana/fugu-ultra`                     | 1,000,000 |   No    |
+| Meta              | `meta/muse-spark-1.1`                   | 1,048,576 |   No    |
+| Meta              | `meta/muse-spark-1.2`                   | 1,048,576 |   No    |
+| Meta              | `meta/muse-spark-1.2-contributor`       | 1,048,576 |   No    |
+| xAI               | `xai/grok-4.5`                          |   500,000 |   No    |
+| xAI               | `xai/grok-4.6`                          |   500,000 |   No    |
 
 ### Dashboard and credential routing
 

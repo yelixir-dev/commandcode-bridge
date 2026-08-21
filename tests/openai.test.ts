@@ -53,6 +53,20 @@ async function* reasoningOnlyProEvents(): AsyncIterable<CommandCodeEvent> {
   };
 }
 
+async function* multiplexedToolCallEvents(): AsyncIterable<CommandCodeEvent> {
+  yield {
+    type: "tool-call",
+    toolCallId: "call_smashed",
+    toolName: "get_seed</tool_call><c4cf82b7><tool_call><0c7dc7cb>add_numbers",
+    args: { a: "2", b: "3" },
+  };
+  yield {
+    type: "finish",
+    finishReason: "tool-calls",
+    totalUsage: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+  };
+}
+
 function parseSsePayloads(chunks: string[]): unknown[] {
   return chunks
     .join("")
@@ -103,6 +117,35 @@ describe("CommandCode to OpenAI conversion", () => {
         },
       },
     ]);
+  });
+
+  it("splits multiplexed tool frames smashed into one tool-call name (non-streaming)", async () => {
+    const warnings: Array<Record<string, unknown>> = [];
+    const result = await collectOpenAICompletion({
+      id: "chatcmpl_multiplexed",
+      created: 1778420000,
+      model: "stealth/ox-alpha",
+      events: multiplexedToolCallEvents(),
+      log: { warn: (payload) => warnings.push(payload) },
+    });
+    expect(result.choices[0]?.finish_reason).toBe("tool_calls");
+    expect(result.choices[0]?.message.tool_calls).toEqual([
+      {
+        id: "call_smashed",
+        type: "function",
+        function: { name: "get_seed", arguments: "{}" },
+      },
+      {
+        id: "call_smashed_part2",
+        type: "function",
+        function: { name: "add_numbers", arguments: JSON.stringify({ a: "2", b: "3" }) },
+      },
+    ]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      code: "commandcode_multiplexed_tool_call",
+      recovered_names: ["get_seed", "add_numbers"],
+    });
   });
 
   it("fails closed for non-streaming length completions with no visible content", async () => {
@@ -176,6 +219,38 @@ describe("CommandCode to OpenAI conversion", () => {
     expect(chunks.join("")).toContain('"name":"get_weather"');
     expect(chunks.join("")).toContain('"finish_reason":"tool_calls"');
     expect(chunks[chunks.length - 1]).toBe("data: [DONE]\n\n");
+  });
+
+  it("splits multiplexed tool frames smashed into one tool-call name (streaming)", async () => {
+    const chunks: string[] = [];
+    for await (const responseChunk of streamOpenAIChunks({
+      id: "chatcmpl_multiplexed",
+      created: 1778420000,
+      model: "stealth/ox-alpha",
+      events: multiplexedToolCallEvents(),
+    })) {
+      chunks.push(responseChunk);
+    }
+    const payloads = parseSsePayloads(chunks) as Array<{
+      choices: Array<{
+        delta: { tool_calls?: Array<{ index: number; id: string; function: { name: string } }> };
+        finish_reason: string | null;
+      }>;
+    }>;
+    const toolCalls = payloads.flatMap((payload) =>
+      payload.choices.flatMap((choice) => choice.delta.tool_calls ?? []),
+    );
+    expect(
+      toolCalls.map((toolCall) => ({
+        index: toolCall.index,
+        id: toolCall.id,
+        name: toolCall.function.name,
+      })),
+    ).toEqual([
+      { index: 0, id: "call_smashed", name: "get_seed" },
+      { index: 1, id: "call_smashed_part2", name: "add_numbers" },
+    ]);
+    expect(chunks.join("")).toContain('"finish_reason":"tool_calls"');
   });
 
   it("falls back to reasoning deltas as content for DeepSeek V4 Pro streaming when upstream emits no text deltas", async () => {

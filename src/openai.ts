@@ -15,6 +15,7 @@ export interface CollectOpenAICompletionOptions {
   events: AsyncIterable<CommandCodeEvent>;
   includeReasoning?: boolean;
   emptyVisibleResponsePolicy?: CommandCodeEmptyVisibleResponsePolicy;
+  log?: { warn(payload: Record<string, unknown>, message: string): void };
 }
 
 export class CommandCodeEventError extends Error {
@@ -203,11 +204,27 @@ function jsonStringFrom(value: unknown): string {
   return JSON.stringify(value ?? {});
 }
 
-function openAIToolCallFromCommandCodeEvent(
+const TOOL_FRAME_BOUNDARY = /<\/?tool_call>/i;
+const FRAME_TAG = /<[^>]+>/g;
+const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]+$/;
+
+function splitMultiplexedToolNames(name: string): string[] | undefined {
+  if (!TOOL_FRAME_BOUNDARY.test(name)) return undefined;
+  const parts = name
+    .split(FRAME_TAG)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length < 2) return undefined;
+  if (!parts.every((part) => TOOL_NAME_PATTERN.test(part))) return undefined;
+  return parts;
+}
+
+function openAIToolCallsFromCommandCodeEvent(
   event: CommandCodeEvent,
   index: number,
-): OpenAIToolCall | undefined {
-  if (!isToolCallEvent(event)) return undefined;
+  log?: { warn(payload: Record<string, unknown>, message: string): void },
+): OpenAIToolCall[] {
+  if (!isToolCallEvent(event)) return [];
   const record = event as Record<string, unknown>;
   const id =
     stringFrom(record.toolCallId) ??
@@ -220,14 +237,36 @@ function openAIToolCallFromCommandCodeEvent(
     stringFrom(record.name) ??
     "unknown_tool";
   const args = record.args ?? record.arguments ?? record.input ?? {};
-  return {
-    id,
-    type: "function",
-    function: {
-      name,
-      arguments: jsonStringFrom(args),
+  const multiplexed = splitMultiplexedToolNames(name);
+  if (!multiplexed) {
+    return [
+      {
+        id,
+        type: "function",
+        function: {
+          name,
+          arguments: jsonStringFrom(args),
+        },
+      },
+    ];
+  }
+  log?.warn(
+    {
+      code: "commandcode_multiplexed_tool_call",
+      tool_call_id: id,
+      smashed_name: name,
+      recovered_names: multiplexed,
     },
-  };
+    "upstream emitted multiplexed tool frames in one tool-call name; split into separate calls",
+  );
+  return multiplexed.map((partName, partIndex) => ({
+    id: partIndex === 0 ? id : `${id}_part${partIndex + 1}`,
+    type: "function" as const,
+    function: {
+      name: partName,
+      arguments: partIndex === multiplexed.length - 1 ? jsonStringFrom(args) : "{}",
+    },
+  }));
 }
 
 function toolCallDelta(toolCall: OpenAIToolCall, index: number): Record<string, unknown> {
@@ -330,8 +369,13 @@ export async function collectOpenAICompletion(
       content += event.text;
     } else if (isToolCallEvent(event)) {
       sawCompletionSignal = true;
-      const toolCall = openAIToolCallFromCommandCodeEvent(event, toolCalls.length);
-      if (toolCall) toolCalls.push(toolCall);
+      for (const toolCall of openAIToolCallsFromCommandCodeEvent(
+        event,
+        toolCalls.length,
+        options.log,
+      )) {
+        toolCalls.push(toolCall);
+      }
     } else if (isFinishEvent(event)) {
       sawCompletionSignal = true;
       finishReason = event.finishReason;
@@ -480,8 +524,11 @@ export async function* streamOpenAIChunks(
           );
           sentRole = true;
         }
-        const toolCall = openAIToolCallFromCommandCodeEvent(event, toolCallCount);
-        if (toolCall) {
+        for (const toolCall of openAIToolCallsFromCommandCodeEvent(
+          event,
+          toolCallCount,
+          options.log,
+        )) {
           yield sse(
             chunk(
               options.id,

@@ -9,17 +9,18 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
-  it("advertises CommandCode CLI 1.31.0 by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.31.0");
+  it("advertises CommandCode CLI 1.32.1 by default while allowing override", () => {
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.32.1");
     expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "1.14.0-test" } }).cliVersion).toBe(
       "1.14.0-test",
     );
   });
 
-  it("matches the exact CommandCode 1.31.0 canonical catalog and advertised prices", () => {
+  it("matches the exact CommandCode 1.32.1 canonical catalog and advertised prices", () => {
     const expectedPrices = new Map<string, [number, number]>([
       ["deepseek/deepseek-v4-pro", [0.66, 1.98]],
       ["deepseek/deepseek-v4-flash", [0.22, 0.66]],
+      ["deepseek/deepseek-v4-flash-vision-exp", [0.22, 0.66]],
       ["moonshotai/Kimi-K3", [3, 15]],
       ["moonshotai/Kimi-K2.7-Code", [0.95, 4]],
       ["moonshotai/Kimi-K2.7-Code-Highspeed", [1.9, 8]],
@@ -78,7 +79,7 @@ describe("configuration and model aliases", () => {
     ]);
     const catalog = loadBridgeConfig({ env: {} }).modelCatalog ?? [];
 
-    expect(catalog).toHaveLength(57);
+    expect(catalog).toHaveLength(58);
     expect(catalog.map((model) => model.id)).toEqual([...expectedPrices.keys()]);
     for (const model of catalog) {
       const match = model.notes?.match(/^\$(\d+(?:\.\d+)?)\/M in · \$(\d+(?:\.\d+)?)\/M out/);
@@ -87,10 +88,11 @@ describe("configuration and model aliases", () => {
     }
   });
 
-  it("matches the exact CommandCode 1.31.0 published context windows", () => {
+  it("matches the exact CommandCode 1.32.1 published context windows", () => {
     const expectedContextWindows = new Map<string, number | undefined>([
       ["deepseek/deepseek-v4-pro", 1_000_000],
       ["deepseek/deepseek-v4-flash", 1_000_000],
+      ["deepseek/deepseek-v4-flash-vision-exp", 1_000_000],
       ["moonshotai/Kimi-K3", 1_000_000],
       ["moonshotai/Kimi-K2.7-Code", 256_000],
       ["moonshotai/Kimi-K2.7-Code-Highspeed", 262_000],

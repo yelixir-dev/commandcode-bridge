@@ -433,4 +433,60 @@ describe("CommandCode client credential routing", () => {
     });
     expect(events).toContainEqual(expect.objectContaining({ type: "text-delta", text: "ok" }));
   });
+
+  it("releases the credential without cooldown when the caller aborts mid-stream", async () => {
+    let hanging = true;
+    let postStarted: () => void = () => undefined;
+    const postStartedPromise = new Promise<void>((resolve) => {
+      postStarted = resolve;
+    });
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      if (init?.method === "POST") {
+        if (!hanging) {
+          return new Response(
+            'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+            { status: 200 },
+          );
+        }
+        postStarted();
+        const callerSignal = init.signal;
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              callerSignal?.addEventListener(
+                "abort",
+                () => {
+                  controller.error(new DOMException("This operation was aborted", "AbortError"));
+                },
+                { once: true },
+              );
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`Unexpected fetch ${String(input)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new CommandCodeClient(baseConfig);
+    const abortController = new AbortController();
+    const iteration = collectEvents(client.generate(generateBody, abortController.signal));
+    await postStartedPromise;
+    abortController.abort();
+
+    await expect(iteration).rejects.toMatchObject({ name: "AbortError" });
+
+    const diagnostics = await client.getCredentialDiagnostics();
+    for (const diagnostic of diagnostics) {
+      expect(diagnostic.inFlight).toBe(0);
+      expect(diagnostic.disabledUntil).toBeNull();
+    }
+
+    hanging = false;
+    const events = await collectEvents(client.generate(generateBody));
+    expect(events).toContainEqual(expect.objectContaining({ type: "text-delta", text: "ok" }));
+  });
 });

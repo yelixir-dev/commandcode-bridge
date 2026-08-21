@@ -656,6 +656,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
 
   app.post("/v1/chat/completions", async (request, reply) => {
     let resolvedModel: ResolvedModel | undefined;
+    const abortController = new AbortController();
     try {
       const parsed = chatCompletionRequestSchema.parse(request.body);
       const openAIRequest = asOpenAIRequest(parsed);
@@ -668,7 +669,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
           (config.upstreamMode === "auto" && providerAccessAvailable));
       const id = `chatcmpl_${randomUUID().replace(/-/g, "")}`;
       const created = Math.floor(Date.now() / 1000);
-      const abortController = new AbortController();
       request.raw.on("aborted", () => abortController.abort());
       reply.raw.on("close", () => {
         if (!reply.raw.writableEnded) abortController.abort();
@@ -756,6 +756,15 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
           .send(
             openAIError(error.message, "upstream_error", "commandcode_no_available_credential"),
           );
+      }
+      if (abortController.signal.aborted && error instanceof Error && error.name === "AbortError") {
+        request.log.info(
+          { request_id: request.id, model: resolvedModel?.publicModel },
+          "chat completion aborted: client disconnected",
+        );
+        reply.hijack();
+        if (!reply.raw.writableEnded) reply.raw.end();
+        return reply;
       }
       if (
         error instanceof CommandCodeHttpError ||

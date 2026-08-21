@@ -158,6 +158,16 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     notes: "$0.22/M in · $0.66/M out (off-peak; peak $0.44/$1.32)",
   },
   {
+    id: "deepseek/deepseek-v4-flash-vision-exp",
+    label: "DeepSeek V4 Flash Vision (exp)",
+    provider: "DeepSeek",
+    family: "deepseek",
+    aliases: ["deepseek-v4-flash-vision-exp", "commandcode/deepseek-v4-flash-vision-exp"],
+    contextWindow: 1_000_000,
+    enabledByDefault: false,
+    notes: "$0.22/M in · $0.66/M out (off-peak; peak $0.44/$1.32)",
+  },
+  {
     id: "moonshotai/Kimi-K3",
     label: "Kimi K3",
     provider: "Moonshot",

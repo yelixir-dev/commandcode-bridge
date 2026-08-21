@@ -71,6 +71,7 @@ export async function collectOpenAICompletionWithEmptyVisibleRetry(options: {
         events: options.upstream.generate(options.body, options.signal),
         includeReasoning: options.includeReasoning,
         emptyVisibleResponsePolicy: options.emptyVisibleResponsePolicy,
+        log: options.log,
       });
     } catch (error) {
       if (!(error instanceof CommandCodeEmptyVisibleResponseError)) throw error;

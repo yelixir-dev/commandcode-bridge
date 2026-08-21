@@ -1,6 +1,6 @@
 {
   "name": "commandcode-bridge",
-  "version": "1.31.0.a",
+  "version": "1.32.1.a",
   "description": "OpenAI-compatible HTTP bridge for CommandCode's DeepSeek V4 Pro API path.",
   "type": "module",
   "license": "MIT",
