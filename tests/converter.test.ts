@@ -75,6 +75,27 @@ describe("OpenAI to CommandCode conversion", () => {
     expect(body.threadId).toBe("00000000-0000-4000-8000-000000000000");
   });
 
+  it("defaults max_tokens to the CLI wire value and forwards reasoning_effort", () => {
+    const minimal = buildCommandCodeGenerateBody({
+      request: { model: "deepseek/deepseek-v4-pro", messages: [{ role: "user", content: "hi" }] },
+      upstreamModel: "deepseek/deepseek-v4-pro",
+    });
+    expect(minimal.params.max_tokens).toBe(64_000);
+    expect(minimal.params).not.toHaveProperty("reasoning_effort");
+
+    const withEffort = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4-pro",
+        messages: [{ role: "user", content: "hi" }],
+        max_tokens: 128,
+        reasoning_effort: "high",
+      },
+      upstreamModel: "deepseek/deepseek-v4-pro",
+    });
+    expect(withEffort.params.max_tokens).toBe(128);
+    expect(withEffort.params.reasoning_effort).toBe("high");
+  });
+
   it("omits invalid thread IDs instead of forwarding them upstream", () => {
     const body = buildCommandCodeGenerateBody({
       request: { model: "deepseek/deepseek-v4-pro", messages: [{ role: "user", content: "hi" }] },

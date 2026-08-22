@@ -514,7 +514,7 @@ export class CommandCodeClient implements CommandCodeUpstream {
         "x-command-code-version": this.config.cliVersion,
         "x-project-slug": slugFromWorkingDir(body.config.workingDir),
         "x-taste-learning": "false",
-        "x-co-flag": "false",
+        ...(this.config.zdr ? { "x-cmd-zdr": "1" } : {}),
         ...(body.threadId ? { "x-session-id": body.threadId } : {}),
       },
       body: JSON.stringify(body),

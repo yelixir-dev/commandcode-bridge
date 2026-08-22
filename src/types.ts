@@ -49,6 +49,7 @@ export interface OpenAIChatCompletionRequest {
   messages: OpenAIChatMessage[];
   stream?: boolean;
   max_tokens?: number;
+  reasoning_effort?: string;
   temperature?: number;
   top_p?: number;
   stop?: string | string[];
@@ -116,6 +117,7 @@ export interface CommandCodeGenerateBody {
     tools: CommandCodeTool[];
     system: string;
     max_tokens?: number;
+    reasoning_effort?: string;
     temperature?: number;
     top_p?: number;
     stop?: string | string[];

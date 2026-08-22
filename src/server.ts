@@ -87,6 +87,7 @@ const chatCompletionRequestSchema = z.object({
   messages: z.array(messageSchema).min(1),
   stream: z.boolean().optional(),
   max_tokens: z.number().int().positive().optional(),
+  reasoning_effort: z.enum(["minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
   stop: z.union([z.string(), z.array(z.string())]).optional(),

@@ -189,9 +189,11 @@ export function buildCommandCodeGenerateBody(
     messages: convertMessages(options.request.messages),
     tools: convertOpenAITools(options.request.tools, options.request.tool_choice),
     system: buildSystemPrompt(options.request),
+    max_tokens: options.request.max_tokens ?? 64_000,
     stream: true,
   };
-  if (options.request.max_tokens !== undefined) params.max_tokens = options.request.max_tokens;
+  if (options.request.reasoning_effort !== undefined)
+    params.reasoning_effort = options.request.reasoning_effort;
   if (options.request.temperature !== undefined) params.temperature = options.request.temperature;
   if (options.request.top_p !== undefined) params.top_p = options.request.top_p;
   if (options.request.stop !== undefined) params.stop = options.request.stop;
