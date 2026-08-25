@@ -112,15 +112,22 @@
 - Released bridge version `1.32.1.b`.
 - CLI 1.32.1 bundle drift audit (one-shot field-level diff of `/alpha/generate`): the bridge now defaults `max_tokens` to the CLI wire value `64000` when the client omits it, forwards OpenAI `reasoning_effort` into Alpha params, drops the vestigial `x-co-flag` header the CLI no longer sends, and sends `x-cmd-zdr: 1` when `COMMANDCODE_ZDR` is on (matching the CLI's `buildCommandAuthHeaders`). Verified parity: body envelope (`config`/`memory`/`taste`/`skills`/`permissionMode`/`threadId`), `toWireMessages`/`toWireTools` shapes, and the remaining header set.
 
-## Current status — 2026-08-21
+## 2026-08-25
+
+- Updated the locally installed CommandCode CLI from `1.32.1` to `1.32.2`.
+- Audited the npm package diff and installed bundle. The release fixes the BYOK model picker and malformed tool-result session recovery; the Alpha endpoint constants and adjacent wire contract remain unchanged, so no bridge protocol change was required.
+- Confirmed the static catalog remains at 58 models. CommandCode's reference table only corrected the unexposed cache-read price for `deepseek/deepseek-v4-flash-vision-exp` from `$0.01` to `$0.007`.
+- Released bridge version `1.32.2.a`, updated the default advertised CLI version, and aligned all English, Korean, and Chinese README version references.
+
+## Current status — 2026-08-25
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.32.1.b`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.32.2.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
 - Model surface: 58 statically aligned models with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
 - Deployment surface: Docker/Compose, Linux install/uninstall scripts, nginx and systemd release assets, and GitHub/GitLab CI definitions.
 - Verification: `npm run typecheck`, `npm run lint`, all 216 Vitest tests in 15 files, and `npm run build` pass on this workstation.
 - Known local exception: `npm run format:check` fails only because the untracked workspace instruction file `AGENTS.md` is not Prettier-formatted. It is not part of the tracked product tree and was left untouched.
-- Live upstream smoke was not repeated because it requires a running bridge and an upstream CommandCode account; the last recorded live bridge/tool-loop smoke remains the 2026-05-16 entry.
+- Local HTTP QA verified `/health` reports `1.32.2.a`, `/v1/models` returns the configured model list, and an empty chat request returns the expected structured `400 invalid_request`.
 - Session recovery note: the current Senpi transcript exists at the path in `PI_SESSION_FILE`. Cross-platform local session search found no recoverable project implementation transcript covering the missing period, so the entries above were reconstructed from Git history and verified against the current source and test suite.

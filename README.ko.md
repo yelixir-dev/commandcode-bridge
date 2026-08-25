@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.32.1.b-b57920?style=flat-square" alt="Version 1.32.1.b"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.32.2.a-b57920?style=flat-square" alt="Version 1.32.2.a"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-58-1f6f78?style=flat-square" alt="58 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -20,7 +20,7 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이트웨이입니다. 표준 OpenAI-compatible 모델·채팅 endpoint를 제공하고 eligible upstream credential 사이에서 요청을 라우팅하며, CommandCode **1.32.1**에 맞춘 정확한 **58-model** catalog를 게시합니다. Bridge 버전은 항상 현재 CommandCode CLI 버전을 따라가며 그 뒤에 문자 접미사를 붙입니다(예: **1.32.1.b**). 접미사는 bridge 전용 release를 뜻합니다.
+CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이트웨이입니다. 표준 OpenAI-compatible 모델·채팅 endpoint를 제공하고 eligible upstream credential 사이에서 요청을 라우팅하며, CommandCode **1.32.2**에 맞춘 정확한 **58-model** catalog를 게시합니다. Bridge 버전은 항상 현재 CommandCode CLI 버전을 따라가며 그 뒤에 문자 접미사를 붙입니다(예: **1.32.2.a**). 접미사는 bridge 전용 release를 뜻합니다.
 
 [기능](#기능) · [설치](#설치) · [사용법](#사용법) · [동작 방식](#동작-방식) · [저장소 구성](#저장소-구성) · [현재 제한](#현재-제한) · [라이선스](#라이선스)
 
@@ -48,7 +48,7 @@ CommandCode Bridge는 CommandCode 계정을 위한 신뢰 환경용 HTTP 게이�
 
 ### Linux rootless installer
 
-installer는 Linux user systemd용이며 CommandCode CLI 1.32.1 때문에 Node.js 22+를 요구합니다. 가능한 경우 CLI auth를 가져오고 private state는 `~/.config/commandcode-bridge`, 설치본은 `~/.local/share/commandcode-bridge`에 두며 안전한 기본값은 `127.0.0.1:9992`입니다. `0.0.0.0`은 `BRIDGE_API_KEY`를 켠 신뢰 LAN/VPN/tailnet/firewall/reverse proxy 뒤에서만 사용하십시오. 로그인 전 시작에는 `sudo loginctl enable-linger "$USER"`, 제거에는 `./uninstall.sh` 또는 `./uninstall.sh --purge-config`를 사용합니다.
+installer는 Linux user systemd용이며 CommandCode CLI 1.32.2 때문에 Node.js 22+를 요구합니다. 가능한 경우 CLI auth를 가져오고 private state는 `~/.config/commandcode-bridge`, 설치본은 `~/.local/share/commandcode-bridge`에 두며 안전한 기본값은 `127.0.0.1:9992`입니다. `0.0.0.0`은 `BRIDGE_API_KEY`를 켠 신뢰 LAN/VPN/tailnet/firewall/reverse proxy 뒤에서만 사용하십시오. 로그인 전 시작에는 `sudo loginctl enable-linger "$USER"`, 제거에는 `./uninstall.sh` 또는 `./uninstall.sh --purge-config`를 사용합니다.
 
 ```bash
 ./install.sh
@@ -125,7 +125,7 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Model metadata와 정확한 catalog
 
-각 model object는 `id`, `object`, `created`, provider 기반 `owned_by`를 포함합니다. 알려진 context는 `context_window`, `context_length`, `max_context_length`에 동일하게 나옵니다. Provider API를 쓸 수 있을 때는 시작 시 live `GET /provider/v1/models`로 catalog를 갱신해 새로 추가된 model도 반영합니다. 아래 표는 배포되는 1.32.1 baseline이며 “기본 활성화”는 built-in enabled state입니다.
+각 model object는 `id`, `object`, `created`, provider 기반 `owned_by`를 포함합니다. 알려진 context는 `context_window`, `context_length`, `max_context_length`에 동일하게 나옵니다. Provider API를 쓸 수 있을 때는 시작 시 live `GET /provider/v1/models`로 catalog를 갱신해 새로 추가된 model도 반영합니다. 아래 표는 배포되는 1.32.2 baseline이며 “기본 활성화”는 built-in enabled state입니다.
 
 | Provider          | Canonical model ID                      |   Context | 기본 활성화 |
 | ----------------- | --------------------------------------- | --------: | :---------: |

@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.32.1.b-b57920?style=flat-square" alt="Version 1.32.1.b"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.32.2.a-b57920?style=flat-square" alt="Version 1.32.2.a"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-58-1f6f78?style=flat-square" alt="58 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -20,7 +20,7 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge 是面向 CommandCode 账号的可信环境 HTTP 网关。它提供标准 OpenAI-compatible 模型与聊天端点，在符合条件的上游凭据之间路由请求，并发布与 CommandCode **1.32.1** 对齐的准确 **58-model** catalog。Bridge 版本始终跟随当前 CommandCode CLI 版本并在其后附加字母后缀（例如 **1.32.1.b**）；后缀表示仅限 Bridge 的发布。
+CommandCode Bridge 是面向 CommandCode 账号的可信环境 HTTP 网关。它提供标准 OpenAI-compatible 模型与聊天端点，在符合条件的上游凭据之间路由请求，并发布与 CommandCode **1.32.2** 对齐的准确 **58-model** catalog。Bridge 版本始终跟随当前 CommandCode CLI 版本并在其后附加字母后缀（例如 **1.32.2.a**）；后缀表示仅限 Bridge 的发布。
 
 [功能](#功能) · [安装](#安装) · [用法](#用法) · [工作原理](#工作原理) · [仓库布局](#仓库布局) · [当前限制](#当前限制) · [许可证](#许可证)
 
@@ -48,7 +48,7 @@ CommandCode Bridge 是面向 CommandCode 账号的可信环境 HTTP 网关。它
 
 ### Linux rootless installer
 
-installer 面向 Linux user systemd；由于 CommandCode CLI 1.32.1，需要 Node.js 22+。它会在可用时导入 CLI auth，把 private state 写入 `~/.config/commandcode-bridge`，安装到 `~/.local/share/commandcode-bridge`，安全默认值为 `127.0.0.1:9992`。只有在启用 `BRIDGE_API_KEY` 的可信 LAN/VPN/tailnet/firewall/reverse proxy 后才使用 `0.0.0.0`。登录前启动使用 `sudo loginctl enable-linger "$USER"`；卸载使用 `./uninstall.sh` 或 `./uninstall.sh --purge-config`。
+installer 面向 Linux user systemd；由于 CommandCode CLI 1.32.2，需要 Node.js 22+。它会在可用时导入 CLI auth，把 private state 写入 `~/.config/commandcode-bridge`，安装到 `~/.local/share/commandcode-bridge`，安全默认值为 `127.0.0.1:9992`。只有在启用 `BRIDGE_API_KEY` 的可信 LAN/VPN/tailnet/firewall/reverse proxy 后才使用 `0.0.0.0`。登录前启动使用 `sudo loginctl enable-linger "$USER"`；卸载使用 `./uninstall.sh` 或 `./uninstall.sh --purge-config`。
 
 ```bash
 ./install.sh
@@ -125,7 +125,7 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Model metadata 与准确 catalog
 
-每个 model object 包含 `id`、`object`、`created` 和 provider-derived `owned_by`。已知 context 同时写入 `context_window`、`context_length`、`max_context_length`。在 Provider API 可用时，启动时从 live `GET /provider/v1/models` 刷新 catalog，并纳入新添加的模型。下表是随附的 1.32.1 baseline；“默认启用”表示 built-in enabled state。
+每个 model object 包含 `id`、`object`、`created` 和 provider-derived `owned_by`。已知 context 同时写入 `context_window`、`context_length`、`max_context_length`。在 Provider API 可用时，启动时从 live `GET /provider/v1/models` 刷新 catalog，并纳入新添加的模型。下表是随附的 1.32.2 baseline；“默认启用”表示 built-in enabled state。
 
 | Provider          | Canonical model ID                      |   Context | 默认启用 |
 | ----------------- | --------------------------------------- | --------: | :------: |
