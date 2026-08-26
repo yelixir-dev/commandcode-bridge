@@ -119,15 +119,22 @@
 - Confirmed the static catalog remains at 58 models. CommandCode's reference table only corrected the unexposed cache-read price for `deepseek/deepseek-v4-flash-vision-exp` from `$0.01` to `$0.007`.
 - Released bridge version `1.32.2.a`, updated the default advertised CLI version, and aligned all English, Korean, and Chinese README version references.
 
-## Current status — 2026-08-25
+## 2026-08-26
+
+- Updated the locally installed CommandCode CLI from `1.32.2` to `1.36.0` and audited the complete npm package diff across releases 1.33.0 through 1.36.0.
+- Added `z-ai/glm-5.3-flash`, `minimax/minimax-m3-free`, `minimax/minimax-m2.7-free`, and `Qwen/Qwen3.8-Flash`; retired `stealth/ox-alpha`. The static catalog now contains 61 models.
+- Compared the Alpha request function around `/alpha/generate`: request envelope, headers, message/tool conversion, reasoning effort, 64K default output limit, and stream contract remain semantically unchanged. Existing generic multiplexed tool-call handling covers GLM-5.3 Flash without a model-specific parser.
+- Released bridge version `1.36.0.a`, updated the default advertised CLI version, and aligned all English, Korean, and Chinese README version references and model tables.
+
+## Current status — 2026-08-26
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.32.2.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.36.0.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
-- Model surface: 58 statically aligned models with live Provider API refresh when available.
+- Model surface: 61 statically aligned models with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
 - Deployment surface: Docker/Compose, Linux install/uninstall scripts, nginx and systemd release assets, and GitHub/GitLab CI definitions.
 - Verification: `npm run typecheck`, `npm run lint`, all 216 Vitest tests in 15 files, and `npm run build` pass on this workstation.
 - Known local exception: `npm run format:check` fails only because the untracked workspace instruction file `AGENTS.md` is not Prettier-formatted. It is not part of the tracked product tree and was left untouched.
-- Local HTTP QA verified `/health` reports `1.32.2.a`, `/v1/models` returns the configured model list, and an empty chat request returns the expected structured `400 invalid_request`.
+- Local HTTP QA verifies `/health` reports the current bridge release, `/v1/models` returns the configured model list, and an empty chat request returns the expected structured `400 invalid_request`.
 - Session recovery note: the current Senpi transcript exists at the path in `PI_SESSION_FILE`. Cross-platform local session search found no recoverable project implementation transcript covering the missing period, so the entries above were reconstructed from Git history and verified against the current source and test suite.

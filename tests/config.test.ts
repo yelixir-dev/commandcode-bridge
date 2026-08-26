@@ -9,14 +9,14 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
-  it("advertises CommandCode CLI 1.32.2 by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.32.2");
+  it("advertises CommandCode CLI 1.36.0 by default while allowing override", () => {
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.36.0");
     expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "1.14.0-test" } }).cliVersion).toBe(
       "1.14.0-test",
     );
   });
 
-  it("matches the exact CommandCode 1.32.2 canonical catalog and advertised prices", () => {
+  it("matches the exact CommandCode 1.36.0 canonical catalog and advertised prices", () => {
     const expectedPrices = new Map<string, [number, number]>([
       ["deepseek/deepseek-v4-pro", [0.66, 1.98]],
       ["deepseek/deepseek-v4-flash", [0.22, 0.66]],
@@ -26,6 +26,7 @@ describe("configuration and model aliases", () => {
       ["moonshotai/Kimi-K2.7-Code-Highspeed", [1.9, 8]],
       ["moonshotai/Kimi-K2.6", [0.95, 4]],
       ["moonshotai/Kimi-K2.5", [0.6, 3]],
+      ["z-ai/glm-5.3-flash", [0.15, 0.5]],
       ["zai-org/GLM-5.3", [1.4, 4.4]],
       ["zai-org/GLM-5.2", [1.4, 4.4]],
       ["zai-org/GLM-5.2-Fast", [3, 10.25]],
@@ -33,11 +34,14 @@ describe("configuration and model aliases", () => {
       ["zai-org/GLM-5", [1, 3.2]],
       ["MiniMaxAI/MiniMax-M3", [0.3, 1.2]],
       ["MiniMaxAI/MiniMax-M2.7", [0.3, 1.2]],
+      ["minimax/minimax-m3-free", [0, 0]],
+      ["minimax/minimax-m2.7-free", [0, 0]],
       ["MiniMaxAI/MiniMax-M2.5", [0.3, 1.2]],
       ["xiaomi/mimo-v2.5-pro", [0.435, 0.87]],
       ["xiaomi/mimo-v2.5", [0.14, 0.28]],
       ["Qwen/Qwen3.8-Max", [2, 6]],
       ["Qwen/Qwen3.8-27B", [0.4, 3]],
+      ["Qwen/Qwen3.8-Flash", [0.16, 0.47]],
       ["Qwen/Qwen3.7-Max", [2.5, 7.5]],
       ["Qwen/Qwen3.7-Plus", [0.4, 1.6]],
       ["Qwen/Qwen3.7-Flash", [0.03, 0.13]],
@@ -50,7 +54,6 @@ describe("configuration and model aliases", () => {
       ["thinkingmachines/inkling", [1, 4.05]],
       ["thinkingmachines/inkling-small", [0.5, 1.2]],
       ["poolside/laguna-s-2.1-free", [0, 0]],
-      ["stealth/ox-alpha", [0, 0]],
       ["claude-sonnet-5", [2, 10]],
       ["claude-sonnet-4-6", [3, 15]],
       ["claude-fable-5", [10, 50]],
@@ -79,7 +82,7 @@ describe("configuration and model aliases", () => {
     ]);
     const catalog = loadBridgeConfig({ env: {} }).modelCatalog ?? [];
 
-    expect(catalog).toHaveLength(58);
+    expect(catalog).toHaveLength(61);
     expect(catalog.map((model) => model.id)).toEqual([...expectedPrices.keys()]);
     for (const model of catalog) {
       const match = model.notes?.match(/^\$(\d+(?:\.\d+)?)\/M in · \$(\d+(?:\.\d+)?)\/M out/);
@@ -88,7 +91,7 @@ describe("configuration and model aliases", () => {
     }
   });
 
-  it("matches the exact CommandCode 1.32.2 published context windows", () => {
+  it("matches the exact CommandCode 1.36.0 published context windows", () => {
     const expectedContextWindows = new Map<string, number | undefined>([
       ["deepseek/deepseek-v4-pro", 1_000_000],
       ["deepseek/deepseek-v4-flash", 1_000_000],
@@ -98,6 +101,7 @@ describe("configuration and model aliases", () => {
       ["moonshotai/Kimi-K2.7-Code-Highspeed", 262_000],
       ["moonshotai/Kimi-K2.6", 256_000],
       ["moonshotai/Kimi-K2.5", 256_000],
+      ["z-ai/glm-5.3-flash", 1_048_576],
       ["zai-org/GLM-5.3", 1_000_000],
       ["zai-org/GLM-5.2", 1_000_000],
       ["zai-org/GLM-5.2-Fast", 1_000_000],
@@ -105,11 +109,14 @@ describe("configuration and model aliases", () => {
       ["zai-org/GLM-5", 200_000],
       ["MiniMaxAI/MiniMax-M3", 1_000_000],
       ["MiniMaxAI/MiniMax-M2.7", 200_000],
+      ["minimax/minimax-m3-free", 1_000_000],
+      ["minimax/minimax-m2.7-free", 197_000],
       ["MiniMaxAI/MiniMax-M2.5", 200_000],
       ["xiaomi/mimo-v2.5-pro", 1_000_000],
       ["xiaomi/mimo-v2.5", 1_000_000],
       ["Qwen/Qwen3.8-Max", 1_000_000],
       ["Qwen/Qwen3.8-27B", 262_144],
+      ["Qwen/Qwen3.8-Flash", 1_000_000],
       ["Qwen/Qwen3.7-Max", 1_000_000],
       ["Qwen/Qwen3.7-Plus", 1_000_000],
       ["Qwen/Qwen3.7-Flash", 1_000_000],
@@ -122,7 +129,6 @@ describe("configuration and model aliases", () => {
       ["thinkingmachines/inkling", 256_000],
       ["thinkingmachines/inkling-small", 1_000_000],
       ["poolside/laguna-s-2.1-free", 256_000],
-      ["stealth/ox-alpha", 1_048_576],
       ["claude-sonnet-5", 1_000_000],
       ["claude-sonnet-4-6", 1_000_000],
       ["claude-fable-5", 1_000_000],
@@ -325,6 +331,9 @@ describe("configuration and model aliases", () => {
   it("retires removed 1.3.1 built-ins instead of forwarding them as custom models", () => {
     const retiredIds = [
       "MiniMaxAI/MiniMax-M3-Free",
+      "stealth/ox-alpha",
+      "ox-alpha",
+      "Ox-Alpha",
       "anthropic/claude-opus-4.6",
       "anthropic/claude-opus-4-5-20251101",
       "anthropic/claude-sonnet-4-5-20250929",
