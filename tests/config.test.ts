@@ -9,14 +9,14 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
-  it("advertises CommandCode CLI 1.36.0 by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.36.0");
+  it("advertises CommandCode CLI 1.38.2 by default while allowing override", () => {
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.38.2");
     expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "1.14.0-test" } }).cliVersion).toBe(
       "1.14.0-test",
     );
   });
 
-  it("matches the exact CommandCode 1.36.0 canonical catalog and advertised prices", () => {
+  it("matches the exact CommandCode 1.38.2 canonical catalog and advertised prices", () => {
     const expectedPrices = new Map<string, [number, number]>([
       ["deepseek/deepseek-v4-pro", [0.66, 1.98]],
       ["deepseek/deepseek-v4-flash", [0.22, 0.66]],
@@ -50,6 +50,7 @@ describe("configuration and model aliases", () => {
       ["stepfun/Step-3.7-Flash", [0.2, 1.15]],
       ["stepfun/Step-3.5-Flash", [0.1, 0.3]],
       ["tencent/hy3-paid", [0.14, 0.58]],
+      ["tencent/hy4-preview", [0.834, 2.501]],
       ["nvidia/nemotron-3-ultra-550b-a55b", [0.6, 2.4]],
       ["thinkingmachines/inkling", [1, 4.05]],
       ["thinkingmachines/inkling-small", [0.5, 1.2]],
@@ -68,7 +69,7 @@ describe("configuration and model aliases", () => {
       ["gpt-5.4", [2.5, 15]],
       ["gpt-5.3-codex", [2, 8]],
       ["gpt-5.4-mini", [0.75, 4.5]],
-      ["google/gemini-3.7-flash", [0.75, 3.75]],
+      ["google/gemini-3.7-flash", [1.5, 7.5]],
       ["google/gemini-3.6-flash", [1.5, 7.5]],
       ["google/gemini-3.5-flash", [1.5, 9]],
       ["google/gemini-3.5-flash-lite", [0.3, 2.5]],
@@ -82,7 +83,7 @@ describe("configuration and model aliases", () => {
     ]);
     const catalog = loadBridgeConfig({ env: {} }).modelCatalog ?? [];
 
-    expect(catalog).toHaveLength(61);
+    expect(catalog).toHaveLength(62);
     expect(catalog.map((model) => model.id)).toEqual([...expectedPrices.keys()]);
     for (const model of catalog) {
       const match = model.notes?.match(/^\$(\d+(?:\.\d+)?)\/M in · \$(\d+(?:\.\d+)?)\/M out/);
@@ -91,7 +92,7 @@ describe("configuration and model aliases", () => {
     }
   });
 
-  it("matches the exact CommandCode 1.36.0 published context windows", () => {
+  it("matches the exact CommandCode 1.38.2 published context windows", () => {
     const expectedContextWindows = new Map<string, number | undefined>([
       ["deepseek/deepseek-v4-pro", 1_000_000],
       ["deepseek/deepseek-v4-flash", 1_000_000],
@@ -125,6 +126,7 @@ describe("configuration and model aliases", () => {
       ["stepfun/Step-3.7-Flash", 256_000],
       ["stepfun/Step-3.5-Flash", 1_000_000],
       ["tencent/hy3-paid", 262_144],
+      ["tencent/hy4-preview", 1_048_576],
       ["nvidia/nemotron-3-ultra-550b-a55b", 1_000_000],
       ["thinkingmachines/inkling", 256_000],
       ["thinkingmachines/inkling-small", 1_000_000],

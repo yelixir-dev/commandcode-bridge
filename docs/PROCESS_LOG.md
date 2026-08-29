@@ -126,12 +126,19 @@
 - Compared the Alpha request function around `/alpha/generate`: request envelope, headers, message/tool conversion, reasoning effort, 64K default output limit, and stream contract remain semantically unchanged. Existing generic multiplexed tool-call handling covers GLM-5.3 Flash without a model-specific parser.
 - Released bridge version `1.36.0.a`, updated the default advertised CLI version, and aligned all English, Korean, and Chinese README version references and model tables.
 
-## Current status — 2026-08-26
+## 2026-08-29
+
+- Updated the locally installed CommandCode CLI from `1.36.0` to `1.38.2` and audited npm releases 1.37.0 through 1.38.2.
+- Added `tencent/hy4-preview` with a 1,048,576-token context window and published `$0.834/M` input, `$2.501/M` output pricing. Updated Gemini 3.7 Flash to the corrected `$1.5/M` input and `$7.5/M` output pricing. The static catalog now contains 62 models.
+- Audited the Alpha request and stream implementation for reasoning effort and tool-call changes. Custom-agent reasoning effort and Tencent tool-efficiency improvements are CLI-local; the bridge already forwards `reasoning_effort` and emits canonical tool messages, so no protocol parser change was required.
+- Released bridge version `1.38.2.a`, updated the default advertised CLI version, and aligned English, Korean, and Chinese README version references and model tables.
+
+## Current status — 2026-08-29
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.36.0.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.38.2.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
-- Model surface: 61 statically aligned models with live Provider API refresh when available.
+- Model surface: 62 statically aligned models with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
 - Deployment surface: Docker/Compose, Linux install/uninstall scripts, nginx and systemd release assets, and GitHub/GitLab CI definitions.
 - Verification: `npm run typecheck`, `npm run lint`, all 216 Vitest tests in 15 files, and `npm run build` pass on this workstation.

@@ -459,6 +459,16 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     notes: "$0.14/M in · $0.58/M out",
   },
   {
+    id: "tencent/hy4-preview",
+    label: "Tencent Hy4 Preview",
+    provider: "Tencent",
+    family: "hy4",
+    aliases: ["hy4-preview", "HY4-Preview"],
+    contextWindow: 1_048_576,
+    enabledByDefault: false,
+    notes: "$0.834/M in · $2.501/M out",
+  },
+  {
     id: "nvidia/nemotron-3-ultra-550b-a55b",
     label: "Nemotron 3 Ultra",
     provider: "NVIDIA",
@@ -654,7 +664,7 @@ export const COMMANDCODE_MODEL_DEFINITIONS: CommandCodeModelDefinition[] = [
     aliases: ["gemini-3.7-flash", "Gemini-3.7-Flash"],
     contextWindow: 1_048_576,
     enabledByDefault: false,
-    notes: "$0.75/M in · $3.75/M out",
+    notes: "$1.5/M in · $7.5/M out",
   },
   {
     id: "google/gemini-3.6-flash",
