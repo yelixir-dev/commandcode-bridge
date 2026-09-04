@@ -9,18 +9,19 @@ describe("configuration and model aliases", () => {
     expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
   });
 
-  it("advertises CommandCode CLI 1.38.2 by default while allowing override", () => {
-    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.38.2");
+  it("advertises CommandCode CLI 1.49.0 by default while allowing override", () => {
+    expect(loadBridgeConfig({ env: {} }).cliVersion).toBe("1.49.0");
     expect(loadBridgeConfig({ env: { COMMANDCODE_CLI_VERSION: "1.14.0-test" } }).cliVersion).toBe(
       "1.14.0-test",
     );
   });
 
-  it("matches the exact CommandCode 1.38.2 canonical catalog and advertised prices", () => {
+  it("matches the exact CommandCode 1.49.0 canonical catalog and advertised prices", () => {
     const expectedPrices = new Map<string, [number, number]>([
       ["deepseek/deepseek-v4-pro", [0.66, 1.98]],
       ["deepseek/deepseek-v4-flash", [0.22, 0.66]],
       ["deepseek/deepseek-v4-flash-vision-exp", [0.22, 0.66]],
+      ["deepseek/deepseek-v4-flash-fast", [0.28, 0.56]],
       ["moonshotai/Kimi-K3", [3, 15]],
       ["moonshotai/Kimi-K2.7-Code", [0.95, 4]],
       ["moonshotai/Kimi-K2.7-Code-Highspeed", [1.9, 8]],
@@ -34,11 +35,10 @@ describe("configuration and model aliases", () => {
       ["zai-org/GLM-5", [1, 3.2]],
       ["MiniMaxAI/MiniMax-M3", [0.3, 1.2]],
       ["MiniMaxAI/MiniMax-M2.7", [0.3, 1.2]],
-      ["minimax/minimax-m3-free", [0, 0]],
-      ["minimax/minimax-m2.7-free", [0, 0]],
       ["MiniMaxAI/MiniMax-M2.5", [0.3, 1.2]],
       ["xiaomi/mimo-v2.5-pro", [0.435, 0.87]],
       ["xiaomi/mimo-v2.5", [0.14, 0.28]],
+      ["Qwen/Qwen3.8-Max-0902", [2, 6]],
       ["Qwen/Qwen3.8-Max", [2, 6]],
       ["Qwen/Qwen3.8-27B", [0.4, 3]],
       ["Qwen/Qwen3.8-Flash", [0.16, 0.47]],
@@ -47,6 +47,7 @@ describe("configuration and model aliases", () => {
       ["Qwen/Qwen3.7-Flash", [0.03, 0.13]],
       ["Qwen/Qwen3.6-Max-Preview", [1.3, 7.8]],
       ["Qwen/Qwen3.6-Plus", [0.5, 3]],
+      ["meituan/LongCat-2.0:free", [0, 0]],
       ["stepfun/Step-3.7-Flash", [0.2, 1.15]],
       ["stepfun/Step-3.5-Flash", [0.1, 0.3]],
       ["tencent/hy3-paid", [0.14, 0.58]],
@@ -57,11 +58,13 @@ describe("configuration and model aliases", () => {
       ["poolside/laguna-s-2.1-free", [0, 0]],
       ["claude-sonnet-5", [2, 10]],
       ["claude-sonnet-4-6", [3, 15]],
+      ["claude-fable-5-1", [10, 50]],
       ["claude-fable-5", [10, 50]],
       ["claude-opus-5", [5, 25]],
       ["claude-opus-4-8", [5, 25]],
       ["claude-opus-4-7", [5, 25]],
       ["claude-haiku-4-5-20251001", [1, 5]],
+      ["gpt-6-astra", [10, 50]],
       ["gpt-5.6-sol", [5, 30]],
       ["gpt-5.6-terra", [2, 12]],
       ["gpt-5.6-luna", [0.2, 1.2]],
@@ -69,6 +72,7 @@ describe("configuration and model aliases", () => {
       ["gpt-5.4", [2.5, 15]],
       ["gpt-5.3-codex", [2, 8]],
       ["gpt-5.4-mini", [0.75, 4.5]],
+      ["google/gemini-3.8-flash", [1.5, 7.5]],
       ["google/gemini-3.7-flash", [1.5, 7.5]],
       ["google/gemini-3.6-flash", [1.5, 7.5]],
       ["google/gemini-3.5-flash", [1.5, 9]],
@@ -78,12 +82,14 @@ describe("configuration and model aliases", () => {
       ["meta/muse-spark-1.1", [1.25, 4.25]],
       ["meta/muse-spark-1.2", [1.25, 4.25]],
       ["meta/muse-spark-1.2-contributor", [0.1, 0.2]],
+      ["meta/muse-spark-1.3", [1.25, 4.25]],
+      ["meta/muse-spark-1.3-contributor", [0.1, 0.2]],
       ["xai/grok-4.5", [2, 6]],
       ["xai/grok-4.6", [2, 6]],
     ]);
     const catalog = loadBridgeConfig({ env: {} }).modelCatalog ?? [];
 
-    expect(catalog).toHaveLength(62);
+    expect(catalog).toHaveLength(68);
     expect(catalog.map((model) => model.id)).toEqual([...expectedPrices.keys()]);
     for (const model of catalog) {
       const match = model.notes?.match(/^\$(\d+(?:\.\d+)?)\/M in · \$(\d+(?:\.\d+)?)\/M out/);
@@ -92,11 +98,12 @@ describe("configuration and model aliases", () => {
     }
   });
 
-  it("matches the exact CommandCode 1.38.2 published context windows", () => {
+  it("matches the exact CommandCode 1.49.0 published context windows", () => {
     const expectedContextWindows = new Map<string, number | undefined>([
       ["deepseek/deepseek-v4-pro", 1_000_000],
       ["deepseek/deepseek-v4-flash", 1_000_000],
       ["deepseek/deepseek-v4-flash-vision-exp", 1_000_000],
+      ["deepseek/deepseek-v4-flash-fast", 1_000_000],
       ["moonshotai/Kimi-K3", 1_000_000],
       ["moonshotai/Kimi-K2.7-Code", 256_000],
       ["moonshotai/Kimi-K2.7-Code-Highspeed", 262_000],
@@ -110,11 +117,10 @@ describe("configuration and model aliases", () => {
       ["zai-org/GLM-5", 200_000],
       ["MiniMaxAI/MiniMax-M3", 1_000_000],
       ["MiniMaxAI/MiniMax-M2.7", 200_000],
-      ["minimax/minimax-m3-free", 1_000_000],
-      ["minimax/minimax-m2.7-free", 197_000],
       ["MiniMaxAI/MiniMax-M2.5", 200_000],
       ["xiaomi/mimo-v2.5-pro", 1_000_000],
       ["xiaomi/mimo-v2.5", 1_000_000],
+      ["Qwen/Qwen3.8-Max-0902", 1_000_000],
       ["Qwen/Qwen3.8-Max", 1_000_000],
       ["Qwen/Qwen3.8-27B", 262_144],
       ["Qwen/Qwen3.8-Flash", 1_000_000],
@@ -123,6 +129,7 @@ describe("configuration and model aliases", () => {
       ["Qwen/Qwen3.7-Flash", 1_000_000],
       ["Qwen/Qwen3.6-Max-Preview", 200_000],
       ["Qwen/Qwen3.6-Plus", 200_000],
+      ["meituan/LongCat-2.0:free", 1_048_576],
       ["stepfun/Step-3.7-Flash", 256_000],
       ["stepfun/Step-3.5-Flash", 1_000_000],
       ["tencent/hy3-paid", 262_144],
@@ -133,11 +140,13 @@ describe("configuration and model aliases", () => {
       ["poolside/laguna-s-2.1-free", 256_000],
       ["claude-sonnet-5", 1_000_000],
       ["claude-sonnet-4-6", 1_000_000],
+      ["claude-fable-5-1", 1_000_000],
       ["claude-fable-5", 1_000_000],
       ["claude-opus-5", 1_000_000],
       ["claude-opus-4-8", 1_000_000],
       ["claude-opus-4-7", 1_000_000],
       ["claude-haiku-4-5-20251001", 200_000],
+      ["gpt-6-astra", 1_050_000],
       ["gpt-5.6-sol", 1_050_000],
       ["gpt-5.6-terra", 1_050_000],
       ["gpt-5.6-luna", 1_050_000],
@@ -145,6 +154,7 @@ describe("configuration and model aliases", () => {
       ["gpt-5.4", 400_000],
       ["gpt-5.3-codex", 400_000],
       ["gpt-5.4-mini", 400_000],
+      ["google/gemini-3.8-flash", 1_000_000],
       ["google/gemini-3.7-flash", 1_048_576],
       ["google/gemini-3.6-flash", 1_000_000],
       ["google/gemini-3.5-flash", 1_000_000],
@@ -154,6 +164,8 @@ describe("configuration and model aliases", () => {
       ["meta/muse-spark-1.1", 1_048_576],
       ["meta/muse-spark-1.2", 1_048_576],
       ["meta/muse-spark-1.2-contributor", 1_048_576],
+      ["meta/muse-spark-1.3", 1_048_576],
+      ["meta/muse-spark-1.3-contributor", 1_048_576],
       ["xai/grok-4.5", 500_000],
       ["xai/grok-4.6", 500_000],
     ]);
@@ -362,6 +374,42 @@ describe("configuration and model aliases", () => {
       env: { COMMANDCODE_ALLOW_UNKNOWN_MODELS: "true" },
     });
     expect(() => resolveModel(retiredIds[0], allowUnknownConfig)).toThrow(/not allowed/i);
+  });
+
+  it.each([
+    "minimax/minimax-m3-free",
+    "minimax-m3-free",
+    "MiniMax-M3-Free",
+    "minimax/minimax-m2.7-free",
+    "minimax-m2.7-free",
+    "MiniMax-M2.7-Free",
+  ])("rejects retired MiniMax id %s even when unknown models are allowed", (id) => {
+    // Given a persisted retired model alongside a custom model.
+    const configured = [
+      { id, enabled: true },
+      { id: "custom/retained", enabled: true, contextWindow: 123_456 },
+    ];
+
+    // When upgrading the catalog and loading a retired default/allowlist.
+    const merged = mergeModelCatalog(configured, [id], normalizeModelName, false);
+    const config = loadBridgeConfig({
+      env: {
+        COMMANDCODE_DEFAULT_MODEL: id,
+        COMMANDCODE_ALLOWED_MODELS: id,
+        COMMANDCODE_ALLOW_UNKNOWN_MODELS: "true",
+      },
+      authPaths: [],
+    });
+
+    // Then retirement cannot be bypassed, while custom state survives.
+    expect(merged.some((model) => model.id === id)).toBe(false);
+    expect(merged.find((model) => model.id === "custom/retained")).toMatchObject({
+      enabled: true,
+      contextWindow: 123_456,
+    });
+    expect(config.defaultModel).toBe("deepseek/deepseek-v4-pro");
+    expect(config.allowedModels).not.toContain(id);
+    expect(() => resolveModel(id, config)).toThrow(/not allowed/i);
   });
 
   it("resolves common aliases to CommandCode model ids", () => {

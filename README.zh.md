@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.38.2.a-b57920?style=flat-square" alt="Version 1.38.2.a"></a>
-  <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-62-1f6f78?style=flat-square" alt="62 models"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.49.0.a-b57920?style=flat-square" alt="Version 1.49.0.a"></a>
+  <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-68-1f6f78?style=flat-square" alt="68 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
 </p>
@@ -20,7 +20,7 @@
 
 <!-- README-I18N:END -->
 
-CommandCode Bridge 是面向 CommandCode 账号的可信环境 HTTP 网关。它提供标准 OpenAI-compatible 模型与聊天端点，在符合条件的上游凭据之间路由请求，并发布与 CommandCode **1.38.2** 对齐的准确 **62-model** catalog。Bridge 版本始终跟随当前 CommandCode CLI 版本并在其后附加字母后缀（例如 **1.38.2.a**）；后缀表示仅限 Bridge 的发布。
+CommandCode Bridge 是面向 CommandCode 账号的可信环境 HTTP 网关。它提供标准 OpenAI-compatible 模型与聊天端点，在符合条件的上游凭据之间路由请求，并发布与 CommandCode **1.49.0** 对齐的准确 **68-model** catalog。Bridge 版本始终跟随当前 CommandCode CLI 版本并在其后附加字母后缀（例如 **1.49.0.a**）；后缀表示仅限 Bridge 的发布。
 
 [功能](#功能) · [安装](#安装) · [用法](#用法) · [工作原理](#工作原理) · [仓库布局](#仓库布局) · [当前限制](#当前限制) · [许可证](#许可证)
 
@@ -48,7 +48,7 @@ CommandCode Bridge 是面向 CommandCode 账号的可信环境 HTTP 网关。它
 
 ### Linux rootless installer
 
-installer 面向 Linux user systemd；由于 CommandCode CLI 1.38.2，需要 Node.js 22+。它会在可用时导入 CLI auth，把 private state 写入 `~/.config/commandcode-bridge`，安装到 `~/.local/share/commandcode-bridge`，安全默认值为 `127.0.0.1:9992`。只有在启用 `BRIDGE_API_KEY` 的可信 LAN/VPN/tailnet/firewall/reverse proxy 后才使用 `0.0.0.0`。登录前启动使用 `sudo loginctl enable-linger "$USER"`；卸载使用 `./uninstall.sh` 或 `./uninstall.sh --purge-config`。
+installer 面向 Linux user systemd；由于 CommandCode CLI 1.49.0，需要 Node.js 22+。它会在可用时导入 CLI auth，把 private state 写入 `~/.config/commandcode-bridge`，安装到 `~/.local/share/commandcode-bridge`，安全默认值为 `127.0.0.1:9992`。只有在启用 `BRIDGE_API_KEY` 的可信 LAN/VPN/tailnet/firewall/reverse proxy 后才使用 `0.0.0.0`。登录前启动使用 `sudo loginctl enable-linger "$USER"`；卸载使用 `./uninstall.sh` 或 `./uninstall.sh --purge-config`。
 
 ```bash
 ./install.sh
@@ -125,13 +125,14 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Model metadata 与准确 catalog
 
-每个 model object 包含 `id`、`object`、`created` 和 provider-derived `owned_by`。已知 context 同时写入 `context_window`、`context_length`、`max_context_length`。在 Provider API 可用时，启动时从 live `GET /provider/v1/models` 刷新 catalog，并纳入新添加的模型。下表是随附的 1.38.2 baseline；“默认启用”表示 built-in enabled state。
+每个 model object 包含 `id`、`object`、`created` 和 provider-derived `owned_by`。已知 context 同时写入 `context_window`、`context_length`、`max_context_length`。在 Provider API 可用时，启动时从 live `GET /provider/v1/models` 刷新 catalog，并纳入新添加的模型。下表是随附的 1.49.0 baseline；“默认启用”表示 built-in enabled state。
 
 | Provider          | Canonical model ID                      |   Context | 默认启用 |
 | ----------------- | --------------------------------------- | --------: | :------: |
 | DeepSeek          | `deepseek/deepseek-v4-pro`              | 1,000,000 |    是    |
 | DeepSeek          | `deepseek/deepseek-v4-flash`            | 1,000,000 |    是    |
 | DeepSeek          | `deepseek/deepseek-v4-flash-vision-exp` | 1,000,000 |    否    |
+| DeepSeek          | `deepseek/deepseek-v4-flash-fast`       | 1,000,000 |    否    |
 | Moonshot          | `moonshotai/Kimi-K3`                    | 1,000,000 |    否    |
 | Moonshot          | `moonshotai/Kimi-K2.7-Code`             |   256,000 |    否    |
 | Moonshot          | `moonshotai/Kimi-K2.7-Code-Highspeed`   |   262,000 |    否    |
@@ -145,11 +146,10 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 | Z.ai              | `zai-org/GLM-5`                         |   200,000 |    否    |
 | MiniMax           | `MiniMaxAI/MiniMax-M3`                  | 1,000,000 |    否    |
 | MiniMax           | `MiniMaxAI/MiniMax-M2.7`                |   200,000 |    是    |
-| MiniMax           | `minimax/minimax-m3-free`               | 1,000,000 |    否    |
-| MiniMax           | `minimax/minimax-m2.7-free`             |   197,000 |    否    |
 | MiniMax           | `MiniMaxAI/MiniMax-M2.5`                |   200,000 |    否    |
 | Xiaomi            | `xiaomi/mimo-v2.5-pro`                  | 1,000,000 |    否    |
 | Xiaomi            | `xiaomi/mimo-v2.5`                      | 1,000,000 |    否    |
+| Qwen              | `Qwen/Qwen3.8-Max-0902`                 | 1,000,000 |    否    |
 | Qwen              | `Qwen/Qwen3.8-Max`                      | 1,000,000 |    否    |
 | Qwen              | `Qwen/Qwen3.8-27B`                      |   262,144 |    否    |
 | Qwen              | `Qwen/Qwen3.8-Flash`                    | 1,000,000 |    否    |
@@ -158,6 +158,7 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 | Qwen              | `Qwen/Qwen3.7-Flash`                    | 1,000,000 |    否    |
 | Qwen              | `Qwen/Qwen3.6-Max-Preview`              |   200,000 |    否    |
 | Qwen              | `Qwen/Qwen3.6-Plus`                     |   200,000 |    是    |
+| Meituan           | `meituan/LongCat-2.0:free`              | 1,048,576 |    否    |
 | StepFun           | `stepfun/Step-3.7-Flash`                |   256,000 |    否    |
 | StepFun           | `stepfun/Step-3.5-Flash`                | 1,000,000 |    否    |
 | Tencent           | `tencent/hy3-paid`                      |   262,144 |    否    |
@@ -168,11 +169,13 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 | Poolside          | `poolside/laguna-s-2.1-free`            |   256,000 |    否    |
 | Anthropic         | `claude-sonnet-5`                       | 1,000,000 |    否    |
 | Anthropic         | `claude-sonnet-4-6`                     | 1,000,000 |    否    |
+| Anthropic         | `claude-fable-5-1`                      | 1,000,000 |    否    |
 | Anthropic         | `claude-fable-5`                        | 1,000,000 |    否    |
 | Anthropic         | `claude-opus-5`                         | 1,000,000 |    否    |
 | Anthropic         | `claude-opus-4-8`                       | 1,000,000 |    否    |
 | Anthropic         | `claude-opus-4-7`                       | 1,000,000 |    否    |
 | Anthropic         | `claude-haiku-4-5-20251001`             |   200,000 |    否    |
+| OpenAI            | `gpt-6-astra`                           | 1,050,000 |    否    |
 | OpenAI            | `gpt-5.6-sol`                           | 1,050,000 |    否    |
 | OpenAI            | `gpt-5.6-terra`                         | 1,050,000 |    否    |
 | OpenAI            | `gpt-5.6-luna`                          | 1,050,000 |    否    |
@@ -180,6 +183,7 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 | OpenAI            | `gpt-5.4`                               |   400,000 |    否    |
 | OpenAI            | `gpt-5.3-codex`                         |   400,000 |    否    |
 | OpenAI            | `gpt-5.4-mini`                          |   400,000 |    否    |
+| Google            | `google/gemini-3.8-flash`               | 1,000,000 |    否    |
 | Google            | `google/gemini-3.7-flash`               | 1,048,576 |    否    |
 | Google            | `google/gemini-3.6-flash`               | 1,000,000 |    否    |
 | Google            | `google/gemini-3.5-flash`               | 1,000,000 |    否    |
@@ -189,6 +193,8 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 | Meta              | `meta/muse-spark-1.1`                   | 1,048,576 |    否    |
 | Meta              | `meta/muse-spark-1.2`                   | 1,048,576 |    否    |
 | Meta              | `meta/muse-spark-1.2-contributor`       | 1,048,576 |    否    |
+| Meta              | `meta/muse-spark-1.3`                   | 1,048,576 |    否    |
+| Meta              | `meta/muse-spark-1.3-contributor`       | 1,048,576 |    否    |
 | xAI               | `xai/grok-4.5`                          |   500,000 |    否    |
 | xAI               | `xai/grok-4.6`                          |   500,000 |    否    |
 
@@ -200,11 +206,11 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### 配置与运维
 
-从持久化的 dashboard catalog 升级时，会保留当前 model 的 enabled state 和所有 custom model，并用 1.38.2 canonical 定义刷新 built-in metadata。包括 Ox Alpha 在内的 retired built-in 不会作为 unknown upstream model 转发；若 default 已退役，则安全回退到 `deepseek/deepseek-v4-pro`。
+从持久化的 dashboard catalog 升级时，会保留当前 model 的 enabled state 和所有 custom model，并用 1.49.0 canonical 定义刷新 built-in metadata。包括 Ox Alpha 和 MiniMax M3/M2.7 Free 在内的 retired built-in 不会作为 unknown upstream model 转发；若 default 已退役，则安全回退到 `deepseek/deepseek-v4-pro`。
 
 浏览器已保存 key 的现有用户可继续使用。新浏览器在保存或重启前，需要在 **当前管理员 API Key** 中输入一次现有 key。无 key runtime 仅在真实 loopback 连接且 Host 也是 loopback 时允许 bootstrap。
 
-Credential 优先级为 `COMMANDCODE_CREDENTIALS_FILE`、`COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`、`COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`、CLI auth file。核心默认值：`HOST=127.0.0.1`、`PORT=9992`、`COMMANDCODE_UPSTREAM_MODE=auto`、`COMMANDCODE_ROUTING_POLICY=daily_burn_priority`、`COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`、`COMMANDCODE_CLI_VERSION=1.38.2`、`COMMANDCODE_TIMEOUT_MS=600000`、`COMMANDCODE_RETRY_MAX_ATTEMPTS=5`、`COMMANDCODE_RETRY_BACKOFF_MS=250`、`COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`。对瞬时上游故障（429、5xx、超时）按指数退避重试，最多 `COMMANDCODE_RETRY_MAX_ATTEMPTS` 次；以 401/402/403 失败的凭据会在本次请求中被跳过并优先使用其他 key，一旦产生可见输出即停止重试。设置后 `BRIDGE_API_KEY` 保护 `/v1/*`；client 可使用 Bearer 或 `x-api-key`。`COMMANDCODE_UPSTREAM_MODE=auto` 在启动时探测 Provider API，套餐允许时（Provider $15/月或更高）使用官方 API；`provider` 强制官方 API；`alpha` 强制所有模型走 legacy `/alpha/generate`。设 `COMMANDCODE_ZDR=true` 会在 Provider API 请求中发送 `x-cmd-zdr: 1`（zero data retention）。用 `chmod 600` 保护 credential JSON。Balance alert 默认关闭。可选 `commandcode-router` 用于多个 bridge host 的 least-in-flight routing。
+Credential 优先级为 `COMMANDCODE_CREDENTIALS_FILE`、`COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`、`COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`、CLI auth file。核心默认值：`HOST=127.0.0.1`、`PORT=9992`、`COMMANDCODE_UPSTREAM_MODE=auto`、`COMMANDCODE_ROUTING_POLICY=daily_burn_priority`、`COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`、`COMMANDCODE_CLI_VERSION=1.49.0`、`COMMANDCODE_TIMEOUT_MS=600000`、`COMMANDCODE_RETRY_MAX_ATTEMPTS=5`、`COMMANDCODE_RETRY_BACKOFF_MS=250`、`COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`。对瞬时上游故障（429、5xx、超时）按指数退避重试，最多 `COMMANDCODE_RETRY_MAX_ATTEMPTS` 次；以 401/402/403 失败的凭据会在本次请求中被跳过并优先使用其他 key，一旦产生可见输出即停止重试。设置后 `BRIDGE_API_KEY` 保护 `/v1/*`；client 可使用 Bearer 或 `x-api-key`。`COMMANDCODE_UPSTREAM_MODE=auto` 在启动时探测 Provider API，套餐允许时（Provider $15/月或更高）使用官方 API；`provider` 强制官方 API；`alpha` 强制所有模型走 legacy `/alpha/generate`。设 `COMMANDCODE_ZDR=true` 会在 Provider API 请求中发送 `x-cmd-zdr: 1`（zero data retention）。用 `chmod 600` 保护 credential JSON。Balance alert 默认关闭。可选 `commandcode-router` 用于多个 bridge host 的 least-in-flight routing。
 
 ## 工作原理
 
