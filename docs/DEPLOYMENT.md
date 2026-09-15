@@ -347,6 +347,7 @@ Notes:
 - The Compose service binds inside the container to `HOST=0.0.0.0`.
 - The host port can still be published as `127.0.0.1:9992:9992` for local-only exposure.
 - Do not commit `release/env.production`.
+- The dashboard restart button needs `COMMANDCODE_BRIDGE_RESTART_MODE=exit` together with a container restart policy such as `restart: unless-stopped`. Both are set in the shipped Compose files. The bridge restarts itself only when it is supervised: under systemd it detects `INVOCATION_ID`/`SYSTEMD_EXEC_PID`, and elsewhere it exits only when that variable is set, so that an unsupervised process cannot shut itself down for good. Without it, `POST /admin/restart` answers `restart_requested: false` and the saved configuration stays pending until you run `docker compose restart` yourself.
 
 ## Updating the global npm deployment
 

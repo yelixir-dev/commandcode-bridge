@@ -291,15 +291,26 @@ function dashboardConfigResponse(
   };
 }
 
-function restartBridge(): void {
-  if (process.platform === "linux") {
-    const supervisedBySystemd = Boolean(process.env.INVOCATION_ID || process.env.SYSTEMD_EXEC_PID);
-    if (supervisedBySystemd || process.env.COMMANDCODE_BRIDGE_RESTART_MODE === "exit") {
-      setTimeout(() => {
-        process.exit(0);
-      }, 100).unref?.();
-    }
-    return;
+export type RestartMode = "systemd" | "exit" | "launchctl" | "unsupported";
+
+export function resolveRestartMode(options: {
+  platform: NodeJS.Platform;
+  env: NodeJS.ProcessEnv;
+}): RestartMode {
+  if (options.platform !== "linux") return "launchctl";
+  if (options.env.INVOCATION_ID || options.env.SYSTEMD_EXEC_PID) return "systemd";
+  if (options.env.COMMANDCODE_BRIDGE_RESTART_MODE === "exit") return "exit";
+  return "unsupported";
+}
+
+function restartBridge(): RestartMode {
+  const mode = resolveRestartMode({ platform: process.platform, env: process.env });
+  if (mode === "unsupported") return mode;
+  if (mode !== "launchctl") {
+    setTimeout(() => {
+      process.exit(0);
+    }, 100).unref?.();
+    return mode;
   }
   const label = process.env.COMMANDCODE_BRIDGE_LAUNCHD_LABEL ?? "com.yorha.commandcode-bridge";
   const target = `gui/${process.getuid?.() ?? 501}/${label}`;
@@ -308,6 +319,7 @@ function restartBridge(): void {
     stdio: "ignore",
   });
   child.unref();
+  return mode;
 }
 
 async function writeStreamingResponse(
@@ -587,9 +599,18 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   });
 
   app.post("/admin/restart", async () => {
-    restartBridge();
+    const mode = restartBridge();
+    if (mode === "unsupported") {
+      return {
+        ok: true,
+        restart_requested: false,
+        restart_mode: mode,
+        detail:
+          "This process is not supervised, so it cannot restart itself. Restart the container or service manually, or set COMMANDCODE_BRIDGE_RESTART_MODE=exit with an external restart policy.",
+      };
+    }
     configDirty = false;
-    return { ok: true, restart_requested: true };
+    return { ok: true, restart_requested: true, restart_mode: mode };
   });
 
   app.get("/admin/commandcode/credentials", async (request, reply) => {

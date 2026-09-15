@@ -194,6 +194,34 @@ describe("dashboard UI", () => {
     expect(html).toContain("return isRedactedSecret(key)?''");
   });
 
+  it("authenticates admin calls with the pending client API key after a save", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+      bridgeApiKey: "[REDACTED]",
+    });
+
+    expect(html).toContain(
+      "const key=currentBridgeAuthKey()||pendingBridgeKey||fullBridgeKey()||''",
+    );
+    expect(html).not.toContain("(!pendingBridgeKey?fullBridgeKey():'')");
+  });
+
+  it("explains that the deployment cannot restart itself instead of waiting for a restart", () => {
+    const html = dashboardHtml({
+      server: { host: "0.0.0.0", port: 9992 },
+      routing: { policy: "daily_burn_priority", maxInFlightPerCredential: 4 },
+      credentials: [],
+      models: [],
+    });
+
+    expect(html).toContain("if(res&&res.restart_requested===false)");
+    expect(html).toContain("popup(tr('restartUnsupported'),8000)");
+    expect(html).toContain("restartUnsupported:'This deployment cannot restart itself.");
+  });
+
   it("does not ask for the current admin key before save or restart", () => {
     const html = dashboardHtml({
       server: { host: "0.0.0.0", port: 9992 },
@@ -226,7 +254,7 @@ describe("dashboard UI", () => {
     expect(html).toContain("cmdbr-");
     expect(html).toContain("generateBridgeKey");
     expect(html).toContain("pendingBridgeApiKey");
-    expect(html).toContain("currentBridgeAuthKey()||(!pendingBridgeKey?fullBridgeKey():'')");
+    expect(html).toContain("currentBridgeAuthKey()||pendingBridgeKey||fullBridgeKey()");
     expect(html).toContain("bridgeApiKey:pendingKey");
     expect(html).toContain("Pending Client API key saved");
   });

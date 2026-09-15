@@ -10,7 +10,7 @@ import {
   resolveConfigFilePath,
   writeDashboardConfigFile,
 } from "../src/dashboard-config.js";
-import { createApp } from "../src/server.js";
+import { createApp, resolveRestartMode } from "../src/server.js";
 import type {
   CommandCodeEvent,
   CommandCodeGenerateBody,
@@ -464,7 +464,9 @@ describe("JSON dashboard configuration", () => {
       payload: {},
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ ok: true, restart_requested: true });
+    const restartable =
+      resolveRestartMode({ platform: process.platform, env: process.env }) !== "unsupported";
+    expect(response.json()).toMatchObject({ ok: true, restart_requested: restartable });
 
     await app.close();
   });
@@ -768,5 +770,33 @@ describe("JSON dashboard configuration", () => {
     expect(preflight.headers["access-control-allow-headers"]).toContain("authorization");
 
     await app.close();
+  });
+});
+
+describe("restart mode resolution", () => {
+  it("restarts through systemd when the unit environment is present", () => {
+    expect(resolveRestartMode({ platform: "linux", env: { INVOCATION_ID: "abc" } })).toBe(
+      "systemd",
+    );
+    expect(resolveRestartMode({ platform: "linux", env: { SYSTEMD_EXEC_PID: "42" } })).toBe(
+      "systemd",
+    );
+  });
+
+  it("restarts by exiting when an external supervisor is declared", () => {
+    expect(
+      resolveRestartMode({
+        platform: "linux",
+        env: { COMMANDCODE_BRIDGE_RESTART_MODE: "exit" },
+      }),
+    ).toBe("exit");
+  });
+
+  it("reports unsupported for an unsupervised linux process such as plain Docker", () => {
+    expect(resolveRestartMode({ platform: "linux", env: {} })).toBe("unsupported");
+  });
+
+  it("uses launchctl on macOS", () => {
+    expect(resolveRestartMode({ platform: "darwin", env: {} })).toBe("launchctl");
   });
 });

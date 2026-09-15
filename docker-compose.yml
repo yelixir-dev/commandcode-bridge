@@ -8,6 +8,9 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 9992
+      # The dashboard restart button exits the process; the restart policy above brings it back.
+      # Without this the container is unsupervised and /admin/restart cannot take effect.
+      COMMANDCODE_BRIDGE_RESTART_MODE: exit
     ports:
       - "127.0.0.1:9992:9992"
     healthcheck:

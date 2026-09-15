@@ -346,6 +346,7 @@ export BRIDGE_API_KEY='<same value as release/env.production>'
 - container 내부 process는 `HOST=0.0.0.0`으로 떠야 Docker port publishing이 됩니다.
 - host 노출은 `127.0.0.1:9992:9992`로 local-only 제한할 수 있습니다.
 - `release/env.production`은 절대 커밋하지 마십시오.
+- 대시보드의 재시작 버튼을 쓰려면 `COMMANDCODE_BRIDGE_RESTART_MODE=exit`와 `restart: unless-stopped` 같은 container restart 정책이 함께 필요합니다. 두 값 모두 제공되는 Compose 파일에 들어 있습니다. bridge는 supervise되는 환경에서만 스스로 재시작합니다. systemd에서는 `INVOCATION_ID`/`SYSTEMD_EXEC_PID`로 감지하고, 그 외 환경에서는 이 변수가 설정된 경우에만 종료하여 supervise되지 않는 process가 스스로 완전히 죽는 일을 막습니다. 설정이 없으면 `POST /admin/restart`는 `restart_requested: false`를 반환하고, 저장한 설정은 직접 `docker compose restart`를 실행할 때까지 적용 대기 상태로 남습니다.
 
 ## 글로벌 npm 설치본 업데이트 절차
 

@@ -111,17 +111,17 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### API 表面
 
-| Method | Path                             | Behavior                                                                                   |
-| ------ | -------------------------------- | ------------------------------------------------------------------------------------------ |
-| `GET`  | `/health`                        | Public、secret-free health/runtime summary。                                               |
-| `GET`  | `/dashboard`                     | 可信 network 的 public read-only shell。                                                   |
-| `GET`  | `/v1/models`                     | 配置 `BRIDGE_API_KEY` 时认证；列出 available model。                                       |
-| `GET`  | `/v1/models/:model`              | 配置时认证；查询一个 available model。                                                     |
-| `POST` | `/v1/chat/completions`           | 配置时认证；streaming/non-streaming chat。                                                 |
-| `GET`  | `/admin/config`                  | 可信 network 上的 public redacted dashboard state。                                        |
-| `GET`  | `/admin/commandcode/credentials` | Public redacted diagnostics；`?refresh=true` 刷新 billing。                                |
-| `PUT`  | `/admin/config`                  | 需要当前 `BRIDGE_API_KEY`；无 key runtime 仅可在 peer 与 Host 都为 loopback 时 bootstrap。 |
-| `POST` | `/admin/restart`                 | 使用相同认证规则；restart 完成前旧 key 仍是 current key。                                  |
+| Method | Path                             | Behavior                                                                                                                     |
+| ------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/health`                        | Public、secret-free health/runtime summary。                                                                                 |
+| `GET`  | `/dashboard`                     | 可信 network 的 public read-only shell。                                                                                     |
+| `GET`  | `/v1/models`                     | 配置 `BRIDGE_API_KEY` 时认证；列出 available model。                                                                         |
+| `GET`  | `/v1/models/:model`              | 配置时认证；查询一个 available model。                                                                                       |
+| `POST` | `/v1/chat/completions`           | 配置时认证；streaming/non-streaming chat。                                                                                   |
+| `GET`  | `/admin/config`                  | 可信 network 上的 public redacted dashboard state。                                                                          |
+| `GET`  | `/admin/commandcode/credentials` | Public redacted diagnostics；`?refresh=true` 刷新 billing。                                                                  |
+| `PUT`  | `/admin/config`                  | 需要当前 `BRIDGE_API_KEY`；无 key runtime 仅可在 peer 与 Host 都为 loopback 时 bootstrap。                                   |
+| `POST` | `/admin/restart`                 | 使用相同认证规则；restart 完成前旧 key 仍是 current key。进程未被 supervise、无法自行重启时返回 `restart_requested: false`。 |
 
 ### Model metadata 与准确 catalog
 
@@ -211,6 +211,8 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 从持久化的 dashboard catalog 升级时，会保留当前 model 的 enabled state 和所有 custom model，并用 1.53.0 canonical 定义刷新 built-in metadata。包括 Ox Alpha 和 MiniMax M3/M2.7 Free 在内的 retired built-in 不会作为 unknown upstream model 转发；若 default 已退役，则安全回退到 `deepseek/deepseek-v4-pro`。
 
 浏览器已保存 key 的现有用户可继续使用。新浏览器在保存或重启前，需要在 **当前管理员 API Key** 中输入一次现有 key。无 key runtime 仅在真实 loopback 连接且 Host 也是 loopback 时允许 bootstrap。
+
+Dashboard 的重启按钮只有在进程被 supervise 时才能应用已保存的配置。systemd 会被自动检测；包括配置了 restart 策略的 Docker 在内的其他 supervisor 需要 `COMMANDCODE_BRIDGE_RESTART_MODE=exit`，随附的两个 Compose 文件均已设置。未设置时 bridge 拒绝退出，`POST /admin/restart` 返回 `restart_requested: false`，已保存的配置会保持待应用状态，直到手动重启服务。
 
 Credential 优先级为 `COMMANDCODE_CREDENTIALS_FILE`、`COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`、`COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`、CLI auth file。核心默认值：`HOST=127.0.0.1`、`PORT=9992`、`COMMANDCODE_UPSTREAM_MODE=auto`、`COMMANDCODE_ROUTING_POLICY=daily_burn_priority`、`COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`、`COMMANDCODE_CLI_VERSION=1.53.0`、`COMMANDCODE_TIMEOUT_MS=600000`、`COMMANDCODE_RETRY_MAX_ATTEMPTS=5`、`COMMANDCODE_RETRY_BACKOFF_MS=250`、`COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`。对瞬时上游故障（429、5xx、超时）按指数退避重试，最多 `COMMANDCODE_RETRY_MAX_ATTEMPTS` 次；以 401/402/403 失败的凭据会在本次请求中被跳过并优先使用其他 key，一旦产生可见输出即停止重试。设置后 `BRIDGE_API_KEY` 保护 `/v1/*`；client 可使用 Bearer 或 `x-api-key`。`COMMANDCODE_UPSTREAM_MODE=auto` 在启动时探测 Provider API，套餐允许时（Provider $15/月或更高）使用官方 API；`provider` 强制官方 API；`alpha` 强制所有模型走 legacy `/alpha/generate`。设 `COMMANDCODE_ZDR=true` 会在 Provider API 请求中发送 `x-cmd-zdr: 1`（zero data retention）。用 `chmod 600` 保护 credential JSON。Balance alert 默认关闭。可选 `commandcode-router` 用于多个 bridge host 的 least-in-flight routing。
 

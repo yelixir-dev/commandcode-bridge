@@ -111,17 +111,17 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### API surface
 
-| Method | Path                             | Behavior                                                                                                            |
-| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/health`                        | Public, secret-free health and runtime summary.                                                                     |
-| `GET`  | `/dashboard`                     | Public read-only shell for trusted networks.                                                                        |
-| `GET`  | `/v1/models`                     | Authenticated when `BRIDGE_API_KEY` is configured; lists available models.                                          |
-| `GET`  | `/v1/models/:model`              | Authenticated when configured; retrieves one available model.                                                       |
-| `POST` | `/v1/chat/completions`           | Authenticated when configured; streaming or non-streaming chat.                                                     |
-| `GET`  | `/admin/config`                  | Public redacted dashboard state on the trusted network.                                                             |
-| `GET`  | `/admin/commandcode/credentials` | Public redacted diagnostics; `?refresh=true` refreshes billing.                                                     |
-| `PUT`  | `/admin/config`                  | Requires the current `BRIDGE_API_KEY`; a keyless runtime may bootstrap only over a loopback peer and loopback Host. |
-| `POST` | `/admin/restart`                 | Uses the same authentication rule; the pre-restart key remains current until restart completes.                     |
+| Method | Path                             | Behavior                                                                                                                                                                                       |
+| ------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/health`                        | Public, secret-free health and runtime summary.                                                                                                                                                |
+| `GET`  | `/dashboard`                     | Public read-only shell for trusted networks.                                                                                                                                                   |
+| `GET`  | `/v1/models`                     | Authenticated when `BRIDGE_API_KEY` is configured; lists available models.                                                                                                                     |
+| `GET`  | `/v1/models/:model`              | Authenticated when configured; retrieves one available model.                                                                                                                                  |
+| `POST` | `/v1/chat/completions`           | Authenticated when configured; streaming or non-streaming chat.                                                                                                                                |
+| `GET`  | `/admin/config`                  | Public redacted dashboard state on the trusted network.                                                                                                                                        |
+| `GET`  | `/admin/commandcode/credentials` | Public redacted diagnostics; `?refresh=true` refreshes billing.                                                                                                                                |
+| `PUT`  | `/admin/config`                  | Requires the current `BRIDGE_API_KEY`; a keyless runtime may bootstrap only over a loopback peer and loopback Host.                                                                            |
+| `POST` | `/admin/restart`                 | Uses the same authentication rule; the pre-restart key remains current until restart completes. Answers `restart_requested: false` when the process is unsupervised and cannot restart itself. |
 
 ### Model metadata and exact catalog
 
@@ -211,6 +211,8 @@ Open `http://127.0.0.1:9992/dashboard`. The mobile-first UI stores its Korean/En
 Upgrades from a persisted dashboard catalog preserve each current model's enabled state and all custom models, while refreshing built-in metadata from the 1.53.0 canonical definitions. Retired built-ins, including Ox Alpha and the MiniMax M3/M2.7 Free models, are removed rather than forwarded as unknown upstream models; a retired configured default falls back to `deepseek/deepseek-v4-pro`.
 
 Existing browsers with a saved key continue without interruption. On a fresh browser, enter the current key in **Current Admin API Key** before saving or restarting. A runtime with no key can bootstrap only from a real loopback connection whose Host is also loopback.
+
+The dashboard restart button applies a saved configuration only where the process is supervised. systemd is detected automatically; every other supervisor, including Docker with a restart policy, needs `COMMANDCODE_BRIDGE_RESTART_MODE=exit`, which both shipped Compose files set. Without it the bridge refuses to exit, `POST /admin/restart` reports `restart_requested: false`, and the saved configuration stays pending until the service is restarted by hand.
 
 Credential precedence is `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, then `COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`, then CLI auth files. Core defaults are `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_UPSTREAM_MODE=auto`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.53.0`, `COMMANDCODE_TIMEOUT_MS=600000`, `COMMANDCODE_RETRY_MAX_ATTEMPTS=5`, `COMMANDCODE_RETRY_BACKOFF_MS=250`, and `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`. Transient upstream failures (429, 5xx, timeouts) are retried with exponential backoff up to `COMMANDCODE_RETRY_MAX_ATTEMPTS`; a credential that fails with 401/402/403 is skipped for the rest of the request while other keys are preferred, and retries stop once any visible output has been emitted. `BRIDGE_API_KEY` protects `/v1/*` when set; clients may use Bearer or `x-api-key`. `COMMANDCODE_UPSTREAM_MODE=auto` probes the Provider API at startup and uses it whenever the plan allows (the Provider plan at $15/mo or higher); `provider` forces the official API and `alpha` forces the legacy `/alpha/generate` path for every model. Set `COMMANDCODE_ZDR=true` to send `x-cmd-zdr: 1` (zero data retention) on Provider API requests. Protect credential JSON with `chmod 600`. Optional balance alerts are off. Optional `commandcode-router` is for least-in-flight routing across multiple bridge hosts.
 

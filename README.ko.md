@@ -111,17 +111,17 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### API 표면
 
-| Method | Path                             | Behavior                                                                                          |
-| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `GET`  | `/health`                        | Public secret-free health/runtime summary.                                                        |
-| `GET`  | `/dashboard`                     | 신뢰 network용 public read-only shell.                                                            |
-| `GET`  | `/v1/models`                     | `BRIDGE_API_KEY` 설정 시 인증; available model 목록.                                              |
-| `GET`  | `/v1/models/:model`              | 설정 시 인증; 단일 available model 조회.                                                          |
-| `POST` | `/v1/chat/completions`           | 설정 시 인증; streaming/non-streaming chat.                                                       |
-| `GET`  | `/admin/config`                  | 신뢰 network의 public redacted dashboard state.                                                   |
-| `GET`  | `/admin/commandcode/credentials` | Public redacted diagnostics; `?refresh=true`는 billing refresh.                                   |
-| `PUT`  | `/admin/config`                  | 현재 `BRIDGE_API_KEY` 인증 필요. key 없는 runtime은 peer와 Host가 모두 loopback일 때만 bootstrap. |
-| `POST` | `/admin/restart`                 | 동일한 인증 규칙 적용. restart가 끝날 때까지 기존 key가 current key.                              |
+| Method | Path                             | Behavior                                                                                                                                                   |
+| ------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/health`                        | Public secret-free health/runtime summary.                                                                                                                 |
+| `GET`  | `/dashboard`                     | 신뢰 network용 public read-only shell.                                                                                                                     |
+| `GET`  | `/v1/models`                     | `BRIDGE_API_KEY` 설정 시 인증; available model 목록.                                                                                                       |
+| `GET`  | `/v1/models/:model`              | 설정 시 인증; 단일 available model 조회.                                                                                                                   |
+| `POST` | `/v1/chat/completions`           | 설정 시 인증; streaming/non-streaming chat.                                                                                                                |
+| `GET`  | `/admin/config`                  | 신뢰 network의 public redacted dashboard state.                                                                                                            |
+| `GET`  | `/admin/commandcode/credentials` | Public redacted diagnostics; `?refresh=true`는 billing refresh.                                                                                            |
+| `PUT`  | `/admin/config`                  | 현재 `BRIDGE_API_KEY` 인증 필요. key 없는 runtime은 peer와 Host가 모두 loopback일 때만 bootstrap.                                                          |
+| `POST` | `/admin/restart`                 | 동일한 인증 규칙 적용. restart가 끝날 때까지 기존 key가 current key. supervise되지 않아 스스로 재시작할 수 없으면 `restart_requested: false`를 반환합니다. |
 
 ### Model metadata와 정확한 catalog
 
@@ -211,6 +211,8 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 저장된 dashboard catalog에서 업그레이드하면 현재 model의 enabled state와 모든 custom model은 보존하고, built-in metadata는 1.53.0 canonical 정의로 갱신합니다. Ox Alpha와 MiniMax M3/M2.7 Free를 포함한 retired built-in은 unknown upstream model로 전달하지 않으며, 제거된 default가 설정돼 있으면 `deepseek/deepseek-v4-pro`로 안전하게 fallback합니다.
 
 브라우저에 key가 저장된 기존 사용자는 그대로 동작합니다. 새 브라우저에서는 저장·재시작 전에 **현재 Admin API Key**에 기존 key를 한 번 입력합니다. key 없는 runtime은 실제 loopback 연결이며 Host도 loopback인 경우에만 bootstrap할 수 있습니다.
+
+Dashboard의 재시작 버튼은 process가 supervise되는 환경에서만 저장한 설정을 적용합니다. systemd는 자동으로 감지하고, restart 정책을 둔 Docker를 포함한 그 밖의 supervisor는 `COMMANDCODE_BRIDGE_RESTART_MODE=exit`가 필요하며 제공되는 두 Compose 파일에 모두 설정돼 있습니다. 설정이 없으면 bridge는 종료를 거부하고 `POST /admin/restart`는 `restart_requested: false`를 반환하며, 저장한 설정은 service를 직접 재시작할 때까지 적용 대기 상태로 남습니다.
 
 Credential 우선순위는 `COMMANDCODE_CREDENTIALS_FILE`, `COMMANDCODE_CREDENTIALS`/`COMMANDCODE_API_KEYS`, `COMMAND_CODE_API_KEY`/`COMMANDCODE_API_KEY`/`CMD_API_KEY`, CLI auth file 순입니다. 핵심 기본값은 `HOST=127.0.0.1`, `PORT=9992`, `COMMANDCODE_UPSTREAM_MODE=auto`, `COMMANDCODE_ROUTING_POLICY=daily_burn_priority`, `COMMANDCODE_MAX_IN_FLIGHT_PER_CREDENTIAL=4`, `COMMANDCODE_CLI_VERSION=1.53.0`, `COMMANDCODE_TIMEOUT_MS=600000`, `COMMANDCODE_RETRY_MAX_ATTEMPTS=5`, `COMMANDCODE_RETRY_BACKOFF_MS=250`, `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY=error_on_length`입니다. 일시적 upstream 실패(429, 5xx, timeout)는 `COMMANDCODE_RETRY_MAX_ATTEMPTS`까지 지수 백오프로 재시도합니다. 401/402/403으로 실패한 키는 해당 요청에서 제외되고 다른 키를 우선하며, visible output이 나온 뒤에는 재시도하지 않습니다. `BRIDGE_API_KEY`는 설정 시 `/v1/*`를 보호하며 client는 Bearer 또는 `x-api-key`를 쓸 수 있습니다. `COMMANDCODE_UPSTREAM_MODE=auto`는 시작 시 Provider API를 프로브해 요금제가 허용하면(Provider $15/월 이상) 공식 API를 쓰고, `provider`는 공식 API를 강제하며, `alpha`는 모든 model을 legacy `/alpha/generate`로 강제합니다. `COMMANDCODE_ZDR=true`면 Provider API 요청에 `x-cmd-zdr: 1`(zero data retention)을 보냅니다. Credential JSON은 `chmod 600`으로 보호하십시오. Balance alert는 기본 off입니다. 선택적 `commandcode-router`는 여러 bridge host의 least-in-flight routing용입니다.
 
