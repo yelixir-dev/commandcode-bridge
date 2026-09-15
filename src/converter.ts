@@ -195,8 +195,6 @@ export function buildCommandCodeGenerateBody(
   if (options.request.reasoning_effort !== undefined)
     params.reasoning_effort = options.request.reasoning_effort;
   if (options.request.temperature !== undefined) params.temperature = options.request.temperature;
-  if (options.request.top_p !== undefined) params.top_p = options.request.top_p;
-  if (options.request.stop !== undefined) params.stop = options.request.stop;
 
   const threadId = options.threadId ?? randomUUID();
   return {

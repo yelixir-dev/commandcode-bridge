@@ -119,8 +119,6 @@ export interface CommandCodeGenerateBody {
     max_tokens?: number;
     reasoning_effort?: string;
     temperature?: number;
-    top_p?: number;
-    stop?: string | string[];
     stream: true;
   };
   threadId?: string;

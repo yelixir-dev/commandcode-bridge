@@ -7,6 +7,23 @@ import {
 } from "../src/converter.js";
 
 describe("OpenAI to CommandCode conversion", () => {
+  it("forwards temperature but never top_p or stop, matching the CommandCode CLI wire body", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4-pro",
+        messages: [{ role: "user", content: "hi" }],
+        temperature: 0.4,
+        top_p: 0.9,
+        stop: ["\n\n"],
+      },
+      upstreamModel: "deepseek/deepseek-v4-pro",
+    });
+
+    expect(body.params.temperature).toBe(0.4);
+    expect(Object.keys(body.params)).not.toContain("top_p");
+    expect(Object.keys(body.params)).not.toContain("stop");
+  });
+
   it("flattens string and structured text content", () => {
     expect(flattenOpenAIContent("hello")).toBe("hello");
     expect(
