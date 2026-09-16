@@ -48,10 +48,15 @@ export async function handleProviderChat(options: {
         firstChoice && isRecord(firstChoice.message) ? firstChoice.message : undefined;
       const content = typeof message?.content === "string" ? message.content : "";
       const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+      const reasoningContent =
+        config.includeReasoning && typeof message?.reasoning_content === "string"
+          ? message.reasoning_content
+          : "";
       const emptyVisible =
         config.emptyVisibleResponsePolicy === "error_on_length" &&
         firstChoice?.finish_reason === "length" &&
         content.length === 0 &&
+        reasoningContent.length === 0 &&
         toolCalls.length === 0;
       if (!emptyVisible) break;
       const retrying = attempt < retries;
@@ -134,7 +139,9 @@ export async function handleProviderChat(options: {
   const content = typeof message?.content === "string" ? message.content : "";
   const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
   const reasoningContent =
-    typeof message?.reasoning_content === "string" ? message.reasoning_content : "";
+    config.includeReasoning && typeof message?.reasoning_content === "string"
+      ? message.reasoning_content
+      : "";
   if (!config.includeReasoning && message && typeof message.reasoning_content === "string") {
     delete message.reasoning_content;
   }
