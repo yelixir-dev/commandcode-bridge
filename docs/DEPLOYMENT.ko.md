@@ -451,6 +451,14 @@ Credential JSON 파일 예시:
 
 이 정책은 reasoning-heavy model이 hidden token만 쓰다가 끝난 응답을 client가 정상 빈 답변으로 오인하지 않게 막습니다.
 
+Provider 비스트리밍 응답에서는 `INCLUDE_REASONING=true`일 때만 `reasoning_content`를 사용자에게 보이는 출력으로 셉니다. 이 경우 reasoning만 있는 응답도 빈 응답 재시도 없이 반환합니다. 옵션을 끄면 숨겨진 reasoning은 빈 `length` 응답의 재시도 소진과 오류 반환을 막지 않습니다. 텍스트와 tool call은 옵션과 관계없이 유효한 출력입니다.
+
+### 모델의 이미지 입력
+
+Alpha와 Provider 요청 변환 모두 `src/model-images.ts`에 기록된 CommandCode CLI 1.53.0 모델 목록을 기준으로 텍스트 전용 모델의 이미지 입력을 제거합니다. 별칭에도 같은 정책을 적용합니다. 이전 이미지 입력은 제거하고, 가장 최근 이미지가 포함된 user 또는 tool 메시지에는 번호가 붙은 텍스트 마커를 넣습니다. 이미지만 있던 과거 메시지에는 생략 마커를 남겨 빈 메시지가 되지 않도록 합니다. 입력 대화 객체는 변경하지 않습니다.
+
+비전 모델의 이미지는 유지합니다. 알 수 없는 모델이나 custom 모델은 CLI와 같이 이미지 입력을 허용하는 기본 동작을 따르므로, 텍스트 전용 목록에 없다고 실제 상류의 비전 지원이 보장되지는 않습니다. 향후 CLI 카탈로그 정렬 시 이 목록도 함께 갱신해야 합니다. Alpha에서는 base64 data URI를 `mimeType`이 있는 네이티브 이미지 파트로 변환하며, 원격 URL은 텍스트 자리표시자로 유지하고 bridge가 내려받지 않습니다.
+
 ### Balance alert 옵션
 
 Balance alert는 기본적으로 꺼져 있습니다.

@@ -452,6 +452,14 @@ When upgrading a persisted 1.3.1 dashboard catalog, enabled state and custom mod
 
 This protects clients from treating hidden-token exhaustion as a valid empty answer.
 
+For non-streaming Provider responses, `reasoning_content` counts as visible output only when `INCLUDE_REASONING=true`. Reasoning-only responses then return without an empty-response retry. With the flag off, hidden reasoning does not prevent an empty `length` response from exhausting retries and returning an error. Text and tool calls remain valid output regardless of the flag.
+
+### Model image input
+
+Both Alpha and Provider request builders remove image inputs for text-only models using the CommandCode CLI 1.53.0 model list in `src/model-images.ts`. Aliases resolve to the same policy. Older image inputs are removed; the latest image-bearing user or tool message receives numbered text markers instead. Image-only historical messages retain an omission marker so the message is not empty. The input conversation is not mutated.
+
+Vision-capable models keep their images. Unknown/custom models follow the CLI's image-capable fallback; absence from the text-only list is not a guarantee of upstream vision support. Update the list alongside future CLI catalog alignments. Alpha converts base64 data URIs to native image parts with `mimeType`; remote URLs remain text placeholders and are not downloaded by the bridge.
+
 ### Balance alert options
 
 Balance alerts are disabled by default.

@@ -1,4 +1,5 @@
 import { Transform, type TransformCallback } from "node:stream";
+import { messagesForModel } from "./model-images.js";
 
 import {
   combineAbortSignals,
@@ -27,7 +28,7 @@ export function buildProviderChatRequestBody(
 ): ProviderChatRequestBody {
   const body: ProviderChatRequestBody = {
     model: upstreamModel,
-    messages: request.messages,
+    messages: messagesForModel(request.messages, upstreamModel),
   };
   if (request.stream !== undefined) body.stream = request.stream;
   if (request.max_tokens !== undefined) body.max_tokens = request.max_tokens;

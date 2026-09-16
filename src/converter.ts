@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { cwd as processCwd } from "node:process";
+import { messagesForModel } from "./model-images.js";
 
 import type {
   CommandCodeContentPart,
@@ -253,7 +254,7 @@ export function buildCommandCodeGenerateBody(
 
   const params: CommandCodeGenerateBody["params"] = {
     model: options.upstreamModel,
-    messages: convertMessages(options.request.messages),
+    messages: convertMessages(messagesForModel(options.request.messages, options.upstreamModel)),
     tools: convertOpenAITools(options.request.tools, options.request.tool_choice),
     system: buildSystemPrompt(options.request),
     max_tokens: options.request.max_tokens ?? 64_000,
