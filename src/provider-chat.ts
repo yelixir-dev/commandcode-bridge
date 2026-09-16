@@ -133,10 +133,16 @@ export async function handleProviderChat(options: {
   const message = firstChoice && isRecord(firstChoice.message) ? firstChoice.message : undefined;
   const content = typeof message?.content === "string" ? message.content : "";
   const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+  const reasoningContent =
+    typeof message?.reasoning_content === "string" ? message.reasoning_content : "";
+  if (!config.includeReasoning && message && typeof message.reasoning_content === "string") {
+    delete message.reasoning_content;
+  }
   if (
     config.emptyVisibleResponsePolicy === "error_on_length" &&
     firstChoice?.finish_reason === "length" &&
     content.length === 0 &&
+    reasoningContent.length === 0 &&
     toolCalls.length === 0
   ) {
     reply.code(502).send({

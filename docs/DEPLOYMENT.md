@@ -376,17 +376,17 @@ npm run smoke
 
 ### Server and client-auth options
 
-| Variable                   | Default     | Description                                                                                                 |
-| -------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
-| `HOST`                     | `127.0.0.1` | Bind address. Use `127.0.0.1` for local-only, `0.0.0.0` for Tailscale/VPN/reverse-proxy exposure.           |
-| `PORT`                     | `9992`      | HTTP listen port.                                                                                           |
-| `BRIDGE_API_KEY`           | unset       | Client-facing bearer key. Strongly recommended; required for admin endpoints.                               |
-| `REQUEST_BODY_LIMIT_BYTES` | `1048576`   | Fastify request body limit. Increase only for unusually large prompts/tool schemas.                         |
-| `RATE_LIMIT_MAX`           | `60`        | Max requests per rate-limit window per client.                                                              |
-| `RATE_LIMIT_WINDOW`        | `1 minute`  | Rate-limit window string accepted by `@fastify/rate-limit`.                                                 |
-| `LOG_LEVEL`                | `info`      | Pino/Fastify log level. Common values: `debug`, `info`, `warn`, `error`, `silent`.                          |
-| `CORS_ORIGIN`              | unset       | Enables CORS for a specific browser origin. Leave unset for non-browser clients.                            |
-| `INCLUDE_REASONING`        | `false`     | If `true`, reasoning deltas are appended to visible content. Keep `false` for normal OpenAI-compatible use. |
+| Variable                   | Default     | Description                                                                                                                              |
+| -------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOST`                     | `127.0.0.1` | Bind address. Use `127.0.0.1` for local-only, `0.0.0.0` for Tailscale/VPN/reverse-proxy exposure.                                        |
+| `PORT`                     | `9992`      | HTTP listen port.                                                                                                                        |
+| `BRIDGE_API_KEY`           | unset       | Client-facing bearer key. Strongly recommended; required for admin endpoints.                                                            |
+| `REQUEST_BODY_LIMIT_BYTES` | `1048576`   | Fastify request body limit. Increase only for unusually large prompts/tool schemas.                                                      |
+| `RATE_LIMIT_MAX`           | `60`        | Max requests per rate-limit window per client.                                                                                           |
+| `RATE_LIMIT_WINDOW`        | `1 minute`  | Rate-limit window string accepted by `@fastify/rate-limit`.                                                                              |
+| `LOG_LEVEL`                | `info`      | Pino/Fastify log level. Common values: `debug`, `info`, `warn`, `error`, `silent`.                                                       |
+| `CORS_ORIGIN`              | unset       | Enables CORS for a specific browser origin. Leave unset for non-browser clients.                                                         |
+| `INCLUDE_REASONING`        | `false`     | If `true`, reasoning deltas return in the `reasoning_content` field instead of `content`. Keep `false` for normal OpenAI-compatible use. |
 
 ### CommandCode upstream options
 

@@ -359,6 +359,7 @@ export async function collectOpenAICompletion(
   options: CollectOpenAICompletionOptions,
 ): Promise<OpenAIChatCompletion> {
   let content = "";
+  let reasoningContent = "";
   const toolCalls: OpenAIToolCall[] = [];
   let usage: CommandCodeUsage | undefined;
   let finishReason: string | undefined;
@@ -373,7 +374,7 @@ export async function collectOpenAICompletion(
       content += event.text;
     } else if (options.includeReasoning && isReasoningDelta(event)) {
       sawCompletionSignal = true;
-      content += event.text;
+      reasoningContent += event.text;
     } else if (isToolCallEvent(event)) {
       sawCompletionSignal = true;
       for (const toolCall of openAIToolCallsFromCommandCodeEvent(
@@ -398,7 +399,7 @@ export async function collectOpenAICompletion(
   if (
     shouldFailEmptyVisibleResponse({
       policy: options.emptyVisibleResponsePolicy,
-      visibleContentLength: content.length,
+      visibleContentLength: content.length + reasoningContent.length,
       toolCallCount: toolCalls.length,
       finishReason: finalReason,
     })
@@ -406,7 +407,7 @@ export async function collectOpenAICompletion(
     throw new CommandCodeEmptyVisibleResponseError({
       model: options.model,
       finishReason: "length",
-      visibleContentLength: content.length,
+      visibleContentLength: content.length + reasoningContent.length,
       toolCallCount: toolCalls.length,
     });
   }
@@ -415,6 +416,7 @@ export async function collectOpenAICompletion(
     role: "assistant",
     content: toolCalls.length > 0 && content.length === 0 ? null : content,
   };
+  if (reasoningContent.length > 0) message.reasoning_content = reasoningContent;
   if (toolCalls.length > 0) message.tool_calls = toolCalls;
 
   return {
@@ -508,7 +510,7 @@ export async function* streamOpenAIChunks(
             options.id,
             options.created,
             options.model,
-            { content: event.text },
+            { reasoning_content: event.text },
             null,
             options.includeUsage,
           ),

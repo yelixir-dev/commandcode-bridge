@@ -160,6 +160,9 @@ function convertMessages(messages: OpenAIChatMessage[]): CommandCodeMessage[] {
 
     if (message.role === "assistant") {
       const content: CommandCodeContentPart[] = [];
+      const reasoning =
+        typeof message.reasoning_content === "string" ? message.reasoning_content : "";
+      if (reasoning.length > 0) content.push({ type: "reasoning", text: reasoning });
       const text = flattenOpenAIContent(message.content).trim();
       if (text.length > 0) content.push(...asTextContent(text));
 

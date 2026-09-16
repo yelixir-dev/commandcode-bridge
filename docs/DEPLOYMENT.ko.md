@@ -375,17 +375,17 @@ npm run smoke
 
 ### 서버와 client auth 옵션
 
-| 변수                       | 기본값      | 설명                                                                                                                  |
-| -------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
-| `HOST`                     | `127.0.0.1` | bind 주소입니다. local-only면 `127.0.0.1`, Tailscale/VPN/reverse proxy 뒤에서 접근하려면 `0.0.0.0`을 사용합니다.      |
-| `PORT`                     | `9992`      | HTTP listen port입니다.                                                                                               |
-| `BRIDGE_API_KEY`           | 미설정      | client-facing bearer key입니다. 강력 권장합니다. Admin endpoint는 이 값이 설정되어 있어야 접근 가능합니다.            |
-| `REQUEST_BODY_LIMIT_BYTES` | `1048576`   | Fastify request body limit입니다. 매우 큰 prompt/tool schema를 받을 때만 늘리십시오.                                  |
-| `RATE_LIMIT_MAX`           | `60`        | client별 rate-limit window 안에서 허용할 최대 request 수입니다.                                                       |
-| `RATE_LIMIT_WINDOW`        | `1 minute`  | `@fastify/rate-limit`이 이해하는 window 문자열입니다.                                                                 |
-| `LOG_LEVEL`                | `info`      | Pino/Fastify log level입니다. 보통 `debug`, `info`, `warn`, `error`, `silent`를 사용합니다.                           |
-| `CORS_ORIGIN`              | 미설정      | browser client 특정 origin에 CORS를 열 때 사용합니다. CLI/server client만 쓰면 비워두십시오.                          |
-| `INCLUDE_REASONING`        | `false`     | `true`면 reasoning delta를 visible content에 붙입니다. 일반 OpenAI-compatible client에서는 `false` 유지가 안전합니다. |
+| 변수                       | 기본값      | 설명                                                                                                                                            |
+| -------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOST`                     | `127.0.0.1` | bind 주소입니다. local-only면 `127.0.0.1`, Tailscale/VPN/reverse proxy 뒤에서 접근하려면 `0.0.0.0`을 사용합니다.                                |
+| `PORT`                     | `9992`      | HTTP listen port입니다.                                                                                                                         |
+| `BRIDGE_API_KEY`           | 미설정      | client-facing bearer key입니다. 강력 권장합니다. Admin endpoint는 이 값이 설정되어 있어야 접근 가능합니다.                                      |
+| `REQUEST_BODY_LIMIT_BYTES` | `1048576`   | Fastify request body limit입니다. 매우 큰 prompt/tool schema를 받을 때만 늘리십시오.                                                            |
+| `RATE_LIMIT_MAX`           | `60`        | client별 rate-limit window 안에서 허용할 최대 request 수입니다.                                                                                 |
+| `RATE_LIMIT_WINDOW`        | `1 minute`  | `@fastify/rate-limit`이 이해하는 window 문자열입니다.                                                                                           |
+| `LOG_LEVEL`                | `info`      | Pino/Fastify log level입니다. 보통 `debug`, `info`, `warn`, `error`, `silent`를 사용합니다.                                                     |
+| `CORS_ORIGIN`              | 미설정      | browser client 특정 origin에 CORS를 열 때 사용합니다. CLI/server client만 쓰면 비워두십시오.                                                    |
+| `INCLUDE_REASONING`        | `false`     | `true`면 reasoning delta가 `content` 대신 `reasoning_content` 필드로 반환됩니다. 일반 OpenAI-compatible client에서는 `false` 유지가 안전합니다. |
 
 ### CommandCode upstream 옵션
 

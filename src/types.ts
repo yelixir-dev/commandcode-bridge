@@ -31,6 +31,7 @@ export interface OpenAIChatMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: OpenAIToolCall[];
+  reasoning_content?: string | null;
 }
 
 export interface OpenAIFunctionTool {
@@ -101,9 +102,15 @@ export interface CommandCodeImagePart {
   mimeType: string;
 }
 
+export interface CommandCodeReasoningPart {
+  type: "reasoning";
+  text: string;
+}
+
 export type CommandCodeContentPart =
   | OpenAITextContentPart
   | CommandCodeImagePart
+  | CommandCodeReasoningPart
   | CommandCodeToolCallPart
   | CommandCodeToolResultPart;
 
@@ -254,6 +261,7 @@ export interface OpenAIChatCompletion {
     message: {
       role: "assistant";
       content: string | null;
+      reasoning_content?: string;
       tool_calls?: OpenAIToolCall[];
     };
     finish_reason: "stop" | "length" | "tool_calls" | "content_filter" | null;

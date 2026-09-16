@@ -80,6 +80,7 @@ const messageSchema = z.object({
   name: z.string().optional(),
   tool_call_id: z.string().optional(),
   tool_calls: z.array(toolCallSchema).optional(),
+  reasoning_content: z.string().nullish(),
 });
 
 const chatCompletionRequestSchema = z.object({

@@ -502,4 +502,73 @@ describe("OpenAI to CommandCode conversion", () => {
     });
     expect(body.params.system).toMatch(/valid JSON object/i);
   });
+
+  it("forwards assistant reasoning_content as a leading reasoning part", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4.1-flash",
+        messages: [
+          { role: "user", content: "Remember the number 7391." },
+          {
+            role: "assistant",
+            content: "Got it.",
+            reasoning_content: "The secret number is 7391. I must remember it.",
+          },
+          { role: "user", content: "What is the secret number?" },
+        ],
+      },
+      upstreamModel: "deepseek/deepseek-v4.1-flash",
+    });
+
+    expect(body.params.messages[1]).toEqual({
+      role: "assistant",
+      content: [
+        { type: "reasoning", text: "The secret number is 7391. I must remember it." },
+        { type: "text", text: "Got it." },
+      ],
+    });
+  });
+
+  it("keeps reasoning alongside tool calls and skips empty reasoning_content", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4.1-flash",
+        messages: [
+          { role: "user", content: "Check the time." },
+          {
+            role: "assistant",
+            content: null,
+            reasoning_content: "I should call get_time first.",
+            tool_calls: [
+              {
+                id: "call_time",
+                type: "function",
+                function: { name: "get_time", arguments: "{}" },
+              },
+            ],
+          },
+          { role: "tool", tool_call_id: "call_time", content: "12:00" },
+          { role: "assistant", content: "It is noon.", reasoning_content: null },
+          { role: "assistant", content: "Now.", reasoning_content: "" },
+        ],
+      },
+      upstreamModel: "deepseek/deepseek-v4.1-flash",
+    });
+
+    expect(body.params.messages[1]).toEqual({
+      role: "assistant",
+      content: [
+        { type: "reasoning", text: "I should call get_time first." },
+        { type: "tool-call", toolCallId: "call_time", toolName: "get_time", input: {} },
+      ],
+    });
+    expect(body.params.messages[3]).toEqual({
+      role: "assistant",
+      content: [{ type: "text", text: "It is noon." }],
+    });
+    expect(body.params.messages[4]).toEqual({
+      role: "assistant",
+      content: [{ type: "text", text: "Now." }],
+    });
+  });
 });
