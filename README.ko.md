@@ -208,6 +208,10 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### 설정과 운영
 
+**Reasoning 출력 변경:** `INCLUDE_REASONING=true`이면 reasoning을 `content`에 붙이지 않고 스트리밍은 `delta.reasoning_content`, 비스트리밍은 `message.reasoning_content`로 따로 반환합니다. Reasoning을 표시하는 클라이언트는 이 필드를 읽어야 합니다. Provider 비스트리밍 재시도에서는 옵션이 켜졌을 때만 reasoning을 보이는 출력으로 세므로, 숨겨진 reasoning만 있는 빈 응답의 성공 처리와 노출된 reasoning의 불필요한 재시도를 방지합니다.
+
+Alpha와 Provider 모두 CLI 1.53.0의 텍스트 전용 모델 목록과 별칭에 대해 이미지 입력을 제거합니다. 가장 최근 이미지 메시지에는 번호가 붙은 텍스트 마커를 넣고 과거 이미지는 생략합니다. 비전 모델의 이미지는 유지하며, 알 수 없는 모델이나 custom 모델은 CLI와 같이 이미지 입력을 허용하지만 실제 비전 지원을 보장하지는 않습니다. Alpha는 base64 data URI를 `mimeType`이 있는 네이티브 이미지 파트로 보내고, 원격 URL은 내려받지 않고 텍스트 자리표시자로 유지합니다.
+
 저장된 dashboard catalog에서 업그레이드하면 현재 model의 enabled state와 모든 custom model은 보존하고, built-in metadata는 1.53.0 canonical 정의로 갱신합니다. Ox Alpha와 MiniMax M3/M2.7 Free를 포함한 retired built-in은 unknown upstream model로 전달하지 않으며, 제거된 default가 설정돼 있으면 `deepseek/deepseek-v4-pro`로 안전하게 fallback합니다.
 
 브라우저에 key가 저장된 기존 사용자는 그대로 동작합니다. 새 브라우저에서는 저장·재시작 전에 **현재 Admin API Key**에 기존 key를 한 번 입력합니다. key 없는 runtime은 실제 loopback 연결이며 Host도 loopback인 경우에만 bootstrap할 수 있습니다.

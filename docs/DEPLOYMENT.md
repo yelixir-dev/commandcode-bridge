@@ -376,17 +376,17 @@ npm run smoke
 
 ### Server and client-auth options
 
-| Variable                   | Default     | Description                                                                                                 |
-| -------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
-| `HOST`                     | `127.0.0.1` | Bind address. Use `127.0.0.1` for local-only, `0.0.0.0` for Tailscale/VPN/reverse-proxy exposure.           |
-| `PORT`                     | `9992`      | HTTP listen port.                                                                                           |
-| `BRIDGE_API_KEY`           | unset       | Client-facing bearer key. Strongly recommended; required for admin endpoints.                               |
-| `REQUEST_BODY_LIMIT_BYTES` | `1048576`   | Fastify request body limit. Increase only for unusually large prompts/tool schemas.                         |
-| `RATE_LIMIT_MAX`           | `60`        | Max requests per rate-limit window per client.                                                              |
-| `RATE_LIMIT_WINDOW`        | `1 minute`  | Rate-limit window string accepted by `@fastify/rate-limit`.                                                 |
-| `LOG_LEVEL`                | `info`      | Pino/Fastify log level. Common values: `debug`, `info`, `warn`, `error`, `silent`.                          |
-| `CORS_ORIGIN`              | unset       | Enables CORS for a specific browser origin. Leave unset for non-browser clients.                            |
-| `INCLUDE_REASONING`        | `false`     | If `true`, reasoning deltas are appended to visible content. Keep `false` for normal OpenAI-compatible use. |
+| Variable                   | Default     | Description                                                                                                                              |
+| -------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOST`                     | `127.0.0.1` | Bind address. Use `127.0.0.1` for local-only, `0.0.0.0` for Tailscale/VPN/reverse-proxy exposure.                                        |
+| `PORT`                     | `9992`      | HTTP listen port.                                                                                                                        |
+| `BRIDGE_API_KEY`           | unset       | Client-facing bearer key. Strongly recommended; required for admin endpoints.                                                            |
+| `REQUEST_BODY_LIMIT_BYTES` | `1048576`   | Fastify request body limit. Increase only for unusually large prompts/tool schemas.                                                      |
+| `RATE_LIMIT_MAX`           | `60`        | Max requests per rate-limit window per client.                                                                                           |
+| `RATE_LIMIT_WINDOW`        | `1 minute`  | Rate-limit window string accepted by `@fastify/rate-limit`.                                                                              |
+| `LOG_LEVEL`                | `info`      | Pino/Fastify log level. Common values: `debug`, `info`, `warn`, `error`, `silent`.                                                       |
+| `CORS_ORIGIN`              | unset       | Enables CORS for a specific browser origin. Leave unset for non-browser clients.                                                         |
+| `INCLUDE_REASONING`        | `false`     | If `true`, reasoning deltas return in the `reasoning_content` field instead of `content`. Keep `false` for normal OpenAI-compatible use. |
 
 ### CommandCode upstream options
 
@@ -451,6 +451,14 @@ When upgrading a persisted 1.3.1 dashboard catalog, enabled state and custom mod
 | `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY` | `error_on_length` | If upstream finishes with `finish_reason: length` before any visible content, return `commandcode_empty_visible_response` instead of blank success. Use `allow` only for legacy compatibility. |
 
 This protects clients from treating hidden-token exhaustion as a valid empty answer.
+
+For non-streaming Provider responses, `reasoning_content` counts as visible output only when `INCLUDE_REASONING=true`. Reasoning-only responses then return without an empty-response retry. With the flag off, hidden reasoning does not prevent an empty `length` response from exhausting retries and returning an error. Text and tool calls remain valid output regardless of the flag.
+
+### Model image input
+
+Both Alpha and Provider request builders remove image inputs for text-only models using the CommandCode CLI 1.53.0 model list in `src/model-images.ts`. Aliases resolve to the same policy. Older image inputs are removed; the latest image-bearing user or tool message receives numbered text markers instead. Image-only historical messages retain an omission marker so the message is not empty. The input conversation is not mutated.
+
+Vision-capable models keep their images. Unknown/custom models follow the CLI's image-capable fallback; absence from the text-only list is not a guarantee of upstream vision support. Update the list alongside future CLI catalog alignments. Alpha converts base64 data URIs to native image parts with `mimeType`; remote URLs remain text placeholders and are not downloaded by the bridge.
 
 ### Balance alert options
 

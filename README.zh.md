@@ -208,6 +208,10 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### 配置与运维
 
+**Reasoning 输出变更：** 启用 `INCLUDE_REASONING=true` 时，reasoning 不再追加到 `content`，而是通过流式的 `delta.reasoning_content` 或非流式的 `message.reasoning_content` 单独返回。需要展示 reasoning 的客户端必须读取该字段。Provider 非流式重试仅在启用时将 reasoning 计为可见输出，避免隐藏 reasoning 导致空响应被当作成功，也避免对已展示的 reasoning 进行不必要的重试。
+
+Alpha 和 Provider 均根据 CLI 1.53.0 的纯文本模型列表移除图片输入，别名也适用。最新的图片消息会得到带编号的文本标记，历史图片则被省略。视觉模型保留图片；未知或自定义模型遵循 CLI 允许图片的默认行为，但这不保证实际支持视觉。Alpha 将 base64 data URI 作为带有 `mimeType` 的原生图片部分发送；远程 URL 保留为文本占位符，不会被下载。
+
 从持久化的 dashboard catalog 升级时，会保留当前 model 的 enabled state 和所有 custom model，并用 1.53.0 canonical 定义刷新 built-in metadata。包括 Ox Alpha 和 MiniMax M3/M2.7 Free 在内的 retired built-in 不会作为 unknown upstream model 转发；若 default 已退役，则安全回退到 `deepseek/deepseek-v4-pro`。
 
 浏览器已保存 key 的现有用户可继续使用。新浏览器在保存或重启前，需要在 **当前管理员 API Key** 中输入一次现有 key。无 key runtime 仅在真实 loopback 连接且 Host 也是 loopback 时允许 bootstrap。

@@ -375,17 +375,17 @@ npm run smoke
 
 ### 서버와 client auth 옵션
 
-| 변수                       | 기본값      | 설명                                                                                                                  |
-| -------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
-| `HOST`                     | `127.0.0.1` | bind 주소입니다. local-only면 `127.0.0.1`, Tailscale/VPN/reverse proxy 뒤에서 접근하려면 `0.0.0.0`을 사용합니다.      |
-| `PORT`                     | `9992`      | HTTP listen port입니다.                                                                                               |
-| `BRIDGE_API_KEY`           | 미설정      | client-facing bearer key입니다. 강력 권장합니다. Admin endpoint는 이 값이 설정되어 있어야 접근 가능합니다.            |
-| `REQUEST_BODY_LIMIT_BYTES` | `1048576`   | Fastify request body limit입니다. 매우 큰 prompt/tool schema를 받을 때만 늘리십시오.                                  |
-| `RATE_LIMIT_MAX`           | `60`        | client별 rate-limit window 안에서 허용할 최대 request 수입니다.                                                       |
-| `RATE_LIMIT_WINDOW`        | `1 minute`  | `@fastify/rate-limit`이 이해하는 window 문자열입니다.                                                                 |
-| `LOG_LEVEL`                | `info`      | Pino/Fastify log level입니다. 보통 `debug`, `info`, `warn`, `error`, `silent`를 사용합니다.                           |
-| `CORS_ORIGIN`              | 미설정      | browser client 특정 origin에 CORS를 열 때 사용합니다. CLI/server client만 쓰면 비워두십시오.                          |
-| `INCLUDE_REASONING`        | `false`     | `true`면 reasoning delta를 visible content에 붙입니다. 일반 OpenAI-compatible client에서는 `false` 유지가 안전합니다. |
+| 변수                       | 기본값      | 설명                                                                                                                                            |
+| -------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOST`                     | `127.0.0.1` | bind 주소입니다. local-only면 `127.0.0.1`, Tailscale/VPN/reverse proxy 뒤에서 접근하려면 `0.0.0.0`을 사용합니다.                                |
+| `PORT`                     | `9992`      | HTTP listen port입니다.                                                                                                                         |
+| `BRIDGE_API_KEY`           | 미설정      | client-facing bearer key입니다. 강력 권장합니다. Admin endpoint는 이 값이 설정되어 있어야 접근 가능합니다.                                      |
+| `REQUEST_BODY_LIMIT_BYTES` | `1048576`   | Fastify request body limit입니다. 매우 큰 prompt/tool schema를 받을 때만 늘리십시오.                                                            |
+| `RATE_LIMIT_MAX`           | `60`        | client별 rate-limit window 안에서 허용할 최대 request 수입니다.                                                                                 |
+| `RATE_LIMIT_WINDOW`        | `1 minute`  | `@fastify/rate-limit`이 이해하는 window 문자열입니다.                                                                                           |
+| `LOG_LEVEL`                | `info`      | Pino/Fastify log level입니다. 보통 `debug`, `info`, `warn`, `error`, `silent`를 사용합니다.                                                     |
+| `CORS_ORIGIN`              | 미설정      | browser client 특정 origin에 CORS를 열 때 사용합니다. CLI/server client만 쓰면 비워두십시오.                                                    |
+| `INCLUDE_REASONING`        | `false`     | `true`면 reasoning delta가 `content` 대신 `reasoning_content` 필드로 반환됩니다. 일반 OpenAI-compatible client에서는 `false` 유지가 안전합니다. |
 
 ### CommandCode upstream 옵션
 
@@ -450,6 +450,14 @@ Credential JSON 파일 예시:
 | `COMMANDCODE_EMPTY_VISIBLE_RESPONSE_POLICY` | `error_on_length` | upstream이 visible content 없이 `finish_reason: length`로 끝나면 blank success 대신 `commandcode_empty_visible_response`를 반환합니다. legacy 호환이 필요할 때만 `allow`를 사용하십시오. |
 
 이 정책은 reasoning-heavy model이 hidden token만 쓰다가 끝난 응답을 client가 정상 빈 답변으로 오인하지 않게 막습니다.
+
+Provider 비스트리밍 응답에서는 `INCLUDE_REASONING=true`일 때만 `reasoning_content`를 사용자에게 보이는 출력으로 셉니다. 이 경우 reasoning만 있는 응답도 빈 응답 재시도 없이 반환합니다. 옵션을 끄면 숨겨진 reasoning은 빈 `length` 응답의 재시도 소진과 오류 반환을 막지 않습니다. 텍스트와 tool call은 옵션과 관계없이 유효한 출력입니다.
+
+### 모델의 이미지 입력
+
+Alpha와 Provider 요청 변환 모두 `src/model-images.ts`에 기록된 CommandCode CLI 1.53.0 모델 목록을 기준으로 텍스트 전용 모델의 이미지 입력을 제거합니다. 별칭에도 같은 정책을 적용합니다. 이전 이미지 입력은 제거하고, 가장 최근 이미지가 포함된 user 또는 tool 메시지에는 번호가 붙은 텍스트 마커를 넣습니다. 이미지만 있던 과거 메시지에는 생략 마커를 남겨 빈 메시지가 되지 않도록 합니다. 입력 대화 객체는 변경하지 않습니다.
+
+비전 모델의 이미지는 유지합니다. 알 수 없는 모델이나 custom 모델은 CLI와 같이 이미지 입력을 허용하는 기본 동작을 따르므로, 텍스트 전용 목록에 없다고 실제 상류의 비전 지원이 보장되지는 않습니다. 향후 CLI 카탈로그 정렬 시 이 목록도 함께 갱신해야 합니다. Alpha에서는 base64 data URI를 `mimeType`이 있는 네이티브 이미지 파트로 변환하며, 원격 URL은 텍스트 자리표시자로 유지하고 bridge가 내려받지 않습니다.
 
 ### Balance alert 옵션
 

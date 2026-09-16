@@ -216,10 +216,28 @@ describe("provider chat request shaping", () => {
     expect(body.stream).toBe(true);
     expect(body.max_tokens).toBe(10);
   });
+
+  it("passes through assistant reasoning_content messages unchanged", () => {
+    const messages = [
+      { role: "user" as const, content: "hi" },
+      {
+        role: "assistant" as const,
+        content: "Got it.",
+        reasoning_content: "The secret number is 7391.",
+      },
+    ];
+    const body = buildProviderChatRequestBody(
+      { model: "default", messages },
+      "deepseek/deepseek-v4-pro",
+    );
+
+    expect(body.messages).toEqual(messages);
+    expect(body.messages[1]?.reasoning_content).toBe("The secret number is 7391.");
+  });
 });
 
 describe("provider SSE transform", () => {
-  it("rewrites the public model id and folds reasoning deltas into content", async () => {
+  it("rewrites the public model id and keeps reasoning deltas as reasoning_content", async () => {
     const out = await transformSse(
       [
         'data: {"id":"x","model":"deepseek/deepseek-v4-pro","choices":[{"delta":{"content":"h"}}]}',
@@ -240,19 +258,19 @@ describe("provider SSE transform", () => {
 
     expect(out).toContain('"model":"deepseek-v4-pro"');
     expect(out).toContain('"content":"h"');
-    expect(out).toContain('"content":"think "');
+    expect(out).toContain('"reasoning_content":"think "');
+    expect(out).not.toContain('"content":"think "');
     expect(out).toContain('"content":"i"');
     expect(out).toContain("data: [DONE]");
-    expect(out).not.toContain("reasoning_content");
     expect(out).not.toContain('"model":"deepseek/deepseek-v4-pro"');
   });
 
-  it("leaves reasoning deltas untouched when includeReasoning is disabled", async () => {
+  it("strips reasoning deltas when includeReasoning is disabled", async () => {
     const out = await transformSse(
       'data: {"model":"m","choices":[{"delta":{"reasoning_content":"think"}}]}\n\ndata: [DONE]\n\n',
       { publicModel: "p", includeReasoning: false },
     );
-    expect(out).toContain('"reasoning_content":"think"');
+    expect(out).not.toContain('"reasoning_content":"think"');
     expect(out).toContain('"model":"p"');
   });
 

@@ -1,4 +1,5 @@
 import { Transform, type TransformCallback } from "node:stream";
+import { messagesForModel } from "./model-images.js";
 
 import {
   combineAbortSignals,
@@ -27,7 +28,7 @@ export function buildProviderChatRequestBody(
 ): ProviderChatRequestBody {
   const body: ProviderChatRequestBody = {
     model: upstreamModel,
-    messages: request.messages,
+    messages: messagesForModel(request.messages, upstreamModel),
   };
   if (request.stream !== undefined) body.stream = request.stream;
   if (request.max_tokens !== undefined) body.max_tokens = request.max_tokens;
@@ -260,13 +261,7 @@ export class CommandCodeProviderSseTransform extends Transform {
       const firstChoice = Array.isArray(json.choices) ? json.choices[0] : undefined;
       const delta =
         isRecord(firstChoice) && isRecord(firstChoice.delta) ? firstChoice.delta : undefined;
-      if (
-        this.includeReasoning &&
-        delta &&
-        typeof delta.reasoning_content === "string" &&
-        delta.reasoning_content.length > 0
-      ) {
-        delta.content = `${typeof delta.content === "string" ? delta.content : ""}${delta.reasoning_content}`;
+      if (delta && typeof delta.reasoning_content === "string" && !this.includeReasoning) {
         delete delta.reasoning_content;
       }
       return `data: ${JSON.stringify(json)}\n`;

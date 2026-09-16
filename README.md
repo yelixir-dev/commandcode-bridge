@@ -208,6 +208,10 @@ Open `http://127.0.0.1:9992/dashboard`. The mobile-first UI stores its Korean/En
 
 ### Configuration and operations
 
+**Reasoning output change:** with `INCLUDE_REASONING=true`, reasoning is returned separately as `delta.reasoning_content` (streaming) or `message.reasoning_content` (non-streaming), not appended to `content`. Clients that display reasoning must read that field. Non-streaming Provider retries count reasoning as visible only when enabled, avoiding both blank success with hidden reasoning and unnecessary retries for exposed reasoning.
+
+Image inputs are removed for the CLI 1.53.0 text-only model list in both Alpha and Provider modes, including aliases. The newest image-bearing message gets numbered text markers; historical images are omitted. Vision models retain images, while unknown/custom models follow the CLI's image-capable fallback, not a guarantee of actual vision support. Alpha sends base64 data URIs as native image parts with `mimeType`; remote URLs remain text placeholders and are not downloaded.
+
 Upgrades from a persisted dashboard catalog preserve each current model's enabled state and all custom models, while refreshing built-in metadata from the 1.53.0 canonical definitions. Retired built-ins, including Ox Alpha and the MiniMax M3/M2.7 Free models, are removed rather than forwarded as unknown upstream models; a retired configured default falls back to `deepseek/deepseek-v4-pro`.
 
 Existing browsers with a saved key continue without interruption. On a fresh browser, enter the current key in **Current Admin API Key** before saving or restarting. A runtime with no key can bootstrap only from a real loopback connection whose Host is also loopback.
