@@ -293,6 +293,200 @@ describe("OpenAI to CommandCode conversion", () => {
     ]);
   });
 
+  it("converts base64 image_url parts into native image parts with mimeType", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4-flash-vision-exp",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "What is in this image?" },
+              { type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } },
+            ],
+          },
+        ],
+      },
+      upstreamModel: "deepseek/deepseek-v4-flash-vision-exp",
+    });
+
+    expect(body.params.messages).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "What is in this image?" },
+          { type: "image", image: "data:image/png;base64,AAAA", mimeType: "image/png" },
+        ],
+      },
+    ]);
+  });
+
+  it("flattens image parts to short placeholders instead of inlining base64", () => {
+    expect(
+      flattenOpenAIContent([
+        { type: "text", text: "look" },
+        { type: "image_url", image_url: { url: "data:image/jpeg;base64,AAAA" } },
+      ]),
+    ).toBe("look[image: image/jpeg]");
+    expect(
+      flattenOpenAIContent([{ type: "image_url", image_url: "https://example.com/cat.png" }]),
+    ).toBe("[image_url: https://example.com/cat.png]");
+  });
+
+  it("keeps remote image URLs as text placeholders instead of image parts", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4-flash-vision-exp",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "What is this?" },
+              { type: "image_url", image_url: { url: "https://example.com/cat.png" } },
+            ],
+          },
+        ],
+      },
+      upstreamModel: "deepseek/deepseek-v4-flash-vision-exp",
+    });
+
+    expect(body.params.messages).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "What is this?" },
+          { type: "text", text: "[image_url: https://example.com/cat.png]" },
+        ],
+      },
+    ]);
+  });
+
+  it("falls back to text for data URIs that are not base64 encoded", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4-flash-vision-exp",
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "image_url", image_url: "data:image/svg+xml,%3Csvg%3E" }],
+          },
+        ],
+      },
+      upstreamModel: "deepseek/deepseek-v4-flash-vision-exp",
+    });
+
+    expect(body.params.messages).toEqual([
+      {
+        role: "user",
+        content: [{ type: "text", text: "[image: image/svg+xml]" }],
+      },
+    ]);
+  });
+
+  it("forwards tool-result images as a following user image message", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4-flash-vision-exp",
+        messages: [
+          { role: "user", content: "Inspect the screenshot." },
+          {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_shot",
+                type: "function",
+                function: { name: "read_image", arguments: "{}" },
+              },
+            ],
+          },
+          {
+            role: "tool",
+            tool_call_id: "call_shot",
+            content: [
+              { type: "text", text: "Screenshot captured." },
+              { type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } },
+            ],
+          },
+        ],
+      },
+      upstreamModel: "deepseek/deepseek-v4-flash-vision-exp",
+    });
+
+    expect(body.params.messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+      "tool",
+      "user",
+    ]);
+    expect(body.params.messages[2]).toEqual({
+      role: "tool",
+      content: [
+        {
+          type: "tool-result",
+          toolCallId: "call_shot",
+          toolName: "read_image",
+          output: { type: "text", value: "Screenshot captured.[image: image/png]" },
+        },
+      ],
+    });
+    expect(body.params.messages[3]).toEqual({
+      role: "user",
+      content: [{ type: "image", image: "data:image/png;base64,AAAA", mimeType: "image/png" }],
+    });
+  });
+
+  it("keeps remote tool-result image URLs in the tool text only", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4-flash-vision-exp",
+        messages: [
+          { role: "user", content: "Inspect the screenshot." },
+          {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_shot",
+                type: "function",
+                function: { name: "read_image", arguments: "{}" },
+              },
+            ],
+          },
+          {
+            role: "tool",
+            tool_call_id: "call_shot",
+            content: [
+              { type: "text", text: "Screenshot captured." },
+              { type: "image_url", image_url: { url: "https://example.com/shot.png" } },
+            ],
+          },
+        ],
+      },
+      upstreamModel: "deepseek/deepseek-v4-flash-vision-exp",
+    });
+
+    expect(body.params.messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+      "tool",
+    ]);
+    expect(body.params.messages[2]).toEqual({
+      role: "tool",
+      content: [
+        {
+          type: "tool-result",
+          toolCallId: "call_shot",
+          toolName: "read_image",
+          output: {
+            type: "text",
+            value: "Screenshot captured.[image_url: https://example.com/shot.png]",
+          },
+        },
+      ],
+    });
+  });
+
   it("injects JSON-only guidance for OpenAI response_format", () => {
     const body = buildCommandCodeGenerateBody({
       request: {

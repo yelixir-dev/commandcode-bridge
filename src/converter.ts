@@ -4,6 +4,7 @@ import { cwd as processCwd } from "node:process";
 import type {
   CommandCodeContentPart,
   CommandCodeGenerateBody,
+  CommandCodeImagePart,
   CommandCodeMessage,
   CommandCodeTool,
   CommandCodeToolResultPart,
@@ -37,16 +38,74 @@ function imageUrlToText(value: unknown): string {
   return "";
 }
 
+function imageMediaType(dataUri: string): string | undefined {
+  const match = /^data:([^;,]+);base64,/.exec(dataUri);
+  return match?.[1];
+}
+
+function imagePartFromUrl(value: unknown): CommandCodeImagePart | undefined {
+  const url = imageUrlToText(value);
+  const mimeType = url ? imageMediaType(url) : undefined;
+  if (!mimeType) return undefined;
+  return { type: "image", image: url, mimeType };
+}
+
+function imagePlaceholder(value: unknown): string {
+  const url = imageUrlToText(value);
+  if (!url) return "[image_url]";
+  if (url.startsWith("data:")) {
+    const mediaType = /^data:([^;,]+)/.exec(url)?.[1];
+    return `[image: ${mediaType ?? "image"}]`;
+  }
+  return `[image_url: ${url.slice(0, 256)}]`;
+}
+
 export function flattenOpenAIContent(content: OpenAIMessageContent | undefined): string {
   if (content === undefined || content === null) return "";
   if (typeof content === "string") return content;
   return content
     .map((part) => {
       if (isTextPart(part)) return part.text;
-      if (part.type === "image_url") return `[image_url: ${imageUrlToText(part.image_url)}]`;
+      if (part.type === "image_url") return imagePlaceholder(part.image_url);
       return "";
     })
     .join("");
+}
+
+function toolResultImages(content: OpenAIMessageContent | undefined): CommandCodeContentPart[] {
+  if (content === undefined || content === null || typeof content === "string") return [];
+  const images: CommandCodeContentPart[] = [];
+  for (const part of content) {
+    if (part.type !== "image_url") continue;
+    const imagePart = imagePartFromUrl(part.image_url);
+    if (imagePart) images.push(imagePart);
+  }
+  return images;
+}
+
+function convertUserContent(
+  content: OpenAIMessageContent | undefined,
+  prefix: string,
+): CommandCodeContentPart[] {
+  const parts: CommandCodeContentPart[] = [];
+  if (prefix.length > 0) parts.push({ type: "text", text: prefix });
+  if (content === undefined || content === null) return parts;
+  if (typeof content === "string") {
+    if (content.length > 0) parts.push({ type: "text", text: content });
+    return parts;
+  }
+  for (const part of content) {
+    if (isTextPart(part)) {
+      if (part.text.length > 0) parts.push({ type: "text", text: part.text });
+      continue;
+    }
+    if (part.type === "image_url") {
+      const imagePart = imagePartFromUrl(part.image_url);
+      if (imagePart) parts.push(imagePart);
+      else parts.push({ type: "text", text: imagePlaceholder(part.image_url) });
+    }
+  }
+  return parts;
 }
 
 function asTextContent(text: string): OpenAITextContentPart[] {
@@ -130,13 +189,18 @@ function convertMessages(messages: OpenAIChatMessage[]): CommandCodeMessage[] {
       } else {
         converted.push({ role: "tool", content: [part] });
       }
+      const images = toolResultImages(message.content);
+      if (images.length > 0) {
+        converted.push({ role: "user", content: images });
+      }
       continue;
     }
 
     const userPrefix = message.name ? `name: ${message.name}\n` : "";
+    const userParts = convertUserContent(message.content, userPrefix);
     converted.push({
       role: "user",
-      content: asTextContent(`${userPrefix}${flattenOpenAIContent(message.content)}`),
+      content: userParts.length > 0 ? userParts : asTextContent(""),
     });
   }
 

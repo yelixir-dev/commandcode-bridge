@@ -95,8 +95,15 @@ export interface CommandCodeToolResultPart {
   output: { type: "text" | "error-text"; value: string };
 }
 
+export interface CommandCodeImagePart {
+  type: "image";
+  image: string;
+  mimeType: string;
+}
+
 export type CommandCodeContentPart =
   | OpenAITextContentPart
+  | CommandCodeImagePart
   | CommandCodeToolCallPart
   | CommandCodeToolResultPart;
 
