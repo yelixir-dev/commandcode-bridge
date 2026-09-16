@@ -144,6 +144,13 @@
 - Regression-first verification observed 10 expected failures before implementation (version, catalog, context, dashboard, and six retired-id cases). Focused config/dashboard/Alpha/Provider/server tests then passed: 122 tests in five files. Full `npm test` passed once: 222 tests in 15 files. LSP diagnostics on all five changed TypeScript files, `npm run typecheck`, `npm run lint`, and `npm run build` passed.
 - Built-artifact HTTP QA used isolated HOME/config/auth, a local unused port, Alpha mode, and a non-routable upstream. The listening log event signaled readiness without polling. `/health` returned `1.49.0.a`, `/v1/models` returned all 68 canonical models (192 entries with aliases) with matching context fields, and an empty chat request returned structured `400 invalid_request`. Both QA processes were stopped. `node dist/index.js --help` still starts the HTTP server rather than printing help; this existing behavior was observed and its process stopped.
 
+## 2026-09-16
+
+- Bridge-only release `1.53.0.c` incorporates PR #3 and the image-input policy from issue #5; the CLI baseline remains `1.53.0` and the 70-model catalog is unchanged.
+- With `INCLUDE_REASONING=true`, streaming and non-streaming responses return reasoning separately in `reasoning_content`, rather than appending it to `content`. Clients displaying reasoning must read the separate field. Provider empty-response retries count reasoning only when it is exposed.
+- Alpha forwards base64 image inputs as native image parts with `mimeType`; remote URLs remain text placeholders. Both transports apply the CLI's 23-model text-only input policy, including aliases, while preserving vision-capable and unknown-model fallback behavior.
+- Contributor commits are preserved in the merge of PR #3. The release contains no deployment credentials or environment changes.
+
 ## 2026-09-15
 
 - Released bridge version `1.53.0.b` against an unchanged CommandCode CLI `1.53.0`; this is a bridge-only bugfix release and no catalog, model, or version default other than the bridge version string changed.
@@ -167,15 +174,15 @@
 - An independent read-only differential audit of both npm bundles found the Alpha caching work of 1.50.0 to be additive rather than breaking: `params.system` may now be a structured block list with `cache_control`, `promptCache` is an optional top-level field, and one-hour cache-write counts arrive as extra provider metadata. The bridge keeps sending a string system prompt with no `promptCache`, its parsers ignore unknown metadata, and existing `cacheReadTokens`/`cacheWriteTokens` mapping stays correct, so no protocol code changed. Adopting cache blocks or org spend-cap surfacing would be separate feature work. `/alpha/generate` transport, `buildCommandAuthHeaders`, `toWireMessages`/`toWireTools`, the 64,000 default output limit, and the NDJSON stream reader are unchanged.
 - Regression-first verification observed 6 expected catalog/version failures before implementation, then 30 passing focused config tests. The full suite passed once with 226 tests in 15 files, alongside `npm run typecheck`, `npm run lint`, Prettier checks on the changed parser-supported files, `npm run build`, `npm pack --dry-run`, and `git diff --check`.
 
-## Current status — 2026-09-04
+## Current status — 2026-09-16
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.49.0.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.53.0.c`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and same-origin dashboard configuration.
-- Model surface: 68 statically aligned models with live Provider API refresh when available.
+- Model surface: 70 statically aligned models with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
 - Deployment surface: Docker/Compose, Linux install/uninstall scripts, nginx and systemd release assets, and GitHub/GitLab CI definitions.
-- Verification: `npm run typecheck`, `npm run lint`, all 222 Vitest tests in 15 files, and `npm run build` pass on this workstation.
-- Known local exception: `npm run format:check` fails only because the untracked workspace instruction file `AGENTS.md` is not Prettier-formatted. It is not part of the tracked product tree and was left untouched.
+- Verification baseline: merged PR #3 passed 265 tests in 17 files, local HTTP QA, and GitHub CI on Node 20, 22, and 24. Release and deployment checks are performed separately for each version.
+- Local workspace instruction file `AGENTS.md` remains untracked and is excluded from release commits.
 - Local HTTP QA verifies `/health` reports the current bridge release, `/v1/models` returns the configured model list, and an empty chat request returns the expected structured `400 invalid_request`.
 - Session recovery note: the current Senpi transcript exists at the path in `PI_SESSION_FILE`. Cross-platform local session search found no recoverable project implementation transcript covering the missing period, so the entries above were reconstructed from Git history and verified against the current source and test suite.
