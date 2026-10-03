@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.74.0.a-b57920?style=flat-square" alt="Version 1.74.0.a"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.74.0.b-b57920?style=flat-square" alt="Version 1.74.0.b"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-85-1f6f78?style=flat-square" alt="85 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -245,7 +245,7 @@ The previous single-file dashboard (`src/dashboard.ts`) was retired in 1.66.0.b.
 
 ### Credential routing
 
-`daily_burn_priority` is the default and weights required daily burn (`depletion_aware` is its legacy alias); `balance_priority` prefers usable balance; `round_robin` rotates smoothly by weight; `drain_first` drains the eligible key with the least remaining time, then moves to the next. Every policy first narrows to eligible credentials expiring within 1 day. Manual disablement, `allowedModels`, in-flight caps, exhausted/expired balance, auth failure, and billing (402) cooldown can exclude a key; 429/5xx/timeouts are retried without cooling the key down. Each request stays on one key; failover occurs only before visible output. **Session affinity** keeps the turns of one conversation (same system text and first user message) on the key that served it, so the upstream prompt cache stays warm, and sends one stable CLI-shaped `threadId`/`x-session-id` per conversation. A pin is only a preference: health, capacity, urgent expiry, and exclusion still apply first, and a failed key hands the conversation to the next choice. Pins expire after `COMMANDCODE_SESSION_AFFINITY_TTL_MS` (2 hours; `0` disables), and the dashboard shows live sessions per key.
+`daily_burn_priority` is the default and weights required daily burn (`depletion_aware` is its legacy alias); `balance_priority` prefers usable balance; `round_robin` rotates smoothly by weight; `drain_first` drains the eligible key with the least remaining time, then moves to the next. Every policy first narrows to eligible credentials expiring within 1 day. Manual disablement, `allowedModels`, in-flight caps, exhausted/expired balance, auth failure, and billing cooldown (402, or a 400 "insufficient credits" response, which also moves the request to another key) can exclude a key; 429/5xx/timeouts are retried without cooling the key down. Each request stays on one key; failover occurs only before visible output. **Session affinity** keeps the turns of one conversation (same system text and first user message) on the key that served it, so the upstream prompt cache stays warm, and sends one stable CLI-shaped `threadId`/`x-session-id` per conversation. A pin is only a preference: health, capacity, urgent expiry, and exclusion still apply first, and a failed key hands the conversation to the next choice. Pins expire after `COMMANDCODE_SESSION_AFFINITY_TTL_MS` (2 hours; `0` disables), and the dashboard shows live sessions per key.
 
 ### Configuration and operations
 

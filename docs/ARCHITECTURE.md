@@ -52,7 +52,7 @@ DeepSeek V4 Pro / Flash etc.
    - forced `tool_choice` values → HTTP 400 `unsupported_tool_choice`
 7. Bridge posts to `COMMANDCODE_API_BASE/alpha/generate` with `params.stream: true`.
 8. CommandCode newline/SSE-like events are parsed.
-9. If a selected credential fails before visible output, retryable 401/402/429/5xx/timeouts can fail over to another available credential.
+9. If a selected credential fails before visible output, retryable 401/402/403/429/5xx/timeouts and 400 insufficient-credits responses can fail over to another available credential.
 10. For `stream=false`, text deltas and tool-call events are aggregated into one OpenAI `chat.completion`.
 11. For `stream=true`, text deltas and tool-call events are emitted as OpenAI `chat.completion.chunk` SSE frames. When `stream_options.include_usage` is true, the bridge emits a final usage-only chunk with `choices: []` before `[DONE]`.
 
@@ -79,8 +79,8 @@ The Provider API emits token usage in the final chunk with no opt-in required; `
 - Invalid OpenAI request → HTTP 400 OpenAI-style error.
 - Disallowed model → HTTP 400 OpenAI-style error.
 - Missing upstream API key → HTTP 500 configuration error.
-- Transient upstream failures (429, 5xx, timeouts, empty bodies) are retried with exponential backoff up to `COMMANDCODE_RETRY_MAX_ATTEMPTS` (default 5, base `COMMANDCODE_RETRY_BACKOFF_MS` doubled per attempt, capped at 2s). A credential that fails with 401/402/403 is excluded for the rest of the request so other keys are preferred; retries stop once any visible output has been emitted.
-- Provider API HTTP failure → upstream status and OpenAI-style error body forwarded (for example `403 upgrade_required` or `429 rate_limit_error`); only credential-scoped statuses (401/402/403) disable or cool down the key; 429/5xx release it without a cooldown.
+- Transient upstream failures (429, 5xx, timeouts, empty bodies) are retried with exponential backoff up to `COMMANDCODE_RETRY_MAX_ATTEMPTS` (default 5, base `COMMANDCODE_RETRY_BACKOFF_MS` doubled per attempt, capped at 2s). A credential that fails with 401/402/403 or a 400 insufficient-credits response is excluded for the rest of the request so other keys are preferred; retries stop once any visible output has been emitted.
+- Provider API HTTP failure → upstream status and OpenAI-style error body forwarded (for example `403 upgrade_required` or `429 rate_limit_error`); only credential-scoped failures (401/402/403 and 400 insufficient credits) disable or cool down the key; 429/5xx release it without a cooldown.
 - `/alpha` HTTP failure → HTTP 502 with upstream status and sanitized body.
 - `/alpha` stream `error` event → fail over first if no visible output has been emitted and another credential is available; otherwise map to HTTP 502 or SSE error frame plus `[DONE]`.
 - No available upstream credential → HTTP 503 OpenAI-style upstream error.

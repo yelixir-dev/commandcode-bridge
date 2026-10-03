@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.74.0.a-b57920?style=flat-square" alt="Version 1.74.0.a"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.74.0.b-b57920?style=flat-square" alt="Version 1.74.0.b"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-85-1f6f78?style=flat-square" alt="85 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -245,7 +245,7 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Credential routing
 
-`daily_burn_priority` 是按 required daily burn 加权的默认值，`depletion_aware` 是 legacy alias；`balance_priority` 偏好 usable balance；`round_robin` 平滑按 weight 轮换；`drain_first` 优先耗尽剩余期限最短的 eligible key，再移动到下一个。所有 policy 先缩小到 1 天内到期的 eligible credential。Manual disable、`allowedModels`、in-flight cap、exhausted/expired balance、auth failure、billing（402）cooldown 都可排除 key；429/5xx/timeout 会重试，但不会让 key 进入 cooldown。每个请求固定一个 key；仅在 visible output 前 failover。**Session affinity** 会把同一对话（相同 system 文本与第一条 user 消息）的各轮次持续发往处理过它的 key，以保持 upstream prompt cache 命中，并为每个对话发送一个与 CLI 形态相同的固定 `threadId`/`x-session-id`。固定只是偏好：health、capacity、临近到期和排除规则优先生效，失败的 key 会把对话交给下一个选择。固定在 `COMMANDCODE_SESSION_AFFINITY_TTL_MS`（2 小时，`0` 为关闭）后过期，dashboard 显示每个 key 的活跃对话数。
+`daily_burn_priority` 是按 required daily burn 加权的默认值，`depletion_aware` 是 legacy alias；`balance_priority` 偏好 usable balance；`round_robin` 平滑按 weight 轮换；`drain_first` 优先耗尽剩余期限最短的 eligible key，再移动到下一个。所有 policy 先缩小到 1 天内到期的 eligible credential。Manual disable、`allowedModels`、in-flight cap、exhausted/expired balance、auth failure、billing cooldown（402 或 "insufficient credits" 的 400，该请求会转到其他 key）都可排除 key；429/5xx/timeout 会重试，但不会让 key 进入 cooldown。每个请求固定一个 key；仅在 visible output 前 failover。**Session affinity** 会把同一对话（相同 system 文本与第一条 user 消息）的各轮次持续发往处理过它的 key，以保持 upstream prompt cache 命中，并为每个对话发送一个与 CLI 形态相同的固定 `threadId`/`x-session-id`。固定只是偏好：health、capacity、临近到期和排除规则优先生效，失败的 key 会把对话交给下一个选择。固定在 `COMMANDCODE_SESSION_AFFINITY_TTL_MS`（2 小时，`0` 为关闭）后过期，dashboard 显示每个 key 的活跃对话数。
 
 ### 配置与运维
 

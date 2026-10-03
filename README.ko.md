@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="package.json"><img src="https://img.shields.io/badge/version-1.74.0.a-b57920?style=flat-square" alt="Version 1.74.0.a"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/version-1.74.0.b-b57920?style=flat-square" alt="Version 1.74.0.b"></a>
   <a href="src/model-catalog.ts"><img src="https://img.shields.io/badge/models-85-1f6f78?style=flat-square" alt="85 models"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-20%2B-9f4d2e?style=flat-square" alt="Node.js 20+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-28231f?style=flat-square" alt="MIT License"></a>
@@ -245,7 +245,7 @@ curl -sS http://127.0.0.1:9992/v1/chat/completions \
 
 ### Credential routing
 
-`daily_burn_priority`는 required daily burn을 가중하는 기본값이며 `depletion_aware`는 legacy alias입니다. `balance_priority`는 usable balance, `round_robin`은 smooth weight rotation, `drain_first`는 남은 기한이 가장 적은 eligible key를 먼저 소진합니다. 모든 policy는 먼저 1일 안에 만료되는 eligible credential로 범위를 좁힙니다. Manual disable, `allowedModels`, in-flight cap, exhausted/expired balance, auth failure, billing(402) cooldown은 key를 제외할 수 있습니다. 429/5xx/timeout은 key를 cooldown하지 않고 재시도합니다. 요청 하나는 key 하나에 고정되고 visible output 전까지만 failover합니다. **Session affinity**는 한 대화(같은 system 텍스트와 첫 user 메시지)의 여러 turn을 그 대화를 처리한 key에 계속 보내 upstream prompt cache를 살리고, 대화마다 CLI와 같은 형태의 고정 `threadId`/`x-session-id` 하나를 보냅니다. 고정은 선호일 뿐이라 health, capacity, 임박 만료, 제외 규칙이 먼저 적용되며 실패한 key는 대화를 다음 선택으로 넘깁니다. 고정은 `COMMANDCODE_SESSION_AFFINITY_TTL_MS`(2시간, `0`이면 끔) 후 만료되고, dashboard에서 key별 활성 대화 수를 볼 수 있습니다.
+`daily_burn_priority`는 required daily burn을 가중하는 기본값이며 `depletion_aware`는 legacy alias입니다. `balance_priority`는 usable balance, `round_robin`은 smooth weight rotation, `drain_first`는 남은 기한이 가장 적은 eligible key를 먼저 소진합니다. 모든 policy는 먼저 1일 안에 만료되는 eligible credential로 범위를 좁힙니다. Manual disable, `allowedModels`, in-flight cap, exhausted/expired balance, auth failure, billing cooldown(402 또는 "insufficient credits" 400; 해당 요청은 다른 key로 넘어감)은 key를 제외할 수 있습니다. 429/5xx/timeout은 key를 cooldown하지 않고 재시도합니다. 요청 하나는 key 하나에 고정되고 visible output 전까지만 failover합니다. **Session affinity**는 한 대화(같은 system 텍스트와 첫 user 메시지)의 여러 turn을 그 대화를 처리한 key에 계속 보내 upstream prompt cache를 살리고, 대화마다 CLI와 같은 형태의 고정 `threadId`/`x-session-id` 하나를 보냅니다. 고정은 선호일 뿐이라 health, capacity, 임박 만료, 제외 규칙이 먼저 적용되며 실패한 key는 대화를 다음 선택으로 넘깁니다. 고정은 `COMMANDCODE_SESSION_AFFINITY_TTL_MS`(2시간, `0`이면 끔) 후 만료되고, dashboard에서 key별 활성 대화 수를 볼 수 있습니다.
 
 ### 설정과 운영
 

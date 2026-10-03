@@ -424,19 +424,19 @@ Credential JSON 파일 예시:
 
 ### Multi-key routing 옵션
 
-| 변수                                  | 기본값            | 설명                                                                                                                          |
-| ------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `COMMANDCODE_ROUTING_POLICY`          | `depletion_aware` | `depletion_aware`는 billing/expiry pressure 기준으로 라우팅합니다. `round_robin`은 eligible key를 weight 기준으로 순환합니다. |
-| `COMMANDCODE_BILLING_REFRESH_MS`      | `300000`          | credential별 billing/usage cache TTL입니다.                                                                                   |
-| `COMMANDCODE_BILLING_TIMEOUT_MS`      | `10000`           | billing probe timeout입니다. probe 실패 시 요청이 멈추지 않도록 안전하게 fallback합니다.                                      |
-| `COMMANDCODE_CREDENTIAL_COOLDOWN_MS`  | `60000`           | 402 이후 최소 cooldown입니다. 이 값과 billing refresh window 중 큰 값을 씁니다. 429/5xx/timeout은 cooldown 없이 재시도합니다. |
-| `COMMANDCODE_SESSION_AFFINITY_TTL_MS` | `7200000`         | 한 대화가 마지막으로 처리한 key에 머무는 시간입니다. `0`이면 affinity를 끄고 요청마다 새 thread id를 보냅니다.                |
+| 변수                                  | 기본값            | 설명                                                                                                                                                             |
+| ------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `COMMANDCODE_ROUTING_POLICY`          | `depletion_aware` | `depletion_aware`는 billing/expiry pressure 기준으로 라우팅합니다. `round_robin`은 eligible key를 weight 기준으로 순환합니다.                                    |
+| `COMMANDCODE_BILLING_REFRESH_MS`      | `300000`          | credential별 billing/usage cache TTL입니다.                                                                                                                      |
+| `COMMANDCODE_BILLING_TIMEOUT_MS`      | `10000`           | billing probe timeout입니다. probe 실패 시 요청이 멈추지 않도록 안전하게 fallback합니다.                                                                         |
+| `COMMANDCODE_CREDENTIAL_COOLDOWN_MS`  | `60000`           | 402 또는 400 insufficient credits 응답 이후 최소 cooldown입니다. 이 값과 billing refresh window 중 큰 값을 씁니다. 429/5xx/timeout은 cooldown 없이 재시도합니다. |
+| `COMMANDCODE_SESSION_AFFINITY_TTL_MS` | `7200000`         | 한 대화가 마지막으로 처리한 key에 머무는 시간입니다. `0`이면 affinity를 끄고 요청마다 새 thread id를 보냅니다.                                                   |
 
 라우팅 동작 요약:
 
 - `depletion_aware`는 reset 전에 소진해야 하는 monthly/free credit 압력이 높은 key에 더 많은 traffic을 보냅니다.
 - 모든 policy는 monthly/free `expiringBalance`가 양수이고 남은 기간이 1일 이하인 credential을 먼저 사용합니다. purchased-only credit은 reserve이므로 urgent pool에 들어가지 않습니다.
-- 고갈된 key(402)는 cooldown 동안, 인증 실패 key(401)는 계속 제외됩니다. 429/5xx/timeout 같은 provider 단위 오류는 key를 cooldown하지 않고 요청 안에서 재시도합니다.
+- 고갈된 key(402 또는 "insufficient credits" 400)는 cooldown 동안, 인증 실패 key(401)는 계속 제외됩니다. 이런 응답이나 403을 받은 요청은 다른 key로 넘어갑니다. 429/5xx/timeout 같은 provider 단위 오류는 key를 cooldown하지 않고 요청 안에서 재시도합니다.
 - visible output 전 application-level stream error가 오면 다른 credential로 failover할 수 있습니다.
 - 이미 visible output을 보낸 뒤에는 중복 출력을 피하기 위해 retry하지 않고 error를 표면화합니다.
 

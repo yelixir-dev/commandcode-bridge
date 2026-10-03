@@ -144,6 +144,15 @@
 - Regression-first verification observed 10 expected failures before implementation (version, catalog, context, dashboard, and six retired-id cases). Focused config/dashboard/Alpha/Provider/server tests then passed: 122 tests in five files. Full `npm test` passed once: 222 tests in 15 files. LSP diagnostics on all five changed TypeScript files, `npm run typecheck`, `npm run lint`, and `npm run build` passed.
 - Built-artifact HTTP QA used isolated HOME/config/auth, a local unused port, Alpha mode, and a non-routable upstream. The listening log event signaled readiness without polling. `/health` returned `1.49.0.a`, `/v1/models` returned all 68 canonical models (192 entries with aliases) with matching context fields, and an empty chat request returned structured `400 invalid_request`. Both QA processes were stopped. `node dist/index.js --help` still starts the HTTP server rather than printing help; this existing behavior was observed and its process stopped.
 
+## 2026-10-03 (1.74.0.b)
+
+- Released bridge-only version `1.74.0.b` on CommandCode CLI `1.74.0` with PR #7 (commit `187107e`, merge `278e83a`) and PR #8 (commit `5f5141a`, merge `0eea7eb`) from WhatAHappyPig (`A8Cl233395`).
+- PR #7: CommandCode reports a drained key as HTTP 400 with an "insufficient credits" message rather than 402, and the bridge treated every 400 as client-scoped, so the key stayed in rotation and kept failing. Both paths now pass the upstream error message to the router; a 400 matching `insufficient (credits|balance)` is credential-scoped and starts an `insufficient_credits` cooldown of `max(COMMANDCODE_CREDENTIAL_COOLDOWN_MS, billing refresh)`. Unlike 402, a billing refresh does not clear it, because upstream pre-charges the estimated cost and a positive balance can still be too small. The installed CLI 1.74.0 uses the same check (`400 === status && message.toLowerCase().includes("insufficient credits")`).
+- PR #8: one shared `shouldRetryStatus(statusCode, errorMessage)` now drives both paths. Insufficient-credits 400s and 403s rotate to another key within the request (the Alpha path did not retry 403 before), with the failed key excluded for the rest of the request. Other 400/404/422 fail fast; 429/5xx keep retrying without a cooldown.
+- With a single key, a drained key now returns `NoAvailableCommandCodeCredentialError` (503) for the cooldown window instead of repeating the upstream 400. The dashboard shows the new state as "Cooling" because it reads `disabledUntil`. `PREMIUM_CREDITS_EXHAUSTED`, which the CLI also recognizes, is not classified.
+- Updated the README routing paragraph (English, Korean, Chinese), `docs/KNOW_HOW.md`, `docs/ARCHITECTURE.md`, and both deployment guides.
+- Verification: PR CI passed on Node 20/22/24 for both PRs; locally #7 alone passed 299 tests and #7 + #8 on `main` passed 303 tests in 16 files, and `npm run verify` passed on the release commit. Built-artifact HTTP QA with two keys against a mock Alpha upstream: a key answering 400 "Insufficient credits" made the first request rotate to the other key and succeed (200), later requests skipped the drained key, and a plain 400 made exactly one upstream call and failed.
+
 ## 2026-10-02 (1.74.0.a)
 
 - Updated the locally installed CommandCode CLI from `1.66.0` to `1.74.0` and released bridge version `1.74.0.a`.
@@ -226,10 +235,10 @@
 - An independent read-only differential audit of both npm bundles found the Alpha caching work of 1.50.0 to be additive rather than breaking: `params.system` may now be a structured block list with `cache_control`, `promptCache` is an optional top-level field, and one-hour cache-write counts arrive as extra provider metadata. The bridge keeps sending a string system prompt with no `promptCache`, its parsers ignore unknown metadata, and existing `cacheReadTokens`/`cacheWriteTokens` mapping stays correct, so no protocol code changed. Adopting cache blocks or org spend-cap surfacing would be separate feature work. `/alpha/generate` transport, `buildCommandAuthHeaders`, `toWireMessages`/`toWireTools`, the 64,000 default output limit, and the NDJSON stream reader are unchanged.
 - Regression-first verification observed 6 expected catalog/version failures before implementation, then 30 passing focused config tests. The full suite passed once with 226 tests in 15 files, alongside `npm run typecheck`, `npm run lint`, Prettier checks on the changed parser-supported files, `npm run build`, `npm pack --dry-run`, and `git diff --check`.
 
-## Current status — 2026-10-02
+## Current status — 2026-10-03
 
 - Branch: `main`, synchronized with `origin/main` when this status audit began.
-- Package: `commandcode-bridge` `1.74.0.a`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
+- Package: `commandcode-bridge` `1.74.0.b`, Node.js `>=20`, with `commandcode-bridge` and `commandcode-router` executables.
 - API surface: authenticated OpenAI-compatible `/v1/models` and `/v1/chat/completions`, health endpoint, and the static `/dashboard/` operations console over same-origin admin configuration.
 - Model surface: 85 statically aligned models (CommandCode CLI 1.74.0) with live Provider API refresh when available.
 - Routing surface: `daily_burn_priority`, `balance_priority`, `round_robin`, and `drain_first`, with per-key model scope, concurrency, cooldown, failover, and retry controls.
