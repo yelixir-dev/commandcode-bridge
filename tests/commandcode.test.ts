@@ -596,6 +596,72 @@ describe("CommandCode client credential routing", () => {
     expect(postCalls(fetchMock)).toHaveLength(2);
   });
 
+  it("marks the credential as billing when a 400 reports insufficient credits", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      if (init?.method === "POST") {
+        return Response.json(
+          {
+            success: false,
+            error: {
+              code: "BAD_REQUEST",
+              status: 400,
+              message:
+                "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+              docs: "https://commandcode.ai/docs/reference/errors/bad_request",
+            },
+          },
+          { status: 400 },
+        );
+      }
+      throw new Error(`Unexpected fetch ${String(input)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new CommandCodeClient({
+      ...baseConfig,
+      commandCodeCredentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+
+    await expect(collectEvents(client.generate(generateBody))).rejects.toBeInstanceOf(
+      CommandCodeHttpError,
+    );
+    const diagnostics = await client.getCredentialDiagnostics();
+    expect(diagnostics[0]?.disabledUntil).not.toBeNull();
+  });
+
+  it("does not cool down the credential for a plain 400 bad request", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      if (init?.method === "POST") {
+        return Response.json(
+          { error: { code: "BAD_REQUEST", message: "Model not allowed for this plan." } },
+          { status: 400 },
+        );
+      }
+      throw new Error(`Unexpected fetch ${String(input)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new CommandCodeClient({
+      ...baseConfig,
+      commandCodeCredentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+
+    await expect(collectEvents(client.generate(generateBody))).rejects.toBeInstanceOf(
+      CommandCodeHttpError,
+    );
+    const diagnostics = await client.getCredentialDiagnostics();
+    expect(diagnostics[0]?.disabledUntil).toBeNull();
+
+    await expect(collectEvents(client.generate(generateBody))).rejects.toBeInstanceOf(
+      CommandCodeHttpError,
+    );
+    expect(postCalls(fetchMock)).toHaveLength(2);
+  });
+
   it("releases the credential without cooldown when the caller aborts mid-stream", async () => {
     let hanging = true;
     let postStarted: () => void = () => undefined;

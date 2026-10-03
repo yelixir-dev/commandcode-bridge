@@ -10,6 +10,7 @@ import {
   isFatalCredFailure,
   responseBody,
   retryBackoff,
+  upstreamErrorMessage,
 } from "./commandcode.js";
 import {
   NoAvailableCommandCodeCredentialError,
@@ -148,10 +149,12 @@ export class CommandCodeProviderClient {
         this.router.recordSuccess(credential.id);
         finalized = true;
       };
-      const finalizeFailure = (statusCode?: number) => {
+      const finalizeFailure = (statusCode?: number, errorMessage?: string) => {
         if (finalized) return;
-        if (statusCode === undefined) this.router.recordFailure(credential.id);
-        else this.router.recordFailure(credential.id, { statusCode });
+        this.router.recordFailure(credential.id, {
+          ...(statusCode !== undefined ? { statusCode } : {}),
+          ...(errorMessage !== undefined ? { errorMessage } : {}),
+        });
         finalized = true;
       };
       const finalizeRelease = () => {
@@ -168,10 +171,11 @@ export class CommandCodeProviderClient {
             response.statusText,
             await responseBody(response),
           );
-          const fatal = isFatalCredFailure(response.status);
+          const upstreamMessage = upstreamErrorMessage(error.body);
+          const fatal = isFatalCredFailure(response.status, upstreamMessage);
           // Only credential-scoped failures may start a cooldown; provider-scoped
           // statuses like 429/5xx hit every credential at once.
-          if (fatal) finalizeFailure(response.status);
+          if (fatal) finalizeFailure(response.status, upstreamMessage);
           else finalizeRelease();
           lastError = error;
           if (
@@ -191,7 +195,10 @@ export class CommandCodeProviderClient {
       } catch (error) {
         if (error instanceof CommandCodeHttpError && finalized) throw error;
         const statusCode = error instanceof CommandCodeHttpError ? error.status : undefined;
-        if (statusCode !== undefined && isFatalCredFailure(statusCode)) finalizeFailure(statusCode);
+        const upstreamMessage =
+          error instanceof CommandCodeHttpError ? upstreamErrorMessage(error.body) : undefined;
+        const fatal = statusCode !== undefined && isFatalCredFailure(statusCode, upstreamMessage);
+        if (fatal) finalizeFailure(statusCode, upstreamMessage);
         else finalizeRelease();
         lastError = error;
         if (
@@ -199,8 +206,7 @@ export class CommandCodeProviderClient {
           shouldRetryStatus(statusCode) &&
           !effectiveSignal.aborted
         ) {
-          if (statusCode !== undefined && isFatalCredFailure(statusCode))
-            fatalIds.add(credential.id);
+          if (fatal) fatalIds.add(credential.id);
           else if (statusCode !== undefined) retryableFailed.add(credential.id);
           await retryBackoff(attempt, this.config.commandCodeRetryBackoffMs ?? 250);
           continue;

@@ -15,7 +15,7 @@ export interface CommandCodeCredentialState {
   credential: CommandCodeCredential;
   billing?: CommandCodeBillingSnapshot;
   billingError: string | undefined;
-  disabledReason: "auth" | "billing" | "cooldown" | "expired" | undefined;
+  disabledReason: "auth" | "billing" | "cooldown" | "expired" | "insufficient_credits" | undefined;
   disabledUntil: number;
   inFlight: number;
   lastSelectedAt: number;
@@ -102,6 +102,15 @@ export interface SelectCredentialOptions {
 
 export interface RecordFailureOptions {
   statusCode?: number;
+  /** Upstream error text; lets a generic 400 carry credential-scoped meaning (insufficient credits). */
+  errorMessage?: string;
+}
+
+const INSUFFICIENT_CREDITS_PATTERN = /insufficient (?:credits|balance)/i;
+
+/** CommandCode reports an empty balance as a 400 whose body says "insufficient credits". */
+export function isInsufficientCreditsMessage(message: string | undefined): boolean {
+  return message !== undefined && INSUFFICIENT_CREDITS_PATTERN.test(message);
 }
 
 export class NoAvailableCommandCodeCredentialError extends Error {
@@ -500,6 +509,13 @@ export class CommandCodeCredentialRouter {
     } else if (statusCode === 402) {
       state.disabledUntil = this.now() + Math.max(this.cooldownMs, this.billingRefreshMs);
       state.disabledReason = "billing";
+    } else if (statusCode === 400 && isInsufficientCreditsMessage(options.errorMessage)) {
+      // Upstream pre-charges the estimated request cost, so a positive balance
+      // can still be too small to serve. Billing snapshots cannot see that
+      // threshold, so this cooldown must survive billing refreshes and expire
+      // on its own before the key is probed again.
+      state.disabledUntil = this.now() + Math.max(this.cooldownMs, this.billingRefreshMs);
+      state.disabledReason = "insufficient_credits";
     } else if (
       statusCode === undefined ||
       statusCode === 429 ||
@@ -545,10 +561,17 @@ export class CommandCodeCredentialRouter {
       if (expired) {
         state.disabledUntil = Number.MAX_SAFE_INTEGER;
         state.disabledReason = "expired";
-      } else if (remaining > 0 && state.disabledReason !== "auth") {
+      } else if (
+        remaining > 0 &&
+        state.disabledReason !== "auth" &&
+        state.disabledReason !== "insufficient_credits"
+      ) {
         state.disabledUntil = 0;
         state.disabledReason = undefined;
-      } else if (state.disabledUntil !== Number.MAX_SAFE_INTEGER) {
+      } else if (
+        state.disabledUntil !== Number.MAX_SAFE_INTEGER &&
+        state.disabledReason !== "insufficient_credits"
+      ) {
         state.disabledUntil = this.now() + this.billingRefreshMs;
         state.disabledReason = "billing";
       }

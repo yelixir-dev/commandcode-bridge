@@ -1,6 +1,7 @@
 import {
   CommandCodeCredentialRouter,
   type CommandCodeCredentialDiagnostic,
+  isInsufficientCreditsMessage,
   NoAvailableCommandCodeCredentialError,
   type SelectCredentialOptions,
 } from "./credential-router.js";
@@ -202,8 +203,24 @@ function isClientVisibleEvent(event: CommandCodeEvent): boolean {
   return ["text-delta", "reasoning-delta", "tool-call", "finish"].includes(event.type);
 }
 
-export function isFatalCredFailure(statusCode: number | undefined): boolean {
-  return statusCode === 401 || statusCode === 402 || statusCode === 403;
+export function isFatalCredFailure(statusCode: number | undefined, errorMessage?: string): boolean {
+  return (
+    statusCode === 401 ||
+    statusCode === 402 ||
+    statusCode === 403 ||
+    // A bare 400 is provider-scoped (bad model, invalid body), but the same
+    // status with an insufficient-credits body blames this credential only.
+    (statusCode === 400 && isInsufficientCreditsMessage(errorMessage))
+  );
+}
+
+/** Extracts the upstream error text from a parsed HTTP or SSE body for failure classification. */
+export function upstreamErrorMessage(body: unknown): string | undefined {
+  if (typeof body === "string") return body;
+  if (!isRecord(body)) return undefined;
+  const error = isRecord(body.error) ? body.error : undefined;
+  const message = error?.message ?? body.message;
+  return typeof message === "string" && message.length > 0 ? message : undefined;
 }
 
 export function retryBackoff(attempt: number, baseMs: number): Promise<void> {
@@ -413,10 +430,12 @@ export class CommandCodeClient implements CommandCodeUpstream {
         this.router.recordSuccess(credential.id);
         finalized = true;
       };
-      const finalizeFailure = (statusCode?: number) => {
+      const finalizeFailure = (statusCode?: number, errorMessage?: string) => {
         if (finalized) return;
-        if (statusCode === undefined) this.router.recordFailure(credential.id);
-        else this.router.recordFailure(credential.id, { statusCode });
+        this.router.recordFailure(credential.id, {
+          ...(statusCode !== undefined ? { statusCode } : {}),
+          ...(errorMessage !== undefined ? { errorMessage } : {}),
+        });
         finalized = true;
       };
       const finalizeRelease = () => {
@@ -434,13 +453,14 @@ export class CommandCodeClient implements CommandCodeUpstream {
             await responseBody(response),
           );
           lastError = error;
-          const fatal = isFatalCredFailure(response.status);
+          const upstreamMessage = upstreamErrorMessage(error.body);
+          const fatal = isFatalCredFailure(response.status, upstreamMessage);
           const willRetry =
             attempt < maxAttempts - 1 && shouldRetry(response.status) && !effectiveSignal.aborted;
           // Only credential-scoped failures may start a cooldown. Provider-scoped
           // statuses like 429/5xx hit every credential at once, so cooling them
           // down would bench the whole pool over a single upstream incident.
-          if (fatal) finalizeFailure(response.status);
+          if (fatal) finalizeFailure(response.status, upstreamMessage);
           else finalizeRelease();
           if (willRetry) {
             if (fatal) fatalIds.add(credential.id);
@@ -476,13 +496,15 @@ export class CommandCodeClient implements CommandCodeUpstream {
               "CommandCode stream error",
               event,
             );
-            const fatal = statusCode !== undefined && isFatalCredFailure(statusCode);
+            const upstreamMessage = upstreamErrorMessage(event);
+            const fatal =
+              statusCode !== undefined && isFatalCredFailure(statusCode, upstreamMessage);
             const willRetry =
               !emittedVisibleEvent &&
               attempt < maxAttempts - 1 &&
               shouldRetry(statusCode) &&
               !effectiveSignal.aborted;
-            if (fatal) finalizeFailure(statusCode);
+            if (fatal) finalizeFailure(statusCode, upstreamMessage);
             else finalizeRelease();
             if (willRetry) {
               if (fatal) fatalIds.add(credential.id);
@@ -501,13 +523,15 @@ export class CommandCodeClient implements CommandCodeUpstream {
       } catch (error) {
         const statusCode = errorStatusCodeFromUnknown(error);
         lastError = error;
-        const fatal = statusCode !== undefined && isFatalCredFailure(statusCode);
+        const upstreamMessage =
+          error instanceof CommandCodeHttpError ? upstreamErrorMessage(error.body) : undefined;
+        const fatal = statusCode !== undefined && isFatalCredFailure(statusCode, upstreamMessage);
         const willRetry =
           signal?.aborted !== true &&
           attempt < maxAttempts - 1 &&
           shouldRetry(statusCode) &&
           !effectiveSignal.aborted;
-        if (fatal) finalizeFailure(statusCode);
+        if (fatal) finalizeFailure(statusCode, upstreamMessage);
         else finalizeRelease();
         if (willRetry) {
           if (fatal) fatalIds.add(credential.id);

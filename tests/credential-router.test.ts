@@ -482,6 +482,103 @@ describe("CommandCode credential routing", () => {
     ).toBeGreaterThan(now);
   });
 
+  it("marks a 400 insufficient-credits failure as an insufficient-credits cooldown", () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("alpha")],
+      policy: "round_robin",
+      billingRefreshMs: 300_000,
+      cooldownMs: 60_000,
+      now: () => now,
+    });
+
+    router.recordFailure("alpha", {
+      statusCode: 400,
+      errorMessage:
+        "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+    });
+
+    const entry = router.snapshot().find((state) => state.credential.id === "alpha");
+    expect(entry?.disabledReason).toBe("insufficient_credits");
+    expect(entry?.disabledUntil).toBe(now + 300_000);
+  });
+
+  it("keeps an insufficient-credits cooldown across billing refreshes", async () => {
+    let current = now;
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("alpha")],
+      policy: "round_robin",
+      billingRefreshMs: 300_000,
+      cooldownMs: 60_000,
+      now: () => current,
+      billingProvider: async () => ({
+        fetchedAt: current,
+        monthlyCredits: 0.09,
+        purchasedCredits: 0,
+        freeCredits: 0,
+        currentPeriodEnd: new Date(current + 8 * DAY_MS).toISOString(),
+      }),
+    });
+
+    router.recordFailure("alpha", {
+      statusCode: 400,
+      errorMessage:
+        "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+    });
+
+    current = now + 10_000;
+    await router.refreshAllBilling({ force: true });
+
+    const entry = router.snapshot().find((state) => state.credential.id === "alpha");
+    expect(entry?.disabledReason).toBe("insufficient_credits");
+    expect(entry?.disabledUntil).toBe(now + 300_000);
+  });
+
+  it("clears a 402 billing cooldown when fresh billing shows credits", async () => {
+    let current = now;
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("alpha")],
+      policy: "round_robin",
+      billingRefreshMs: 300_000,
+      cooldownMs: 60_000,
+      now: () => current,
+      billingProvider: async () => ({
+        fetchedAt: current,
+        monthlyCredits: 5,
+        purchasedCredits: 0,
+        freeCredits: 0,
+        currentPeriodEnd: new Date(current + 8 * DAY_MS).toISOString(),
+      }),
+    });
+
+    router.recordFailure("alpha", { statusCode: 402 });
+    current = now + 10_000;
+    await router.refreshAllBilling({ force: true });
+
+    const entry = router.snapshot().find((state) => state.credential.id === "alpha");
+    expect(entry?.disabledReason).toBeUndefined();
+    expect(entry?.disabledUntil).toBe(0);
+  });
+
+  it("does not cool down a credential for a plain 400 failure", () => {
+    const router = new CommandCodeCredentialRouter({
+      credentials: [credential("alpha")],
+      policy: "round_robin",
+      billingRefreshMs: 300_000,
+      cooldownMs: 60_000,
+      now: () => now,
+    });
+
+    router.recordFailure("alpha", {
+      statusCode: 400,
+      errorMessage: "Model not allowed for this plan.",
+    });
+    router.recordFailure("alpha", { statusCode: 400 });
+
+    const entry = router.snapshot().find((state) => state.credential.id === "alpha");
+    expect(entry?.disabledReason).toBeUndefined();
+    expect(entry?.disabledUntil).toBe(0);
+  });
+
   it("skips keys with an exhausted rolling window regardless of policy priority", async () => {
     const router = new CommandCodeCredentialRouter({
       credentials: [{ ...credential("quota-hit"), weight: 100 }, credential("open")],
