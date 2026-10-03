@@ -412,6 +412,52 @@ describe("provider chat client", () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 
+  it("rotates to the next credential when a 400 reports insufficient credits", async () => {
+    const postResponses = [
+      Response.json(
+        {
+          error: {
+            message:
+              "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+          },
+        },
+        { status: 400 },
+      ),
+      Response.json({ id: "chatcmpl_ok", choices: [] }, { status: 200 }),
+    ];
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      return postResponses.shift()!;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new CommandCodeProviderClient(
+      providerConfig({
+        commandCodeCredentials: [
+          { id: "alpha", apiKey: "a-secret", weight: 1 },
+          { id: "beta", apiKey: "b-secret", weight: 1 },
+        ],
+      }),
+    );
+    const response = await client.chat(
+      buildProviderChatRequestBody(
+        { model: "default", messages: [{ role: "user", content: "hi" }] },
+        "deepseek/deepseek-v4-pro",
+      ),
+    );
+
+    expect(response.ok).toBe(true);
+    const posts = postCalls(fetchMock);
+    expect(posts).toHaveLength(2);
+    expect((posts[0]?.[1] as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer a-secret",
+    });
+    expect((posts[1]?.[1] as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer b-secret",
+    });
+  });
+
   it("retries a transient provider failure up to the configured budget", async () => {
     let postCount = 0;
     const fetchMock = vi.fn<typeof fetch>(async (input) => {

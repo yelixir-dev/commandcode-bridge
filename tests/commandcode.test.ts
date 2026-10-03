@@ -662,6 +662,104 @@ describe("CommandCode client credential routing", () => {
     expect(postCalls(fetchMock)).toHaveLength(2);
   });
 
+  it("rotates to the next credential when a 400 reports insufficient credits", async () => {
+    const postResponses = [
+      Response.json(
+        {
+          success: false,
+          error: {
+            code: "BAD_REQUEST",
+            status: 400,
+            message:
+              "You have insufficient credits to make this request. Please purchase more credits to continue using the service.",
+          },
+        },
+        { status: 400 },
+      ),
+      new Response(
+        'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+        { status: 200 },
+      ),
+    ];
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      if (init?.method === "POST") return postResponses.shift()!;
+      throw new Error(`Unexpected fetch ${String(input)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new CommandCodeClient(baseConfig);
+    const events = await collectEvents(client.generate(generateBody));
+
+    const posts = postCalls(fetchMock);
+    expect(posts).toHaveLength(2);
+    expect((posts[0]?.[1] as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer alpha-secret",
+    });
+    expect((posts[1]?.[1] as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer beta-secret",
+    });
+    expect(events).toContainEqual(expect.objectContaining({ type: "text-delta", text: "ok" }));
+    expect(events).not.toContainEqual(expect.objectContaining({ type: "error" }));
+
+    const diagnostics = await client.getCredentialDiagnostics();
+    expect(diagnostics[0]?.disabledUntil).not.toBeNull();
+    expect(diagnostics[1]?.disabledUntil).toBeNull();
+  });
+
+  it("fails fast on a plain 400 instead of rotating credentials", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      if (init?.method === "POST") {
+        return Response.json(
+          { error: { code: "BAD_REQUEST", message: "Model not allowed for this plan." } },
+          { status: 400 },
+        );
+      }
+      throw new Error(`Unexpected fetch ${String(input)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new CommandCodeClient(baseConfig);
+
+    await expect(collectEvents(client.generate(generateBody))).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(postCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("rotates to the next credential when the first key is forbidden", async () => {
+    const postResponses = [
+      Response.json({ error: { message: "key revoked" } }, { status: 403 }),
+      new Response(
+        'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+        { status: 200 },
+      ),
+    ];
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      if (init?.method === "POST") return postResponses.shift()!;
+      throw new Error(`Unexpected fetch ${String(input)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new CommandCodeClient(baseConfig);
+    const events = await collectEvents(client.generate(generateBody));
+
+    const posts = postCalls(fetchMock);
+    expect(posts).toHaveLength(2);
+    expect((posts[0]?.[1] as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer alpha-secret",
+    });
+    expect((posts[1]?.[1] as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer beta-secret",
+    });
+    expect(events).toContainEqual(expect.objectContaining({ type: "text-delta", text: "ok" }));
+  });
+
   it("releases the credential without cooldown when the caller aborts mid-stream", async () => {
     let hanging = true;
     let postStarted: () => void = () => undefined;

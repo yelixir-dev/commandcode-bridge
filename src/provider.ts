@@ -10,6 +10,7 @@ import {
   isFatalCredFailure,
   responseBody,
   retryBackoff,
+  shouldRetryStatus,
   upstreamErrorMessage,
 } from "./commandcode.js";
 import {
@@ -47,17 +48,6 @@ export function buildProviderChatRequestBody(
   if (request.stream_options !== undefined) body.stream_options = request.stream_options;
   if (request.user !== undefined) body.user = request.user;
   return body;
-}
-
-function shouldRetryStatus(statusCode: number | undefined): boolean {
-  return (
-    statusCode === undefined ||
-    statusCode === 401 ||
-    statusCode === 402 ||
-    statusCode === 403 ||
-    statusCode === 429 ||
-    statusCode >= 500
-  );
 }
 
 export async function probeProviderAccess(
@@ -180,7 +170,7 @@ export class CommandCodeProviderClient {
           lastError = error;
           if (
             attempt < maxAttempts - 1 &&
-            shouldRetryStatus(response.status) &&
+            shouldRetryStatus(response.status, upstreamMessage) &&
             !effectiveSignal.aborted
           ) {
             if (fatal) fatalIds.add(credential.id);
@@ -203,7 +193,7 @@ export class CommandCodeProviderClient {
         lastError = error;
         if (
           attempt < maxAttempts - 1 &&
-          shouldRetryStatus(statusCode) &&
+          shouldRetryStatus(statusCode, upstreamMessage) &&
           !effectiveSignal.aborted
         ) {
           if (fatal) fatalIds.add(credential.id);

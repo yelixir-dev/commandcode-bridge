@@ -189,13 +189,18 @@ function errorStatusCodeFromUnknown(error: unknown): number | undefined {
   return error instanceof CommandCodeHttpError ? error.status : undefined;
 }
 
-function shouldRetry(statusCode: number | undefined): boolean {
+export function shouldRetryStatus(statusCode: number | undefined, errorMessage?: string): boolean {
   return (
     statusCode === undefined ||
     statusCode === 401 ||
     statusCode === 402 ||
+    statusCode === 403 ||
     statusCode === 429 ||
-    statusCode >= 500
+    statusCode >= 500 ||
+    // A bare 400 is client-scoped and must fail fast, but the
+    // insufficient-credits variant blames this credential only: another key can
+    // still serve the request, so rotate instead of failing.
+    (statusCode === 400 && isInsufficientCreditsMessage(errorMessage))
   );
 }
 
@@ -456,7 +461,9 @@ export class CommandCodeClient implements CommandCodeUpstream {
           const upstreamMessage = upstreamErrorMessage(error.body);
           const fatal = isFatalCredFailure(response.status, upstreamMessage);
           const willRetry =
-            attempt < maxAttempts - 1 && shouldRetry(response.status) && !effectiveSignal.aborted;
+            attempt < maxAttempts - 1 &&
+            shouldRetryStatus(response.status, upstreamMessage) &&
+            !effectiveSignal.aborted;
           // Only credential-scoped failures may start a cooldown. Provider-scoped
           // statuses like 429/5xx hit every credential at once, so cooling them
           // down would bench the whole pool over a single upstream incident.
@@ -502,7 +509,7 @@ export class CommandCodeClient implements CommandCodeUpstream {
             const willRetry =
               !emittedVisibleEvent &&
               attempt < maxAttempts - 1 &&
-              shouldRetry(statusCode) &&
+              shouldRetryStatus(statusCode, upstreamMessage) &&
               !effectiveSignal.aborted;
             if (fatal) finalizeFailure(statusCode, upstreamMessage);
             else finalizeRelease();
@@ -529,7 +536,7 @@ export class CommandCodeClient implements CommandCodeUpstream {
         const willRetry =
           signal?.aborted !== true &&
           attempt < maxAttempts - 1 &&
-          shouldRetry(statusCode) &&
+          shouldRetryStatus(statusCode, upstreamMessage) &&
           !effectiveSignal.aborted;
         if (fatal) finalizeFailure(statusCode, upstreamMessage);
         else finalizeRelease();
