@@ -760,6 +760,68 @@ describe("CommandCode client credential routing", () => {
     expect(events).toContainEqual(expect.objectContaining({ type: "text-delta", text: "ok" }));
   });
 
+  it("releases the credential when the consumer stops after a streamed event", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      return new Response(
+        'data: {"type":"text-delta","text":"ok"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new CommandCodeClient({
+      ...baseConfig,
+      commandCodeCredentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+      commandCodeMaxInFlightPerCredential: 1,
+    });
+    const iteration = client.generate(generateBody)[Symbol.asyncIterator]();
+    expect((await iteration.next()).value).toMatchObject({ type: "text-delta" });
+    await iteration.return?.();
+
+    expect((await client.getCredentialDiagnostics())[0]?.inFlight).toBe(0);
+    const events = await collectEvents(client.generate(generateBody));
+    expect(events).toContainEqual(expect.objectContaining({ type: "text-delta", text: "ok" }));
+  });
+
+  it("does not replay a partially delivered turn after a socket failure", async () => {
+    let posts = 0;
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const billing = billingResponse(String(input));
+      if (billing) return billing;
+      posts += 1;
+      if (posts > 1) {
+        return new Response(
+          'data: {"type":"text-delta","text":"replayed"}\ndata: {"type":"finish","finishReason":"stop"}\n',
+        );
+      }
+      let sent = false;
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (sent) controller.error(new Error("socket lost after text"));
+            else {
+              sent = true;
+              controller.enqueue(
+                new TextEncoder().encode('data: {"type":"text-delta","text":"partial"}\n'),
+              );
+            }
+          },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new CommandCodeClient({
+      ...baseConfig,
+      commandCodeCredentials: [{ id: "alpha", apiKey: "alpha-secret", weight: 1 }],
+    });
+    const iteration = client.generate(generateBody)[Symbol.asyncIterator]();
+    expect((await iteration.next()).value).toMatchObject({ type: "text-delta", text: "partial" });
+    await expect(iteration.next()).rejects.toThrow("socket lost after text");
+    expect(posts).toBe(1);
+    expect((await client.getCredentialDiagnostics())[0]?.inFlight).toBe(0);
+  });
+
   it("releases the credential without cooldown when the caller aborts mid-stream", async () => {
     let hanging = true;
     let postStarted: () => void = () => undefined;

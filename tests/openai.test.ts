@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NoAvailableCommandCodeCredentialError } from "../src/credential-router.js";
 
 import {
   collectOpenAICompletion,
@@ -77,6 +78,36 @@ function parseSsePayloads(chunks: string[]): unknown[] {
 }
 
 describe("CommandCode to OpenAI conversion", () => {
+  it("reports unavailable credentials as a typed 503 error in streams", async () => {
+    const chunks: string[] = [];
+    for await (const chunk of streamOpenAIChunks({
+      id: "chatcmpl_no_credential",
+      created: 1778420000,
+      model: "deepseek/deepseek-v4.1-flash",
+      events: {
+        [Symbol.asyncIterator]() {
+          return {
+            next: async () => {
+              throw new NoAvailableCommandCodeCredentialError();
+            },
+          };
+        },
+      },
+    }))
+      chunks.push(chunk);
+    expect(parseSsePayloads(chunks)).toEqual([
+      {
+        error: {
+          message: "No available CommandCode credentials",
+          type: "upstream_error",
+          code: "commandcode_no_available_credential",
+          upstream_status: 503,
+        },
+      },
+    ]);
+    expect(chunks.at(-1)).toBe("data: [DONE]\n\n");
+  });
+
   it("maps usage fields", () => {
     expect(
       mapUsageToOpenAI({

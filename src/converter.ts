@@ -293,7 +293,8 @@ export function buildCommandCodeGenerateBody(
     model: options.upstreamModel,
     messages: convertMessages(messagesForModel(options.request.messages, options.upstreamModel)),
     tools: convertOpenAITools(options.request.tools, options.request.tool_choice),
-    system: buildSystemPrompt(options.request),
+    // ponytail: a blank string triggers the upstream default agent preamble.
+    system: buildSystemPrompt(options.request) || " ",
     max_tokens: options.request.max_tokens ?? 64_000,
     stream: true,
   };

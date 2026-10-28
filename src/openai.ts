@@ -1,4 +1,5 @@
 import { CommandCodeAuthError, CommandCodeHttpError } from "./commandcode.js";
+import { NoAvailableCommandCodeCredentialError } from "./credential-router.js";
 import type {
   CommandCodeEvent,
   CommandCodeUsage,
@@ -290,6 +291,17 @@ function toolCallDelta(toolCall: OpenAIToolCall, index: number): Record<string, 
 }
 
 function streamExceptionPayload(error: unknown): unknown {
+  if (error instanceof NoAvailableCommandCodeCredentialError) {
+    return {
+      error: {
+        message: error.message,
+        type: "upstream_error",
+        code: "commandcode_no_available_credential",
+        upstream_status: 503,
+      },
+    };
+  }
+
   if (error instanceof CommandCodeAuthError) {
     return {
       error: {

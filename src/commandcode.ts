@@ -453,6 +453,7 @@ export class CommandCodeClient implements CommandCodeUpstream {
         finalized = true;
       };
 
+      let emittedVisibleEvent = false;
       try {
         const response = await this.fetchGenerate(body, credential, effectiveSignal);
         if (!response.ok) {
@@ -498,7 +499,6 @@ export class CommandCodeClient implements CommandCodeUpstream {
           throw error;
         }
 
-        let emittedVisibleEvent = false;
         for await (const event of parseCommandCodeStream(response.body)) {
           const statusCode = errorStatusCode(event);
           if (event.type === "error") {
@@ -538,6 +538,7 @@ export class CommandCodeClient implements CommandCodeUpstream {
           error instanceof CommandCodeHttpError ? upstreamErrorMessage(error.body) : undefined;
         const fatal = statusCode !== undefined && isFatalCredFailure(statusCode, upstreamMessage);
         const willRetry =
+          !emittedVisibleEvent &&
           signal?.aborted !== true &&
           attempt < maxAttempts - 1 &&
           shouldRetryStatus(statusCode, upstreamMessage) &&
@@ -551,6 +552,9 @@ export class CommandCodeClient implements CommandCodeUpstream {
           continue;
         }
         throw error;
+      } finally {
+        // Consumers may return while suspended at yield, without entering catch.
+        finalizeRelease();
       }
     }
 

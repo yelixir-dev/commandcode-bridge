@@ -9,6 +9,20 @@ import {
 } from "../src/converter.js";
 
 describe("OpenAI to CommandCode conversion", () => {
+  it("uses a nonempty placeholder to prevent the upstream default agent prompt", () => {
+    const body = buildCommandCodeGenerateBody({
+      request: {
+        model: "deepseek/deepseek-v4.1-flash",
+        messages: [{ role: "user", content: "hi" }],
+      },
+      upstreamModel: "deepseek/deepseek-v4.1-flash",
+    });
+    expect(body.params.system).toBe(" ");
+    expect(body.memory).toBeNull();
+    expect(body.taste).toBeNull();
+    expect(body.skills).toBeNull();
+  });
+
   it("forwards temperature but never top_p or stop, matching the CommandCode CLI wire body", () => {
     const body = buildCommandCodeGenerateBody({
       request: {
